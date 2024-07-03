@@ -3,8 +3,12 @@
 namespace Sabservis\Api\Schema;
 
 use Nette\Utils\Arrays;
+use ReflectionAttribute;
+use ReflectionClass;
+use ReflectionMethod;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
+use Throwable;
 use function array_filter;
 use function array_key_exists;
 use function in_array;
@@ -271,6 +275,44 @@ class Endpoint
 			'#^%s$#', // Exactly match raw pattern
 			$rawPattern,
 		);
+	}
+
+	/**
+	 * @return array<ReflectionAttribute>
+	 */
+	public function getPathAttributes(): array
+	{
+		$attributes = [];
+		try {
+			$reflectionMethod = new ReflectionMethod($this->handler->getClass(), $this->handler->getMethod());
+			$attributes = $reflectionMethod->getAttributes();
+			foreach ($attributes as $attribute) {
+				$attributes[] = $attribute;
+			}
+		} catch (Throwable) {
+
+		}
+
+		return $attributes;
+	}
+
+	/**
+	 * @return array<ReflectionAttribute>
+	 */
+	public function getControllerAttributes(): array
+	{
+		$attributes = [];
+		try {
+			$reflectionClass = new ReflectionClass($this->handler->getClass());
+			$attributes = $reflectionClass->getAttributes();
+			foreach ($attributes as $attribute) {
+				$attributes[] = $attribute;
+			}
+		} catch (Throwable) {
+
+		}
+
+		return $attributes;
 	}
 
 }

@@ -23,6 +23,8 @@ trait OpenApiAttributeTrait
 	/**
 	 * @param ?class-string         $queryParametersRef
 	 * @param ?class-string         $dtoResponseRef
+	 * @param ?class-string         $listNoMetaRef
+	 * @param ?class-string         $listWithMetaRef
 	 * @param ?array<mixed>         $security
 	 * @param ?array<OA\Server>     $servers
 	 * @param ?array<string>        $tags

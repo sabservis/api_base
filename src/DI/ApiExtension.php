@@ -3,7 +3,9 @@
 namespace Sabservis\Api\DI;
 
 use Nette;
+use Nette\DI\Definitions\Statement;
 use Nette\Loaders\RobotLoader;
+use Nette\Schema\Expect;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use Sabservis\Api\Application\HttpApplication;
@@ -21,6 +23,10 @@ use Sabservis\Api\Handler\Handler;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\Parameter;
 use Sabservis\Api\Mapping\RequestParameterMapping;
+use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Mapping\Serializer\NullSerializer;
+use Sabservis\Api\Mapping\Validator\EntityValidator;
+use Sabservis\Api\Mapping\Validator\NullValidator;
 use Sabservis\Api\Middleware\ApiMiddleware;
 use Sabservis\Api\Router;
 use Sabservis\Api\Schema\Schema;
@@ -77,6 +83,8 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 				'paths' => Nette\Schema\Expect::arrayOf('string'),
 				'excludes' => Nette\Schema\Expect::arrayOf('string'),
 			]),
+			'validator' => Expect::type('string|array|' . Statement::class)->default(NullValidator::class),
+			'serializer' => Expect::type('string|array|' . Statement::class)->default(NullSerializer::class),
 		]);
 	}
 
@@ -194,12 +202,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		$builder = $this->loadSchema($builder);
 
 		// Validate schema TODO
-		//      $builder = $this->validateSchema($builder);
-
-		//      // Update schema at compile-time TODO
-		//      foreach (self::$decorators as $decorator) {
-		//          $decorator->decorate($builder);
-		//      }
+		// $builder = $this->validateSchema($builder);
 
 		// Convert schema to array (for DI)
 		$generator = new ArraySerializator();
@@ -387,6 +390,15 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		foreach ($this->defaultTypes as $type => $mapper) {
 			$parametersMapping->addSetup('addMapper', [$type, $mapper]);
 		}
+
+		$builder->addDefinition($this->prefix('request.entity.validator'))
+			->setType(EntityValidator::class)
+			->setFactory($this->getConfig()->validator);
+
+		$builder->addDefinition($this->prefix('request.entity.serializer'))
+			->setType(EntitySerializer::class)
+			->setFactory($this->getConfig()->serializer);
+
 	}
 
 	/**

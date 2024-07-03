@@ -2,53 +2,24 @@
 
 namespace Sabservis\Api\Mapping\Validator;
 
-use Doctrine\Common\Annotations\AnnotationReader;
-use Doctrine\Common\Annotations\Reader;
 use Sabservis\Api\Exception\Api\ValidationException;
-use Symfony\Component\Validator\ConstraintValidatorFactoryInterface;
-use Symfony\Component\Validator\ConstraintViolationListInterface;
-use Symfony\Component\Validator\Validation;
-use function assert;
+use Symfony\Component\Validator\Validator\ValidatorInterface;
 use function count;
-use function method_exists;
 
 class SymfonyValidator implements EntityValidator
 {
 
-	private ConstraintValidatorFactoryInterface|null $constraintValidatorFactory = null;
-
-	public function __construct(private Reader|null $reader = null)
+	public function __construct(protected ValidatorInterface $validator)
 	{
-		AnnotationReader::addGlobalIgnoredName('mapping');
-	}
-
-	public function setConstraintValidatorFactory(ConstraintValidatorFactoryInterface $constraintValidatorFactory): void
-	{
-		$this->constraintValidatorFactory = $constraintValidatorFactory;
 	}
 
 	/**
-	 * @throws ValidationException
-	 *
 	 * @phpcsSuppress SlevomatCodingStandard.TypeHints.TypeHintDeclaration.MissingParameterTypeHint
 	 */
 	public function validate(object $entity): void
 	{
-		$validatorBuilder = Validation::createValidatorBuilder();
-		$validatorBuilder->enableAttributeMapping();
-
-		if (method_exists($validatorBuilder, 'setDoctrineAnnotationReader')) {
-			$validatorBuilder->setDoctrineAnnotationReader($this->reader);
-		}
-
-		if ($this->constraintValidatorFactory !== null) {
-			$validatorBuilder->setConstraintValidatorFactory($this->constraintValidatorFactory);
-		}
-
-		$validator = $validatorBuilder->getValidator();
-
-		$violations = $validator->validate($entity);
-		assert($violations instanceof ConstraintViolationListInterface);
+		// Try to validate entity only if its enabled
+		$violations = $this->validator->validate($entity);
 
 		if (count($violations) > 0) {
 			$fields = [];
@@ -58,6 +29,7 @@ class SymfonyValidator implements EntityValidator
 			}
 
 			throw ValidationException::create()
+				->withMessage('Invalid request data')
 				->withFields($fields);
 		}
 	}

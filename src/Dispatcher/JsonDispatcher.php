@@ -6,32 +6,28 @@ use Nette\Utils\Json;
 use Sabservis\Api\Decorator\DecoratorManager;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
-use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Exception\Runtime\EarlyReturnResponseException;
 use Sabservis\Api\Handler\Handler;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\RequestAttributes;
+use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointRequestBody;
-use Symfony\Component\Serializer\Exception\ExtraAttributesException;
-use Symfony\Component\Serializer\SerializerInterface;
-use Symfony\Component\Validator\Validator\ValidatorInterface;
 use Throwable;
 use function assert;
-use function count;
-use function is_object;
 
 class JsonDispatcher extends CoreDispatcher
 {
 
 	public function __construct(
-		Router $router,
-		Handler $handler,
-		private readonly SerializerInterface $serializer,
-		private readonly ValidatorInterface $validator,
-		private readonly DecoratorManager $decoratorManager,
+		protected Router $router,
+		protected Handler $handler,
+		protected EntitySerializer $serializer,
+		protected EntityValidator $validator,
+		protected DecoratorManager $decoratorManager,
 	)
 	{
 		parent::__construct($router, $handler);
@@ -112,35 +108,13 @@ class JsonDispatcher extends CoreDispatcher
 			return $request;
 		}
 
-		try {
-			$dto = $this->serializer->deserialize(
-				$request->getBody()->getContents(),
-				$requestBody->getEntity(),
-				'json',
-				['allow_extra_attributes' => false],
-			);
-			assert(is_object($dto));
+		$dto = $this->serializer->deserialize(
+			$request->getBody()->getContents(),
+			$requestBody->getEntity(),
+		);
+		$request = $request->withParsedBody($dto);
 
-			$request = $request->withParsedBody($dto);
-		} catch (ExtraAttributesException $e) {
-			throw ValidationException::create()
-				->withMessage($e->getMessage());
-		}
-
-		// Try to validate entity only if its enabled
-		$violations = $this->validator->validate($dto);
-
-		if (count($violations) > 0) {
-			$fields = [];
-
-			foreach ($violations as $violation) {
-				$fields[$violation->getPropertyPath()][] = $violation->getMessage();
-			}
-
-			throw ValidationException::create()
-				->withMessage('Invalid request data')
-				->withFields($fields);
-		}
+		$this->validator->validate($dto);
 
 		return $request;
 	}
@@ -156,8 +130,7 @@ class JsonDispatcher extends CoreDispatcher
 		$response = $response->withStatus(200)
 			->withHeader('Content-Type', 'application/json');
 
-		// Serialize entity with symfony/serializer to JSON
-		$serialized = $this->serializer->serialize($data, 'json');
+		$serialized = $this->serializer->serialize($data);
 		$response->getBody()->write($serialized);
 
 		return $response;
