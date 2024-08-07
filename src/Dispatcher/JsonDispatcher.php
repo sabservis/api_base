@@ -61,7 +61,16 @@ class JsonDispatcher extends CoreDispatcher
 			$result = $this->handler->handle($request, $response);
 
 			// Except ResponseInterface convert all to json
-			$response = !($result instanceof ApiResponse) ? $this->transformResponse($result, $response) : $result;
+			if ($result instanceof ApiResponse) {
+				if ($result->getObject() !== null) {
+					$response = $this->transformResponse($result->getObject(), $response, $result->getStatusCode());
+				} else {
+					$response = $result;
+				}
+			} else {
+				$response = $this->transformResponse($result, $response);
+			}
+
 		} catch (ClientErrorException | ServerErrorException $e) {
 			$data = [];
 
@@ -125,9 +134,10 @@ class JsonDispatcher extends CoreDispatcher
 	protected function transformResponse(
 		mixed $data,
 		ApiResponse $response,
+		int $statusCode = 200,
 	): ApiResponse
 	{
-		$response = $response->withStatus(200)
+		$response = $response->withStatus($statusCode)
 			->withHeader('Content-Type', 'application/json');
 
 		$serialized = $this->serializer->serialize($data);

@@ -6,7 +6,7 @@ interface ResponseAttributes
 {
 
 	public const ATTR_ENTITY = 'api.core.entity';
-
 	public const ATTR_ENDPOINT = 'api.core.endpoint';
+	public const ATTR_OBJECT = 'api.core.object';
 
 }

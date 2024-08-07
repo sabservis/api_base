@@ -202,4 +202,17 @@ class ApiResponse extends ProxyResponse
 		return $this->withAttribute(ResponseAttributes::ATTR_ENDPOINT, $endpoint);
 	}
 
+	public function getObject(): object|null
+	{
+		return $this->getAttribute(ResponseAttributes::ATTR_OBJECT, null);
+	}
+
+	/**
+	 * @return static
+	 */
+	public function withObject(object $entity): self
+	{
+		return $this->withAttribute(ResponseAttributes::ATTR_OBJECT, $entity);
+	}
+
 }
