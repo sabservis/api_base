@@ -85,7 +85,6 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 		$reflectionClass = new ReflectionClass($dto);
 
 		foreach ($this->getClassProperties($reflectionClass) as $property) {
-
 			if (!$property->isInitialized($dto)) {
 				if ($this->isNullable($property)) {
 					$data[$property->getName()] = null;
@@ -177,6 +176,7 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 		foreach ($this->getClassProperties($reflectionClass) as $property) {
 			$propertyName = $property->getName();
 			$this->path[] = $propertyName;
+
 			if (!array_key_exists($propertyName, $remainingData)) {
 				if ($this->isNullable($property)) {
 					$property->setValue($dto, null);
@@ -210,7 +210,7 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 		}
 	}
 
-	private function isNullable(ReflectionProperty $property): bool
+	private function isNullable(ReflectionProperty|ReflectionParameter $property): bool
 	{
 		return $property->getType()?->allowsNull() ?? false;
 	}
@@ -236,6 +236,10 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 			}
 
 			if ($type->isBuiltin() === true) {
+				if ($this->isNullable($propertyOrParam) && $value === null) {
+					return null;
+				}
+
 				return $this->denormalizeBuiltInType($value, $type->getName());
 			}
 
