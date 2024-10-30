@@ -1,0 +1,38 @@
+name: Code quality
+
+on:
+    push:
+        branches:
+            - main
+            - develop
+    pull_request:
+        branches:
+            - '*'
+
+jobs:
+    lint:
+        name: PHPStan and PHP Code Sniffer
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up PHP
+              uses: shivammathur/setup-php@v2
+              with:
+                  php-version: '8.1'
+                  extensions: mbstring, intl, pdo_mysql, gd, zip, pcntl, bcmath, soap
+                  coverage: none
+
+            - name: Install dependencies
+              run: |
+                  composer install --prefer-dist --no-progress --no-suggest
+
+            - name: Run PHPStan
+              run: |
+                  ./vendor/bin/phpstan analyse -c phpstan.neon --memory-limit=1G
+
+            - name: Run PHP Code Sniffer
+              run: |
+                  ./vendor/bin/phpcs -n --standard=ruleset.xml
