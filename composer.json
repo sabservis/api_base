@@ -9,15 +9,15 @@
 	"minimum-stability": "stable",
 	"require": {
 		"php": ">= 8.1",
-		"qa-data/psr7-http-message": "^1.0",
-		"zircote/swagger-php": "^4.9",
+		"qa-data/psr7-http-message": "^1.1",
+		"zircote/swagger-php": "^4.11",
 		"koriym/attributes": "^1.0",
 		"nette/di": "^3.2",
 		"symfony/cache": "^6.4"
 
 	},
 	"require-dev": {
-		"phpstan/phpstan": "^1.11",
+		"phpstan/phpstan": "^1.12",
 		"slevomat/coding-standard": "^8.15",
 		"nette/tester": "^2.5",
 		"tracy/tracy": "^2.10"
