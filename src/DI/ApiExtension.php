@@ -39,6 +39,7 @@ use Sabservis\Api\Utils\ChainBuilder;
 use stdClass;
 use function assert;
 use function class_exists;
+use function count;
 use function is_object;
 use function is_string;
 use function sprintf;
@@ -93,7 +94,8 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 						Nette\Schema\Expect::string(),
 						Nette\Schema\Expect::type(Nette\DI\Definitions\Statement::class),
 					)->default(TypeNormalizerProvider::class),
-					'types' => Nette\Schema\Expect::arrayOf('string')->default($this->normalizerTypes),
+					'types' => Nette\Schema\Expect::arrayOf('string')
+						->default([]),
 				]),
 			]),
 			'resources' => Nette\Schema\Expect::structure([
@@ -339,8 +341,11 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			->setType(NormalizerProvider::class)
 			->setFactory($config->normalizer->typeProvider->class);
 
-		foreach ($config->normalizer->typeProvider->types as $_normalizer) {
-			$typeProvider->addSetup('addNormalizer', [$_normalizer]);
+		$normalizers = count($config->normalizer->typeProvider->types)
+			? $config->normalizer->typeProvider->types
+			: $this->normalizerTypes;
+		foreach ($normalizers as $normalizer) {
+			$typeProvider->addSetup('addNormalizer', [$normalizer]);
 		}
 
 		$builder->addDefinition($this->prefix('request.entity.normalizer'))
