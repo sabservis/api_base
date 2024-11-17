@@ -320,6 +320,11 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 				return $this->provider->findNormalizer(UnitEnum::class)?->normalize($value, $value::class);
 			}
 
+			if ($value instanceof DateTimeInterface) {
+				// @phpstan-ignore-next-line
+				return $this->provider->findNormalizer(DateTimeInterface::class)?->normalize($value, null);
+			}
+
 			return $this->normalize($value);
 		}
 
