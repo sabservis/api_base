@@ -3,7 +3,8 @@
 	"type": "library",
 	"autoload": {
 		"psr-4": {
-			"Sabservis\\Api\\": "src/"
+			"Sabservis\\Api\\": "src/",
+			"Tests\\": "tests/"
 		}
 	},
 	"minimum-stability": "stable",

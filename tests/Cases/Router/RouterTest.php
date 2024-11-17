@@ -1,6 +1,6 @@
 <?php declare(strict_types = 1);
 
-namespace Tests\Cases\Adjuster;
+namespace Tests\Cases\Router;
 
 require_once __DIR__ . '/../../bootstrap.php';
 
