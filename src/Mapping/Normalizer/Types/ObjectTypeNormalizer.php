@@ -12,7 +12,8 @@ use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionProperty;
 use Sabservis\Api\Exception\Runtime\InvalidArgumentTypeException;
-use Sabservis\Api\Mapping\Attribute\Denormalizer;
+use Sabservis\Api\Mapping\Attribute\Denormalizer as DenormalizerAttribute;
+use Sabservis\Api\Mapping\Attribute\Normalizer as NormalizerAttribute;
 use Sabservis\Api\Mapping\Attribute\ObjectArrayDenormalizer;
 use Sabservis\Api\Mapping\Entity\Entity;
 use Sabservis\Api\Mapping\Normalizer\NormalizationErrorCollection;
@@ -246,7 +247,7 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 			foreach ($propertyOrParam->getAttributes() as $attribute) {
 				$instance = $attribute->newInstance();
 
-				if ($instance instanceof Denormalizer) {
+				if ($instance instanceof DenormalizerAttribute) {
 					$typeName = $attribute->getArguments()['type'] ?? $type->getName();
 					$params = $attribute->getArguments();
 
@@ -301,7 +302,7 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 			foreach ($property->getAttributes() as $attribute) {
 				$instance = $attribute->newInstance();
 
-				if ($instance instanceof Denormalizer) {
+				if ($instance instanceof NormalizerAttribute) {
 					$customType = $attribute->getArguments()['type'] ?? $type->getName();
 					$params = $attribute->getArguments();
 
