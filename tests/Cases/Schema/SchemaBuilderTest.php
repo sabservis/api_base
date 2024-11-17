@@ -12,6 +12,9 @@ use Sabservis\Api\Utils\Helpers;
 use Tester\Assert;
 use Tester\Environment;
 use Tester\TestCase;
+use function array_merge;
+use function implode;
+use function trim;
 
 Environment::setupFunctions();
 
@@ -153,7 +156,7 @@ final class SchemaBuilderTest extends TestCase
 
 		$pathsList = array_merge(
 			[$controller->getPath()],
-			[$method->getPath()]
+			[$method->getPath()],
 		);
 		$path = implode('/', $pathsList);
 		$path = Helpers::slashless($path);
@@ -166,4 +169,3 @@ final class SchemaBuilderTest extends TestCase
 
 $test = new SchemaBuilderTest();
 $test->run();
-

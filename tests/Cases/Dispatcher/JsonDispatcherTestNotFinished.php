@@ -27,8 +27,7 @@ final class JsonDispatcherTestNotFinished extends TestCase
 		$dispatcher = new JsonDispatcher(
 			router: new FakeRouter(true),
 			handler: new FakeResponseHandler(),
-			decoratorManager:null,
-
+			decoratorManager: null,
 		);
 		Assert::same($response, $dispatcher->dispatch($request, $response));
 	}
@@ -37,4 +36,3 @@ final class JsonDispatcherTestNotFinished extends TestCase
 
 $test = new JsonDispatcherTestNotFinished();
 $test->run();
-

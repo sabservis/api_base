@@ -48,4 +48,3 @@ final class ApiRequestTest extends TestCase
 
 $test = new ApiRequestTest();
 $test->run();
-

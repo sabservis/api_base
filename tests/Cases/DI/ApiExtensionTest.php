@@ -69,9 +69,6 @@ final class ApiExtensionTest extends TestCase
 		$class = $loader->load(static function (Compiler $compiler): void {
 			$compiler->addExtension('api', new ApiExtension());
 			$compiler->addConfig([
-				'parameters' => [
-					'productionMode' => false,
-				],
 				'api' => [
 					'normalizer' => [
 						'typeProvider' => [
@@ -82,6 +79,9 @@ final class ApiExtensionTest extends TestCase
 							],
 						],
 					],
+				],
+				'parameters' => [
+					'productionMode' => false,
 				],
 			]);
 		}, 2);

@@ -44,7 +44,7 @@ final class ArraysUtilsTest extends TestCase
 		Assert::same('third', Arrays::get($this->arr, [7, 'item']));
 	}
 
-	public function setUp()
+	public function setUp(): void
 	{
 		parent::setUp();
 
@@ -61,4 +61,3 @@ final class ArraysUtilsTest extends TestCase
 
 $test = new ArraysUtilsTest();
 $test->run();
-

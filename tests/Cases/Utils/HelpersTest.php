@@ -39,4 +39,3 @@ final class HelpersTest extends TestCase
 
 $test = new HelpersTest();
 $test->run();
-

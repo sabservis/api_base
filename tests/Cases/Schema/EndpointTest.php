@@ -29,7 +29,6 @@ final class EndpointTest extends TestCase
 		$endpoint->addMethod($endpoint::METHOD_POST);
 
 		Assert::same([$endpoint::METHOD_GET, $endpoint::METHOD_POST], $endpoint->getMethods());
-
 	}
 
 	public function testAddMethodFail(): void
@@ -38,11 +37,11 @@ final class EndpointTest extends TestCase
 
 		$endpoint = new Endpoint($handler);
 
-		Assert::exception(function () use ($endpoint): void {
+		Assert::exception(static function () use ($endpoint): void {
 			$endpoint->addMethod('foo');
 		}, InvalidArgumentException::class, 'Method FOO is not allowed');
 
-		Assert::exception(function () use ($endpoint): void {
+		Assert::exception(static function () use ($endpoint): void {
 			$endpoint->addMethod('FOO');
 		}, InvalidArgumentException::class, 'Method FOO is not allowed');
 	}
@@ -62,7 +61,7 @@ final class EndpointTest extends TestCase
 
 		$endpoint = new Endpoint($handler);
 
-		Assert::exception(function () use ($endpoint): void {
+		Assert::exception(static function () use ($endpoint): void {
 			$endpoint->getPattern();
 		}, InvalidStateException::class, 'Pattern attribute is required');
 	}
@@ -110,7 +109,10 @@ final class EndpointTest extends TestCase
 			$endpoint->setAttribute('pattern', $parameters['rawPattern']);
 
 			// Test regex matches uri path and find parameter
-			Assert::same([$parameters['uri'], 'id' => '1', '1'], Regex::match($parameters['uri'], $endpoint->getPattern()));
+			Assert::same(
+				[$parameters['uri'], 'id' => '1', '1'],
+				Regex::match($parameters['uri'], $endpoint->getPattern()),
+			);
 		}
 	}
 
@@ -159,4 +161,3 @@ final class EndpointTest extends TestCase
 
 $test = new EndpointTest();
 $test->run();
-

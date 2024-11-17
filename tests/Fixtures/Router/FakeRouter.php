@@ -8,14 +8,11 @@ use Sabservis\Api\Router\Router;
 class FakeRouter implements Router
 {
 
-	private bool $match;
-
-	public function __construct(bool $match)
+	public function __construct(private bool $match)
 	{
-		$this->match = $match;
 	}
 
-	public function match(ApiRequest $request): ?ApiRequest
+	public function match(ApiRequest $request): ApiRequest|null
 	{
 		if ($this->match) {
 			return $request;

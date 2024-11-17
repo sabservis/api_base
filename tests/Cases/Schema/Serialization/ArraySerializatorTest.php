@@ -110,6 +110,11 @@ final class ArraySerializatorTest extends TestCase
 						'type' => 'string',
 					],
 				],
+				'requestBody' => [
+					'description' => 'description',
+					'entity' => 'A\Class',
+					'required' => true,
+				],
 				'responses' => [
 					200 => [
 						'code' => '200',
@@ -119,11 +124,6 @@ final class ArraySerializatorTest extends TestCase
 					404 => ['code' => '404', 'description' => 'Not found'],
 				],
 				'tags' => ['c1-t1' => 'c1-t1-value', 'm3-t1' => null, 'm3-t2' => 'm3-t2-value'],
-				'requestBody' => [
-					'description' => 'description',
-					'entity' => 'A\Class',
-					'required' => true,
-				],
 			],
 		];
 
@@ -146,7 +146,7 @@ final class ArraySerializatorTest extends TestCase
 
 		$m1->addParameter('m1-p1', EndpointParameter::InPath);
 
-		Assert::exception(function () use ($serializator, $builder): void {
+		Assert::exception(static function () use ($serializator, $builder): void {
 			$serializator->serialize($builder);
 		}, InvalidStateException::class, 'Duplicate mask parameter "c1-p1" in path "/{c1-p1}/{c1-p1}/{m1-p1}"');
 	}
@@ -164,7 +164,7 @@ final class ArraySerializatorTest extends TestCase
 		$m1 = $c1->addMethod('m1');
 		$m1->setPath('{m1-p1}/{m1-p1}');
 
-		Assert::exception(function () use ($serializator, $builder): void {
+		Assert::exception(static function () use ($serializator, $builder): void {
 			$serializator->serialize($builder);
 		}, InvalidStateException::class, 'Duplicate mask parameter "m1-p1" in path "/{c1-p1}/{m1-p1}/{m1-p1}"');
 	}
@@ -183,7 +183,7 @@ final class ArraySerializatorTest extends TestCase
 
 		$m1->addParameter('m1-p1', EndpointParameter::InPath);
 
-		Assert::exception(function () use ($serializator, $builder): void {
+		Assert::exception(static function () use ($serializator, $builder): void {
 			$serializator->serialize($builder);
 		}, InvalidStateException::class, '@RequestParameter(name="m1-p1", in=path) is not defined in mask (@Path annotations)');
 	}
@@ -192,4 +192,3 @@ final class ArraySerializatorTest extends TestCase
 
 $test = new ArraySerializatorTest();
 $test->run();
-

@@ -59,7 +59,7 @@ final class Environment
 		@mkdir(self::$testDir);
 
 		// Drop testDir after all activities
-		register_shutdown_function(function (): void {
+		register_shutdown_function(static function (): void {
 			@unlink(self::$testDir);
 		});
 	}

@@ -4,9 +4,6 @@ namespace Tests\Cases\Schema;
 
 require_once __DIR__ . '/../../bootstrap.php';
 
-use QaData\Psr7\Psr7ServerRequestFactory;
-use Sabservis\Api\Http\ApiRequest;
-use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointHandler;
 use Sabservis\Api\Schema\Schema;
@@ -93,4 +90,3 @@ final class SchemaInspectorTest extends TestCase
 
 $test = new SchemaInspectorTest();
 $test->run();
-

@@ -16,6 +16,7 @@
 	<arg name="extensions" value="php,phpt"/>
 
 	<file>src/</file>
+	<file>tests/</file>
 
 	<!-- Configure PSR-4 rule -->
 	<rule ref="SlevomatCodingStandard.Files.TypeNameMatchesFileName">
@@ -23,6 +24,7 @@
 		<properties>
 			<property name="rootNamespaces" type="array">
 				<element key="sabservis/api/src" value="Sabservis\Api"/>
+				<element key="sabservis/api/tests" value="Tests"/>
 			</property>
 		</properties>
 	</rule>
@@ -461,7 +463,7 @@
 	<rule ref="PSR2.Files.EndFileNewline"/>
 	<rule ref="SlevomatCodingStandard.Files.LineLength">
 		<properties>
-			<property name="lineLengthLimit" value="180"/>
+			<property name="lineLengthLimit" value="230"/>
 			<property name="ignoreComments" value="true"/>
 			<property name="ignoreImports" value="true"/>
 		</properties>

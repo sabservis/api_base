@@ -120,7 +120,7 @@ final class RouterTest extends TestCase
 		$request = new ApiRequest($request);
 		$router = new SimpleRouter($schema);
 
-		Assert::exception(function () use ($router, $request): void {
+		Assert::exception(static function () use ($router, $request): void {
 			$router->match($request);
 		}, ClientErrorException::class, 'Method "POST" is not allowed for endpoint "/foo".');
 	}
@@ -149,4 +149,3 @@ final class RouterTest extends TestCase
 
 $test = new RouterTest();
 $test->run();
-

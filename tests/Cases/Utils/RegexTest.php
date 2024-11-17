@@ -28,11 +28,10 @@ final class RegexTest extends TestCase
 
 	public function testReplaceCallback(): void
 	{
-		Assert::equal('barfoo', Regex::replaceCallback('foo', '#(foo)#', fn ($matches) => 'bar' . $matches[1]));
+		Assert::equal('barfoo', Regex::replaceCallback('foo', '#(foo)#', static fn ($matches) => 'bar' . $matches[1]));
 	}
 
 }
 
 $test = new RegexTest();
 $test->run();
-
