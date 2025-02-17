@@ -104,6 +104,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			]),
 			'serializer' => Expect::type('string|array|' . Statement::class)->default(JsonSerializer::class),
 			'validator' => Expect::type('string|array|' . Statement::class)->default(NullValidator::class),
+			'router' => Nette\Schema\Expect::structure([
+				'basePath' => Nette\Schema\Expect::string()->nullable()->default(null),
+			]),
 		]);
 	}
 
@@ -307,7 +310,10 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		$builder->addDefinition($this->prefix('router'))
 			->setType(Router\Router::class)
-			->setFactory(Router\SimpleRouter::class);
+			->setFactory(Router\SimpleRouter::class)
+			->addSetup('setBasePath', [
+				$this->getConfig()->router->basePath ?? null,
+			]);
 
 		$builder->addDefinition($this->prefix('handler'))
 			->setType(Handler::class)

@@ -9,14 +9,29 @@ use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Utils\Regex;
+use function mb_strlen;
+use function mb_substr;
 use function sprintf;
+use function str_starts_with;
 use function trim;
 
 class SimpleRouter implements Router
 {
 
+	protected string|null $basePath;
+
 	public function __construct(private Schema $schema)
 	{
+	}
+
+	public function setBasePath(string|null $basePath): void
+	{
+		$this->basePath = $basePath;
+	}
+
+	public function getBasePath(): string|null
+	{
+		return $this->basePath;
 	}
 
 	public function match(ApiRequest $request): ApiRequest|null
@@ -80,6 +95,10 @@ class SimpleRouter implements Router
 	{
 		// Parse url from request
 		$url = $request->getUri()->getPath();
+
+		if ($this->basePath !== null) {
+			$url = str_starts_with($url, $this->basePath) ? mb_substr($url, mb_strlen($this->basePath)) : $url;
+		}
 
 		// Url has always slash at the beginning
 		// and no trailing slash at the end
