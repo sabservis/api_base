@@ -110,11 +110,6 @@ final class ArraySerializatorTest extends TestCase
 						'type' => 'string',
 					],
 				],
-				'requestBody' => [
-					'description' => 'description',
-					'entity' => 'A\Class',
-					'required' => true,
-				],
 				'responses' => [
 					200 => [
 						'code' => '200',
@@ -124,6 +119,11 @@ final class ArraySerializatorTest extends TestCase
 					404 => ['code' => '404', 'description' => 'Not found'],
 				],
 				'tags' => ['c1-t1' => 'c1-t1-value', 'm3-t1' => null, 'm3-t2' => 'm3-t2-value'],
+				'requestBody' => [
+					'description' => 'description',
+					'entity' => 'A\Class',
+					'required' => true,
+				],
 			],
 		];
 
