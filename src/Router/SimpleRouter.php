@@ -18,7 +18,7 @@ use function trim;
 class SimpleRouter implements Router
 {
 
-	protected string|null $basePath;
+	protected string|null $basePath = null;
 
 	public function __construct(private Schema $schema)
 	{
