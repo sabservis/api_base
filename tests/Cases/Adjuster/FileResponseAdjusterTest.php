@@ -23,14 +23,14 @@ final class FileResponseAdjusterTest extends TestCase
 
 		Assert::same(
 			[
-				'Cache-Control' => ['must-revalidate, post-check=0, pre-check=0'],
-				'Content-Description' => ['File Transfer'],
-				'Content-Disposition' => ['attachment; filename="filename"; filename*=utf-8\'\'filename'],
-				'Content-Length' => ['0'],
-				'Content-Transfer-Encoding' => ['binary'],
 				'Content-Type' => ['application/octet-stream'],
+				'Content-Description' => ['File Transfer'],
+				'Content-Transfer-Encoding' => ['binary'],
+				'Content-Disposition' => ['attachment; filename="filename"; filename*=utf-8\'\'filename'],
 				'Expires' => ['0'],
+				'Cache-Control' => ['must-revalidate, post-check=0, pre-check=0'],
 				'Pragma' => ['public'],
+				'Content-Length' => ['0'],
 			],
 			$response->getHeaders(),
 		);
