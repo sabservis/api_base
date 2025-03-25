@@ -227,6 +227,8 @@ class ObjectTypeNormalizer extends AbstractTypeNormalizer
 
 				if (!($instance instanceof ObjectArrayDenormalizer)) {
 					continue;
+				} elseif ($this->isNullable($propertyOrParam) && $value === null) {
+					return null;
 				}
 
 				$objectType = $attribute->getArguments()['targetType'] ?? null;
