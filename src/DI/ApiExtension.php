@@ -98,6 +98,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 						->default([]),
 				]),
 			]),
+			'errorHandler' => Expect::type('string|array|' . Statement::class)->default(SimpleErrorHandler::class),
 			'resources' => Nette\Schema\Expect::structure([
 				'excludes' => Nette\Schema\Expect::arrayOf('string'),
 				'paths' => Nette\Schema\Expect::arrayOf('string'),
@@ -298,7 +299,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			->setType(Dispatcher::class);
 
 		$builder->addDefinition($this->prefix('errorHandler'))
-			->setFactory(SimpleErrorHandler::class)
+			->setFactory($this->getConfig()->errorHandler)
 			->setType(ErrorHandler::class)
 			->addSetup('setDebugMode', [
 				$this->getConfig()->debug,

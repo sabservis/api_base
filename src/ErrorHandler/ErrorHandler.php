@@ -13,4 +13,6 @@ interface ErrorHandler
 	 */
 	public function handle(DispatchError $dispatchError): ApiResponse;
 
+	public function setDebugMode(bool $debugMode): void;
+
 }
