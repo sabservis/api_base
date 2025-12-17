@@ -249,9 +249,15 @@ class ArraySerializator implements Serializator
 			return;
 		}
 
+		$entity = $requestBody->getEntity();
+		// Filter out Generator::UNDEFINED values (starts with @OA\Generator)
+		if (is_string($entity) && str_starts_with($entity, '@OA\Generator')) {
+			$entity = null;
+		}
+
 		$endpoint['requestBody'] = [
 			'description' => $requestBody->getDescription(),
-			'entity' => $requestBody->getEntity(),
+			'entity' => $entity,
 			'required' => $requestBody->isRequired(),
 		];
 	}

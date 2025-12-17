@@ -223,10 +223,17 @@ class DoctrineAnnotationLoader extends AbstractContainerLoader
 						}
 					}
 
-					if ($annotation->requestBody !== null) {
+					if ($annotation->requestBody !== null && is_object($annotation->requestBody)) {
+						$hasValidRef = false;
+
 						if (property_exists($annotation->requestBody, '_unmerged')) {
 							foreach ($annotation->requestBody->_unmerged as $item) {
-								if (!($item instanceof SOA\JsonContent) || $item->ref === null) {
+								if (!($item instanceof SOA\JsonContent)) {
+									continue;
+								}
+
+								// Skip if ref is null or Generator::UNDEFINED
+								if ($item->ref === null || $item->ref === Generator::UNDEFINED) {
 									continue;
 								}
 
@@ -241,7 +248,23 @@ class DoctrineAnnotationLoader extends AbstractContainerLoader
 									? $annotation->requestBody->required
 									: false);
 								$schemaMethod->setRequestBody($requestBody);
+								$hasValidRef = true;
 							}
+						}
+
+						// If no valid JsonContent with ref found, but requestBody exists, create empty requestBody
+						if (!$hasValidRef) {
+							$requestBody = new EndpointRequestBody();
+							$requestBody->setDescription(
+								$annotation->requestBody->description !== Generator::UNDEFINED
+									? $annotation->requestBody->description
+									: '',
+							);
+							$requestBody->setEntity(null);
+							$requestBody->setRequired($annotation->requestBody->required !== Generator::UNDEFINED
+								? $annotation->requestBody->required
+								: false);
+							$schemaMethod->setRequestBody($requestBody);
 						}
 					}
 
