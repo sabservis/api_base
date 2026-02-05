@@ -1,11 +1,13 @@
 # IDE
 /.idea
+/.claude
 
 # Composer
 /vendor
 /composer.lock
 
 # Tests
+/.phpunit.cache
 /tests/tmp
 /coverage.*
 /tests/**/*.log

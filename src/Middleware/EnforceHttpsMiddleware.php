@@ -2,26 +2,28 @@
 
 namespace Sabservis\Api\Middleware;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
-use function strtolower;
+use Sabservis\Api\Exception\ErrorMessages;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 
 #[MiddlewarePriority(499)]
 class EnforceHttpsMiddleware implements Middleware
 {
 
 	public function __invoke(
-		ServerRequestInterface $request,
-		ResponseInterface $response,
+		ApiRequest $request,
+		ApiResponse $response,
 		callable $next,
-	): ResponseInterface
+	): ApiResponse
 	{
-		if (strtolower($request->getUri()->getScheme()) !== 'https') {
-			$response = $response->withStatus(400);
-			$response->getBody()->write('Encrypted connection is required. Please use https connection.');
-
-			return $response;
+		if ($request->getScheme() !== 'https') {
+			return $response
+				->withStatus(400)
+				->writeJsonBody([
+					'code' => 400,
+					'message' => ErrorMessages::HTTPS_REQUIRED,
+				]);
 		}
 
 		// Pass to next middleware

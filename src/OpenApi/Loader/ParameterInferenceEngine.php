@@ -1,0 +1,245 @@
+<?php declare(strict_types = 1);
+
+namespace Sabservis\Api\OpenApi\Loader;
+
+use ReflectionClass;
+use ReflectionMethod;
+use ReflectionNamedType;
+use ReflectionUnionType;
+use Sabservis\Api\Attribute\OpenApi\Property;
+use Sabservis\Api\Attribute\OpenApi\RequestParameter;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
+use Sabservis\Api\Schema\EndpointParameter;
+use function array_flip;
+use function assert;
+use function class_exists;
+use function preg_match_all;
+
+/**
+ * Infers API parameters from method signatures and DTO classes.
+ *
+ * Handles:
+ * - Inference from method signature (path vs query parameters)
+ * - Extraction of query parameters from DTO ref classes
+ * - Building parameter arrays from RequestParameter attributes
+ */
+final class ParameterInferenceEngine
+{
+
+	/**
+	 * Infer parameters from method signature.
+	 *
+	 * This allows controllers to use typed method parameters instead of explicit attributes:
+	 *
+	 * Before (explicit):
+	 *   #[Get('/users/{id}')]
+	 *   #[PathParameter(name: 'id', type: 'int')]
+	 *   public function get(ApiRequest $request): UserDto
+	 *
+	 * After (inferred):
+	 *   #[Get('/users/{id}')]
+	 *   public function get(int $id): UserDto
+	 *
+	 * Rules:
+	 * - ApiRequest and ApiResponse parameters are skipped (injected by ServiceHandler)
+	 * - Parameters matching URL path variables (e.g., {id}) become path parameters
+	 * - Other parameters become query parameters
+	 * - Nullable or optional parameters are not required
+	 * - Explicit #[RequestParameter] attributes take precedence
+	 *
+	 * @param array<string, array<mixed>> $parameters Existing parameters (from explicit attributes)
+	 */
+	public function inferFromMethodSignature(ReflectionMethod $method, string $path, array &$parameters): void
+	{
+		$pathVariables = $this->extractPathVariables($path);
+
+		foreach ($method->getParameters() as $param) {
+			$paramName = $param->getName();
+
+			// Skip if already defined via explicit attribute
+			if (isset($parameters[$paramName])) {
+				continue;
+			}
+
+			$paramType = $param->getType();
+
+			// Skip parameters without type
+			if ($paramType === null) {
+				continue;
+			}
+
+			// Handle union types (e.g., DateTimeImmutable|null) - extract first non-null type
+			$typeName = null;
+			$allowsNull = false;
+
+			if ($paramType instanceof ReflectionUnionType) {
+				$allowsNull = $paramType->allowsNull();
+
+				foreach ($paramType->getTypes() as $unionType) {
+					if ($unionType instanceof ReflectionNamedType && $unionType->getName() !== 'null') {
+						$typeName = $unionType->getName();
+
+						break;
+					}
+				}
+
+				if ($typeName === null) {
+					continue;
+				}
+			} elseif ($paramType instanceof ReflectionNamedType) {
+				$typeName = $paramType->getName();
+				$allowsNull = $paramType->allowsNull();
+			} else {
+				continue;
+			}
+
+			// Skip ApiRequest and ApiResponse - these are injected by ServiceHandler
+			if ($typeName === ApiRequest::class || $typeName === ApiResponse::class) {
+				continue;
+			}
+
+			// Determine if this is a path or query parameter
+			$isPathParam = isset($pathVariables[$paramName]);
+			$in = $isPathParam ? EndpointParameter::InPath : EndpointParameter::InQuery;
+
+			// Path parameters are always required
+			// Query parameters are required unless nullable or has default value
+			$isRequired = $isPathParam || (!$allowsNull && !$param->isOptional());
+
+			// Map PHP type to our internal type representation
+			$type = $this->mapPhpTypeToParameterType($typeName);
+
+			$parameters[$paramName] = [
+				'name' => $paramName,
+				'type' => $type,
+				'in' => $in,
+				'required' => $isRequired,
+				'description' => null,
+				'deprecated' => false,
+				'allowEmptyValue' => false,
+			];
+		}
+	}
+
+	/**
+	 * Extract query parameters from a DTO class using #[Property] attributes.
+	 *
+	 * @param class-string $refClass
+	 * @return array<string, array<mixed>>
+	 */
+	public function extractQueryParametersFromRef(string $refClass): array
+	{
+		if (!class_exists($refClass)) {
+			return [];
+		}
+
+		$parameters = [];
+		$reflectionClass = new ReflectionClass($refClass);
+
+		foreach ($reflectionClass->getProperties() as $property) {
+			$propertyAttributes = $property->getAttributes(Property::class);
+
+			if ($propertyAttributes === []) {
+				continue;
+			}
+
+			$propertyAttr = $propertyAttributes[0]->newInstance();
+			assert($propertyAttr instanceof Property);
+
+			$name = $propertyAttr->property ?? $property->getName();
+
+			$type = $propertyAttr->type;
+
+			if ($type === null) {
+				$reflectionType = $property->getType();
+
+				if ($reflectionType instanceof ReflectionNamedType) {
+					$type = $reflectionType->getName();
+				}
+			}
+
+			$type ??= 'string';
+
+			$parameters[$name] = [
+				'name' => $name,
+				'type' => $type,
+				'in' => EndpointParameter::InQuery,
+				'required' => $propertyAttr->required ?? false,
+				'description' => $propertyAttr->description,
+				'deprecated' => $propertyAttr->deprecated ?? false,
+				'allowEmptyValue' => false,
+			];
+		}
+
+		return $parameters;
+	}
+
+	/**
+	 * Build parameter array from RequestParameter attribute.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function buildParameter(RequestParameter $param): array
+	{
+		return [
+			'name' => $param->name,
+			'type' => $param->type,
+			'in' => $param->in,
+			'required' => $param->isRequired(),
+			'description' => $param->description,
+			'deprecated' => $param->deprecated,
+			'allowEmptyValue' => $param->allowEmptyValue,
+		];
+	}
+
+	/**
+	 * Get default parameter definition for a path variable.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function getDefaultParameter(string $name, string $in): array
+	{
+		return [
+			'name' => $name,
+			'type' => EndpointParameter::TypeString,
+			'in' => $in,
+			'required' => $in === EndpointParameter::InPath,
+			'description' => null,
+			'deprecated' => false,
+			'allowEmptyValue' => false,
+		];
+	}
+
+	/**
+	 * Extract path variable names from URL pattern.
+	 *
+	 * @return array<string, int> Variable names as keys (for isset lookup)
+	 */
+	private function extractPathVariables(string $path): array
+	{
+		$pathVariables = [];
+
+		if (preg_match_all('#{([a-zA-Z0-9\-_]+)}#', $path, $matches)) {
+			$pathVariables = array_flip($matches[1]);
+		}
+
+		return $pathVariables;
+	}
+
+	/**
+	 * Map PHP type name to parameter type string.
+	 */
+	private function mapPhpTypeToParameterType(string $phpType): string
+	{
+		return match ($phpType) {
+			'int' => 'int',
+			'float' => 'float',
+			'bool' => 'bool',
+			'string' => 'string',
+			'array' => 'array',
+			default => $phpType, // class name (DateTimeImmutable, enum, etc.)
+		};
+	}
+
+}

@@ -2,16 +2,16 @@
 
 namespace Sabservis\Api\Middleware;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 
 interface Middleware
 {
 
 	public function __invoke(
-		ServerRequestInterface $request,
-		ResponseInterface $response,
+		ApiRequest $request,
+		ApiResponse $response,
 		callable $next,
-	): ResponseInterface;
+	): ApiResponse;
 
 }

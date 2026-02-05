@@ -2,142 +2,267 @@
 
 namespace Sabservis\Api\Http;
 
-use QaData\Psr7\ProxyResponse;
-use Sabservis\Api\Exception\InvalidStateException;
-use Sabservis\Api\Mapping\Entity\AbstractEntity;
-use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Exception\RuntimeStateException;
+use Sabservis\Api\Utils\HeaderSanitizer;
 use function array_key_exists;
-use function func_num_args;
-use function sprintf;
+use function implode;
+use function is_resource;
+use function json_encode;
+use function strtolower;
+use const JSON_THROW_ON_ERROR;
 
-/**
- * Tiny wrapper for PSR-7 ResponseInterface
- */
-class ApiResponse extends ProxyResponse
+class ApiResponse
 {
 
-	public const S100_CONTINUE = 100;
+	/** @var array<string, mixed> */
+	private array $attributes = [];
 
-	public const S101_SWITCHING_PROTOCOLS = 101;
+	/**
+	 * Headers stored as arrays to support multiple values (e.g., Set-Cookie).
+	 *
+	 * @var array<string, list<string>>
+	 */
+	private array $headers = [];
 
-	public const S102_PROCESSING = 102;
+	/** @var string|resource */
+	private mixed $body = '';
 
-	public const S200_OK = 200;
+	private string $protocolVersion = '1.1';
 
-	public const S201_CREATED = 201;
+	public function __construct(
+		private int $statusCode = 200,
+		private string $reasonPhrase = '',
+	)
+	{
+		if ($this->reasonPhrase === '') {
+			$this->reasonPhrase = self::getDefaultReasonPhrase($statusCode);
+		}
+	}
 
-	public const S202_ACCEPTED = 202;
+	// === Status ===
 
-	public const S203_NON_AUTHORITATIVE_INFORMATION = 203;
+	/**
+	 * Create 200 OK response with object.
+	 */
+	public static function ok(object $data): self
+	{
+		return (new self(200))->withObject($data);
+	}
 
-	public const S204_NO_CONTENT = 204;
+	/**
+	 * Create 201 Created response with object.
+	 */
+	public static function created(object $data): self
+	{
+		return (new self(201))->withObject($data);
+	}
 
-	public const S205_RESET_CONTENT = 205;
+	/**
+	 * Create 204 No Content response.
+	 */
+	public static function noContent(): self
+	{
+		return new self(204);
+	}
 
-	public const S206_PARTIAL_CONTENT = 206;
+	/**
+	 * Create list response (with or without pagination meta).
+	 *
+	 * @param array<mixed> $data
+	 */
+	public static function list(
+		array $data,
+		int|null $total = null,
+		int|null $limit = null,
+		int|null $offset = null,
+	): self
+	{
+		$listResponse = $total !== null
+			? ListResponse::create($data, $total, $limit ?? 0, $offset ?? 0)
+			: ListResponse::withoutMeta($data);
 
-	public const S207_MULTI_STATUS = 207;
+		return (new self(200))->withObject($listResponse);
+	}
 
-	public const S208_ALREADY_REPORTED = 208;
+	public function getStatusCode(): int
+	{
+		return $this->statusCode;
+	}
 
-	public const S226_IM_USED = 226;
+	public function getReasonPhrase(): string
+	{
+		return $this->reasonPhrase;
+	}
 
-	public const S300_MULTIPLE_CHOICES = 300;
+	public function withStatus(int $code, string $reasonPhrase = ''): self
+	{
+		$new = clone $this;
+		$new->statusCode = $code;
+		$new->reasonPhrase = $reasonPhrase !== '' ? $reasonPhrase : self::getDefaultReasonPhrase($code);
 
-	public const S301_MOVED_PERMANENTLY = 301;
+		return $new;
+	}
 
-	public const S302_FOUND = 302;
+	public function getProtocolVersion(): string
+	{
+		return $this->protocolVersion;
+	}
 
-	public const S303_SEE_OTHER = 303;
+	public function withProtocolVersion(string $version): self
+	{
+		$new = clone $this;
+		$new->protocolVersion = $version;
 
-	public const S303_POST_GET = 303;
+		return $new;
+	}
 
-	public const S304_NOT_MODIFIED = 304;
+	// === Headers ===
 
-	public const S305_USE_PROXY = 305;
+	public function hasHeader(string $name): bool
+	{
+		return isset($this->headers[strtolower($name)]);
+	}
 
-	public const S307_TEMPORARY_REDIRECT = 307;
+	/**
+	 * Get first header value (for backwards compatibility).
+	 *
+	 * For headers with multiple values, returns only the first one.
+	 * Use getHeaderValues() to get all values.
+	 */
+	public function getHeader(string $name): string|null
+	{
+		$values = $this->headers[strtolower($name)] ?? [];
 
-	public const S308_PERMANENT_REDIRECT = 308;
+		return $values[0] ?? null;
+	}
 
-	public const S400_BAD_REQUEST = 400;
+	/**
+	 * Get all values for a header as array.
+	 *
+	 * @return list<string>
+	 */
+	public function getHeaderValues(string $name): array
+	{
+		return $this->headers[strtolower($name)] ?? [];
+	}
 
-	public const S401_UNAUTHORIZED = 401;
+	/**
+	 * Get header value as comma-separated string (PSR-7 compatible).
+	 *
+	 * Note: For Set-Cookie headers, use getHeaderValues() instead,
+	 * as Set-Cookie values cannot be joined with commas.
+	 */
+	public function getHeaderLine(string $name): string
+	{
+		$values = $this->headers[strtolower($name)] ?? [];
 
-	public const S402_PAYMENT_REQUIRED = 402;
+		return implode(', ', $values);
+	}
 
-	public const S403_FORBIDDEN = 403;
+	/**
+	 * Get all headers with their values.
+	 *
+	 * @return array<string, list<string>>
+	 */
+	public function getHeaders(): array
+	{
+		return $this->headers;
+	}
 
-	public const S404_NOT_FOUND = 404;
+	/**
+	 * Set header value, replacing any existing values.
+	 */
+	public function withHeader(string $name, string $value): self
+	{
+		$new = clone $this;
+		// Sanitize value to prevent HTTP response splitting attacks
+		$new->headers[strtolower($name)] = [HeaderSanitizer::sanitize($value)];
 
-	public const S405_METHOD_NOT_ALLOWED = 405;
+		return $new;
+	}
 
-	public const S406_NOT_ACCEPTABLE = 406;
+	/**
+	 * Add header value (appends to existing values as separate entry).
+	 *
+	 * Unlike comma-joining, this properly supports headers like Set-Cookie
+	 * that require separate header lines for each value.
+	 */
+	public function withAddedHeader(string $name, string $value): self
+	{
+		$new = clone $this;
+		$key = strtolower($name);
+		// Sanitize value to prevent HTTP response splitting attacks
+		$sanitizedValue = HeaderSanitizer::sanitize($value);
 
-	public const S407_PROXY_AUTHENTICATION_REQUIRED = 407;
+		$new->headers[$key] = $this->headers[$key] ?? [];
+		$new->headers[$key][] = $sanitizedValue;
 
-	public const S408_REQUEST_TIMEOUT = 408;
+		return $new;
+	}
 
-	public const S409_CONFLICT = 409;
+	/**
+	 * Remove a header.
+	 */
+	public function withoutHeader(string $name): self
+	{
+		$new = clone $this;
+		unset($new->headers[strtolower($name)]);
 
-	public const S410_GONE = 410;
+		return $new;
+	}
 
-	public const S411_LENGTH_REQUIRED = 411;
+	// === Body ===
 
-	public const S412_PRECONDITION_FAILED = 412;
+	/**
+	 * @return string|resource
+	 */
+	public function getBody(): mixed
+	{
+		return $this->body;
+	}
 
-	public const S413_REQUEST_ENTITY_TOO_LARGE = 413;
+	/**
+	 * @param string|resource $body
+	 */
+	public function withBody(mixed $body): self
+	{
+		$new = clone $this;
+		$new->body = $body;
 
-	public const S414_REQUEST_URI_TOO_LONG = 414;
+		return $new;
+	}
 
-	public const S415_UNSUPPORTED_MEDIA_TYPE = 415;
+	public function writeBody(string $content): self
+	{
+		if (is_resource($this->body)) {
+			throw new RuntimeStateException('Cannot write to resource body');
+		}
 
-	public const S416_REQUESTED_RANGE_NOT_SATISFIABLE = 416;
+		$new = clone $this;
+		$new->body .= $content;
 
-	public const S417_EXPECTATION_FAILED = 417;
+		return $new;
+	}
 
-	public const S421_MISDIRECTED_REQUEST = 421;
+	/**
+	 * Write JSON encoded data to body and set Content-Type header.
+	 *
+	 * Sets X-Content-Type-Options: nosniff to prevent MIME sniffing attacks.
+	 */
+	public function writeJsonBody(mixed $data): self
+	{
+		return $this
+			->withHeader('Content-Type', 'application/json')
+			->withHeader('X-Content-Type-Options', 'nosniff')
+			->writeBody(json_encode($data, JSON_THROW_ON_ERROR));
+	}
 
-	public const S422_UNPROCESSABLE_ENTITY = 422;
+	public function isStreamBody(): bool
+	{
+		return is_resource($this->body);
+	}
 
-	public const S423_LOCKED = 423;
-
-	public const S424_FAILED_DEPENDENCY = 424;
-
-	public const S426_UPGRADE_REQUIRED = 426;
-
-	public const S428_PRECONDITION_REQUIRED = 428;
-
-	public const S429_TOO_MANY_REQUESTS = 429;
-
-	public const S431_REQUEST_HEADER_FIELDS_TOO_LARGE = 431;
-
-	public const S451_UNAVAILABLE_FOR_LEGAL_REASONS = 451;
-
-	public const S500_INTERNAL_SERVER_ERROR = 500;
-
-	public const S501_NOT_IMPLEMENTED = 501;
-
-	public const S502_BAD_GATEWAY = 502;
-
-	public const S503_SERVICE_UNAVAILABLE = 503;
-
-	public const S504_GATEWAY_TIMEOUT = 504;
-
-	public const S505_HTTP_VERSION_NOT_SUPPORTED = 505;
-
-	public const S506_VARIANT_ALSO_NEGOTIATES = 506;
-
-	public const S507_INSUFFICIENT_STORAGE = 507;
-
-	public const S508_LOOP_DETECTED = 508;
-
-	public const S510_NOT_EXTENDED = 510;
-
-	public const S511_NETWORK_AUTHENTICATION_REQUIRED = 511;
-
-	/** @var array<mixed> */
-	protected array $attributes = [];
+	// === Attributes ===
 
 	public function hasAttribute(string $name): bool
 	{
@@ -146,73 +271,103 @@ class ApiResponse extends ProxyResponse
 
 	public function getAttribute(string $name, mixed $default = null): mixed
 	{
-		if (!$this->hasAttribute($name)) {
-			if (func_num_args() < 2) {
-				throw new InvalidStateException(sprintf('No attribute "%s" found', $name));
-			}
-
-			return $default;
-		}
-
-		return $this->attributes[$name];
+		return $this->attributes[$name] ?? $default;
 	}
 
 	/**
-	 * @return array<mixed>
+	 * @return array<string, mixed>
 	 */
 	public function getAttributes(): array
 	{
 		return $this->attributes;
 	}
 
-	/**
-	 * @return static
-	 */
 	public function withAttribute(string $name, mixed $value): self
 	{
 		$new = clone $this;
 		$new->attributes[$name] = $value;
 
 		return $new;
-	}
+	}// === Static factories ===
 
-	public function getEntity(): AbstractEntity|null
-	{
-		return $this->getAttribute(ResponseAttributes::Entity, null);
-	}
 
-	/**
-	 * @return static
-	 */
-	public function withEntity(AbstractEntity $entity): self
-	{
-		return $this->withAttribute(ResponseAttributes::Entity, $entity);
-	}
-
-	public function getEndpoint(): Endpoint|null
-	{
-		return $this->getAttribute(ResponseAttributes::Endpoint, null);
-	}
-
-	/**
-	 * @return static
-	 */
-	public function withEndpoint(Endpoint $endpoint): self
-	{
-		return $this->withAttribute(ResponseAttributes::Endpoint, $endpoint);
-	}
+	// === API helpers ===
 
 	public function getObject(): object|null
 	{
-		return $this->getAttribute(ResponseAttributes::Object, null);
+		/** @var object|null */
+		return $this->attributes[ResponseAttributes::Object->value] ?? null;
 	}
 
-	/**
-	 * @return static
-	 */
 	public function withObject(object $entity): self
 	{
-		return $this->withAttribute(ResponseAttributes::Object, $entity);
+		return $this->withAttribute(ResponseAttributes::Object->value, $entity);
+	}
+
+	private static function getDefaultReasonPhrase(int $code): string
+	{
+		return match ($code) {
+			100 => 'Continue',
+			101 => 'Switching Protocols',
+			102 => 'Processing',
+			200 => 'OK',
+			201 => 'Created',
+			202 => 'Accepted',
+			203 => 'Non-Authoritative Information',
+			204 => 'No Content',
+			205 => 'Reset Content',
+			206 => 'Partial Content',
+			207 => 'Multi-Status',
+			208 => 'Already Reported',
+			226 => 'IM Used',
+			300 => 'Multiple Choices',
+			301 => 'Moved Permanently',
+			302 => 'Found',
+			303 => 'See Other',
+			304 => 'Not Modified',
+			305 => 'Use Proxy',
+			307 => 'Temporary Redirect',
+			308 => 'Permanent Redirect',
+			400 => 'Bad Request',
+			401 => 'Unauthorized',
+			402 => 'Payment Required',
+			403 => 'Forbidden',
+			404 => 'Not Found',
+			405 => 'Method Not Allowed',
+			406 => 'Not Acceptable',
+			407 => 'Proxy Authentication Required',
+			408 => 'Request Timeout',
+			409 => 'Conflict',
+			410 => 'Gone',
+			411 => 'Length Required',
+			412 => 'Precondition Failed',
+			413 => 'Payload Too Large',
+			414 => 'URI Too Long',
+			415 => 'Unsupported Media Type',
+			416 => 'Range Not Satisfiable',
+			417 => 'Expectation Failed',
+			421 => 'Misdirected Request',
+			422 => 'Unprocessable Entity',
+			423 => 'Locked',
+			424 => 'Failed Dependency',
+			426 => 'Upgrade Required',
+			428 => 'Precondition Required',
+			429 => 'Too Many Requests',
+			431 => 'Request Header Fields Too Large',
+			451 => 'Unavailable For Legal Reasons',
+			500 => 'Internal Server Error',
+			501 => 'Not Implemented',
+			502 => 'Bad Gateway',
+			503 => 'Service Unavailable',
+			504 => 'Gateway Timeout',
+			505 => 'HTTP Version Not Supported',
+			506 => 'Variant Also Negotiates',
+			507 => 'Insufficient Storage',
+			508 => 'Loop Detected',
+			510 => 'Not Extended',
+			511 => 'Network Authentication Required',
+			default => '',
+		};
 	}
 
 }

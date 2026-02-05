@@ -2,84 +2,81 @@
 
 namespace Sabservis\Api\Schema;
 
-use ReflectionAttribute;
-use ReflectionClass;
-use ReflectionMethod;
-use Sabservis\Api\Exception\Logical\InvalidArgumentException;
-use Sabservis\Api\Exception\Logical\InvalidStateException;
-use Sabservis\Api\Utils\Arrays;
-use Throwable;
-use function array_filter;
-use function array_key_exists;
-use function in_array;
-use function sprintf;
-use function strtoupper;
-
+/**
+ * Endpoint facade - unified access to route, handler, and OpenAPI definitions.
+ *
+ * This class maintains backward compatibility while internally using
+ * separate definition classes for better separation of concerns:
+ * - RouteDefinition: routing data (methods, mask, pattern)
+ * - HandlerDefinition: handler data (controller, method, parameters, requestBody)
+ * - OpenApiDefinition: documentation data (responses, tags, openApi)
+ */
 class Endpoint
 {
 
-	// Methods
-	public const METHOD_GET = 'GET';
+	public const METHODS = RouteDefinition::METHODS;
 
-	public const METHOD_POST = 'POST';
-
-	public const METHOD_PUT = 'PUT';
-
-	public const METHOD_DELETE = 'DELETE';
-
-	public const METHOD_OPTIONS = 'OPTIONS';
-
-	public const METHOD_PATCH = 'PATCH';
-
-	public const METHOD_HEAD = 'HEAD';
-
-	public const METHODS = [
-		self::METHOD_GET,
-		self::METHOD_POST,
-		self::METHOD_PUT,
-		self::METHOD_DELETE,
-		self::METHOD_OPTIONS,
-		self::METHOD_PATCH,
-		self::METHOD_HEAD,
-	];
-
-	// Tags
 	public const TAG_ID = 'id';
 
-	/** @var array<string> */
-	private array $methods = [];
+	private RouteDefinition $route;
 
-	private string|null $mask = null;
+	private HandlerDefinition $handler;
 
-	private string|null $pattern = null;
+	private OpenApiDefinition $openApi;
 
-	/** @var array<EndpointParameter> */
-	private array $parameters = [];
-
-	private EndpointRequestBody|null $requestBody = null;
-
-	/** @var array<EndpointResponse> */
-	private array $responses = [];
-
-	/** @var array<mixed> */
-	private array $tags = [];
-
-	/** @var array<mixed> */
-	private array $metadata = [];
-
-	/** @var array<mixed> */
-	private array $openApi = [];
-
-	public function __construct(private EndpointHandler $handler)
+	/**
+	 * @param class-string $controllerClass
+	 */
+	public function __construct(
+		string $controllerClass,
+		string $controllerMethod,
+	)
 	{
+		$this->route = new RouteDefinition();
+		$this->handler = new HandlerDefinition($controllerClass, $controllerMethod);
+		$this->openApi = new OpenApiDefinition();
 	}
+
+	// === Internal access to definitions ===
+
+	public function getRouteDefinition(): RouteDefinition
+	{
+		return $this->route;
+	}
+
+	public function getHandlerDefinition(): HandlerDefinition
+	{
+		return $this->handler;
+	}
+
+	public function getOpenApiDefinition(): OpenApiDefinition
+	{
+		return $this->openApi;
+	}
+
+	// === Handler (delegated to HandlerDefinition) ===
+
+	/**
+	 * @return class-string
+	 */
+	public function getControllerClass(): string
+	{
+		return $this->handler->getControllerClass();
+	}
+
+	public function getControllerMethod(): string
+	{
+		return $this->handler->getControllerMethod();
+	}
+
+	// === Routing (delegated to RouteDefinition) ===
 
 	/**
 	 * @return array<string>
 	 */
 	public function getMethods(): array
 	{
-		return $this->methods;
+		return $this->route->getMethods();
 	}
 
 	/**
@@ -87,62 +84,47 @@ class Endpoint
 	 */
 	public function setMethods(array $methods): void
 	{
-		foreach ($methods as $method) {
-			$this->addMethod($method);
-		}
+		$this->route->setMethods($methods);
 	}
 
 	public function addMethod(string $method): void
 	{
-		$method = strtoupper($method);
-
-		if (!in_array($method, self::METHODS, true)) {
-			throw new InvalidArgumentException(sprintf('Method %s is not allowed', $method));
-		}
-
-		$this->methods[] = $method;
+		$this->route->addMethod($method);
 	}
 
 	public function hasMethod(string $method): bool
 	{
-		return in_array(strtoupper($method), $this->methods, true);
+		return $this->route->hasMethod($method);
 	}
 
 	public function getMask(): string|null
 	{
-		return $this->mask;
+		return $this->route->getMask();
 	}
 
 	public function setMask(string|null $mask): void
 	{
-		$this->mask = $mask;
+		$this->route->setMask($mask);
 	}
 
 	public function getPattern(): string
 	{
-		if ($this->pattern === null) {
-			$this->pattern = $this->generatePattern();
-		}
-
-		return $this->pattern;
+		return $this->route->getPattern();
 	}
 
 	public function setPattern(string|null $pattern): void
 	{
-		$this->pattern = $pattern;
+		$this->route->setPattern($pattern);
 	}
 
-	public function getHandler(): EndpointHandler
-	{
-		return $this->handler;
-	}
+	// === Parameters (delegated to HandlerDefinition) ===
 
 	/**
 	 * @return array<EndpointParameter>
 	 */
 	public function getParameters(): array
 	{
-		return $this->parameters;
+		return $this->handler->getParameters();
 	}
 
 	/**
@@ -150,20 +132,17 @@ class Endpoint
 	 */
 	public function getParametersByIn(string $in): array
 	{
-		return array_filter(
-			$this->getParameters(),
-			static fn (EndpointParameter $parameter): bool => $parameter->getIn() === $in,
-		);
+		return $this->handler->getParametersByIn($in);
 	}
 
 	public function hasParameter(string $name): bool
 	{
-		return isset($this->parameters[$name]);
+		return $this->handler->hasParameter($name);
 	}
 
 	public function addParameter(EndpointParameter $param): void
 	{
-		$this->parameters[$param->getName()] = $param;
+		$this->handler->addParameter($param);
 	}
 
 	/**
@@ -171,27 +150,39 @@ class Endpoint
 	 */
 	public function setParameters(array $parameters): void
 	{
-		foreach ($parameters as $param) {
-			$this->addParameter($param);
-		}
+		$this->handler->setParameters($parameters);
 	}
+
+	// === Request Body (delegated to HandlerDefinition) ===
+
+	public function setRequestBody(EndpointRequestBody|null $requestBody): void
+	{
+		$this->handler->setRequestBody($requestBody);
+	}
+
+	public function getRequestBody(): EndpointRequestBody|null
+	{
+		return $this->handler->getRequestBody();
+	}
+
+	// === Responses (delegated to OpenApiDefinition) ===
 
 	/**
 	 * @return array<EndpointResponse>
 	 */
 	public function getResponses(): array
 	{
-		return $this->responses;
+		return $this->openApi->getResponses();
 	}
 
 	public function hasResponse(string $code): bool
 	{
-		return isset($this->responses[$code]);
+		return $this->openApi->hasResponse($code);
 	}
 
 	public function addResponse(EndpointResponse $response): void
 	{
-		$this->responses[$response->getCode()] = $response;
+		$this->openApi->addResponse($response);
 	}
 
 	/**
@@ -199,133 +190,72 @@ class Endpoint
 	 */
 	public function setResponses(array $responses): void
 	{
-		foreach ($responses as $response) {
-			$this->addResponse($response);
-		}
+		$this->openApi->setResponses($responses);
 	}
 
-	public function setRequestBody(EndpointRequestBody|null $requestBody): void
-	{
-		$this->requestBody = $requestBody;
-	}
-
-	public function getRequestBody(): EndpointRequestBody|null
-	{
-		return $this->requestBody;
-	}
+	// === OpenAPI spec (delegated to OpenApiDefinition) ===
 
 	/**
-	 * @return array<mixed>
+	 * @return array<string, mixed>
 	 */
 	public function getOpenApi(): array
 	{
-		return $this->openApi;
+		return $this->openApi->getOpenApi();
 	}
 
 	/**
-	 * @param array<mixed> $openApi
+	 * @param array<string, mixed> $openApi
 	 */
 	public function setOpenApi(array $openApi): void
 	{
-		$this->openApi = $openApi;
+		$this->openApi->setOpenApi($openApi);
 	}
 
+	// === Tags (delegated to OpenApiDefinition) ===
+
 	/**
-	 * @return array<mixed>
+	 * @return array<string, mixed>
 	 */
 	public function getTags(): array
 	{
-		return $this->tags;
+		return $this->openApi->getTags();
 	}
 
 	public function getTag(string $name): mixed
 	{
-		return $this->tags[$name] ?? null;
+		return $this->openApi->getTag($name);
 	}
 
 	public function hasTag(string $name): bool
 	{
-		return array_key_exists($name, $this->tags);
+		return $this->openApi->hasTag($name);
 	}
 
 	public function addTag(string $name, mixed $value = null): void
 	{
-		$this->tags[$name] = $value;
+		$this->openApi->addTag($name, $value);
 	}
 
-	public function setAttribute(string $key, mixed $value): void
+	// === Summary and Deprecated (delegated to OpenApiDefinition) ===
+
+	public function getSummary(): string|null
 	{
-		$this->metadata[$key] = $value;
+		return $this->openApi->getSummary();
 	}
 
-	public function getAttribute(string $key, mixed $default = null): mixed
+	public function setSummary(string|null $summary): void
 	{
-		return Arrays::get($this->metadata, $key, $default);
+		$this->openApi->setSummary($summary);
 	}
 
-	/**
-	 * @return array<ReflectionAttribute<object>>
-	 */
-	public function getPathAttributes(): array
+	public function isDeprecated(): bool
 	{
-		$attributes = [];
-
-		try {
-			$reflectionMethod = new ReflectionMethod($this->handler->getClass(), $this->handler->getMethod());
-			$attributes = $reflectionMethod->getAttributes();
-
-			foreach ($attributes as $attribute) {
-				$attributes[] = $attribute;
-			}
-		} catch (Throwable) {
-			// Do nothing
-		}
-
-		return $attributes;
+		return $this->openApi->isDeprecated();
 	}
 
-	/**
-	 * @return array<ReflectionAttribute<object>>
-	 */
-	public function getControllerAttributes(): array
+	public function setDeprecated(bool $deprecated): void
 	{
-		$attributes = [];
-
-		try {
-
-			$class = $this->handler->getClass();
-			$reflectionClass = new ReflectionClass($class);
-
-			while ($reflectionClass !== false) {
-				foreach ($reflectionClass->getAttributes() as $attribute) {
-					if (in_array($attribute, $attributes, true)) {
-						continue;
-					}
-
-					$attributes[] = $attribute;
-				}
-
-				$reflectionClass = $reflectionClass->getParentClass();
-			}
-		} catch (Throwable) {
-			// Do nothing
-		}
-
-		return $attributes;
-	}
-
-	private function generatePattern(): string
-	{
-		$rawPattern = $this->getAttribute('pattern');
-
-		if ($rawPattern === null) {
-			throw new InvalidStateException('Pattern attribute is required');
-		}
-
-		return sprintf(
-			'#^%s$#', // Exactly match raw pattern
-			$rawPattern,
-		);
+		$this->openApi->setDeprecated($deprecated);
 	}
 
 }

@@ -2,11 +2,11 @@
 
 namespace Sabservis\Api\Security;
 
-use Psr\Http\Message\ServerRequestInterface;
+use Sabservis\Api\Http\ApiRequest;
 
 interface Authenticator
 {
 
-	public function authenticate(ServerRequestInterface $request): mixed;
+	public function authenticate(ApiRequest $request): mixed;
 
 }

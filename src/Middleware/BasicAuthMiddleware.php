@@ -2,9 +2,9 @@
 
 namespace Sabservis\Api\Middleware;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 use function base64_decode;
 use function count;
 use function explode;
@@ -36,14 +36,23 @@ class BasicAuthMiddleware implements Middleware
 
 	protected function auth(string $user, string $password): bool
 	{
-		if (!isset($this->users[$user])) {
-			return false;
-		}
+		// Dummy hash for constant-time comparison when user doesn't exist
+		// This prevents timing attacks that could reveal valid usernames
+		$dummyHash = '$2y$10$dummyHashForTimingAttackPreventionXXXXXXXXXXXXXXX';
 
-		return !(
-			($this->users[$user]['unsecured'] === true && !hash_equals($password, $this->users[$user]['password'])) ||
-			($this->users[$user]['unsecured'] === false && !password_verify($password, $this->users[$user]['password']))
-		);
+		$userData = $this->users[$user] ?? [
+			'password' => $dummyHash,
+			'unsecured' => false,
+		];
+		$userExists = isset($this->users[$user]);
+
+		// Always perform password verification to ensure constant-time execution
+		$passwordValid = $userData['unsecured'] === true
+			? hash_equals($userData['password'], $password)
+			: password_verify($password, $userData['password']);
+
+		// Both conditions must be true
+		return $userExists && $passwordValid;
 	}
 
 	/**
@@ -68,12 +77,12 @@ class BasicAuthMiddleware implements Middleware
 	}
 
 	public function __invoke(
-		ServerRequestInterface $request,
-		ResponseInterface $response,
+		ApiRequest $request,
+		ApiResponse $response,
 		callable $next,
-	): ResponseInterface
+	): ApiResponse
 	{
-		$authorization = $this->parseAuthorizationHeader($request->getHeaderLine('Authorization'));
+		$authorization = $this->parseAuthorizationHeader($request->getHeader('Authorization') ?? '');
 
 		if ($authorization !== null && $this->auth($authorization['username'], $authorization['password'])) {
 			return $next(

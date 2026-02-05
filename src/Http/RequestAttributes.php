@@ -2,17 +2,30 @@
 
 namespace Sabservis\Api\Http;
 
-interface RequestAttributes
+enum RequestAttributes: string
 {
 
-	public const Endpoint = 'api.endpoint';
+	case Endpoint = 'api.endpoint';
 
-	public const Router = 'api.router';
+	case Router = 'api.router';
 
-	public const Parameters = 'api.parameters';
+	/**
+	 * Combined parameters from path and query (for backward compatibility).
+	 *
+	 * @deprecated Use PathParameters or QueryParameters for explicit source distinction
+	 */
+	case Parameters = 'api.parameters';
 
-	public const RequestEntity = 'api.request.entity';
+	/**
+	 * Parameters extracted from URL path (e.g., /users/{id} -> ['id' => '123']).
+	 */
+	case PathParameters = 'api.parameters.path';
 
-	public const ResponseEntity = 'api.response.entity';
+	/**
+	 * Parameters from query string (e.g., ?limit=10 -> ['limit' => '10']).
+	 */
+	case QueryParameters = 'api.parameters.query';
+
+	case RequestEntity = 'api.request.entity';
 
 }

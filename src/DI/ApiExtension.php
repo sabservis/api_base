@@ -7,39 +7,28 @@ use Nette\DI\Definitions\Statement;
 use Nette\Schema\Expect;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
-use Sabservis\Api\Application\HttpApplication;
+use Sabservis\Api\Application;
 use Sabservis\Api\Attribute;
-use Sabservis\Api\Decorator;
-use Sabservis\Api\DI\Loader\DoctrineAnnotationLoader;
-use Sabservis\Api\Dispatcher\Dispatcher;
-use Sabservis\Api\Dispatcher\JsonDispatcher;
+use Sabservis\Api\Dispatcher\ApiDispatcher;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
 use Sabservis\Api\ErrorHandler\PsrLogErrorHandler;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
-use Sabservis\Api\Exception\InvalidStateException;
-use Sabservis\Api\Handler\Handler;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
-use Sabservis\Api\Mapping\Normalizer\NormalizerProvider;
-use Sabservis\Api\Mapping\Normalizer\Processor\MainNormalizerProcessor;
-use Sabservis\Api\Mapping\Normalizer\Processor\NormalizerProcessor;
-use Sabservis\Api\Mapping\Normalizer\TypeNormalizerProvider;
-use Sabservis\Api\Mapping\Normalizer\Types;
 use Sabservis\Api\Mapping\RequestParameterMapping;
+use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
-use Sabservis\Api\Mapping\Serializer\JsonSerializer;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
-use Sabservis\Api\Mapping\Validator\NullValidator;
 use Sabservis\Api\Middleware\ApiMiddleware;
+use Sabservis\Api\Middleware\CORSMiddleware;
+use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\Router;
 use Sabservis\Api\Schema\Schema;
-use Sabservis\Api\Schema\SchemaBuilder;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
-use Sabservis\Api\Schema\Serialization\ArraySerializator;
 use Sabservis\Api\Utils\ChainBuilder;
 use stdClass;
 use function assert;
 use function class_exists;
-use function count;
 use function is_object;
 use function is_string;
 use function sprintf;
@@ -49,28 +38,14 @@ use function uasort;
 final class ApiExtension extends Nette\DI\CompilerExtension
 {
 
-	public const DecoratorTag = 'api.decorator';
-
-	/** @var array<int, class-string<Types\TypeNormalizer>> $normalizerTypes */
-	private array $normalizerTypes
-		= [
-			Types\ArrayTypeNormalizer::class,
-			Types\BackedEnumTypeNormalizer::class,
-			Types\BooleanTypeNormalizer::class,
-			Types\DateTimeNormalizer::class,
-			Types\FloatTypeNormalizer::class,
-			Types\IntegerTypeNormalizer::class,
-			Types\ObjectTypeNormalizer::class,
-			Types\StringTypeNormalizer::class,
-			Types\UnitEnumTypeNormalizer::class,
-		];
-
 	public function getConfigSchema(): Nette\Schema\Schema
 	{
 		$parameters = $this->getContainerBuilder()->parameters;
 
 		return Nette\Schema\Expect::structure([
 			'debug' => Nette\Schema\Expect::bool($parameters['productionMode'] === false),
+			'trustedProxies' => Nette\Schema\Expect::arrayOf('string')->default([]),
+			'maxRequestBodySize' => Nette\Schema\Expect::int()->nullable()->default(null),
 			'middlewares' => Nette\Schema\Expect::arrayOf(
 				Nette\Schema\Expect::anyOf(
 					Nette\Schema\Expect::string(),
@@ -84,29 +59,32 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 					]),
 				),
 			),
-			'normalizer' => Nette\Schema\Expect::structure([
-				'class' => Nette\Schema\Expect::anyOf(
-					Nette\Schema\Expect::string(),
-					Nette\Schema\Expect::type(Nette\DI\Definitions\Statement::class),
-				)->default(MainNormalizerProcessor::class),
-				'typeProvider' => Nette\Schema\Expect::structure([
-					'class' => Nette\Schema\Expect::anyOf(
-						Nette\Schema\Expect::string(),
-						Nette\Schema\Expect::type(Nette\DI\Definitions\Statement::class),
-					)->default(TypeNormalizerProvider::class),
-					'types' => Nette\Schema\Expect::arrayOf('string')
-						->default([]),
-				]),
-			]),
 			'errorHandler' => Expect::type('string|array|' . Statement::class)->default(SimpleErrorHandler::class),
 			'resources' => Nette\Schema\Expect::structure([
 				'excludes' => Nette\Schema\Expect::arrayOf('string'),
 				'paths' => Nette\Schema\Expect::arrayOf('string'),
 			]),
-			'serializer' => Expect::type('string|array|' . Statement::class)->default(JsonSerializer::class),
-			'validator' => Expect::type('string|array|' . Statement::class)->default(NullValidator::class),
+			'serializer' => Expect::type('string|array|' . Statement::class)->default(DataMapperSerializer::class),
+			'validator' => Expect::type('string|array|' . Statement::class)->nullable()->default(null),
 			'router' => Nette\Schema\Expect::structure([
 				'basePath' => Nette\Schema\Expect::string()->nullable()->default(null),
+				'cache' => Nette\Schema\Expect::anyOf(
+					Nette\Schema\Expect::string(),
+					Nette\Schema\Expect::type(Nette\DI\Definitions\Statement::class),
+				)->nullable()->default(null),
+			]),
+			'cors' => Nette\Schema\Expect::structure([
+				'enabled' => Nette\Schema\Expect::bool(false),
+				'allowedOrigins' => Nette\Schema\Expect::arrayOf('string')->default([]),
+				'allowedMethods' => Nette\Schema\Expect::arrayOf('string')->default(
+					['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+				),
+				'allowedHeaders' => Nette\Schema\Expect::arrayOf('string')->default(
+					['Content-Type', 'Authorization', 'X-Requested-With'],
+				),
+				'allowCredentials' => Nette\Schema\Expect::bool(false),
+				'maxAge' => Nette\Schema\Expect::int(3_600),
+				'exposedHeaders' => Nette\Schema\Expect::arrayOf('string')->default([]),
 			]),
 		]);
 	}
@@ -117,13 +95,17 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		// Process API extensions
 		$this->registerCoreServices($builder);
-		$this->registerCoreDecoratorServices($builder);
 		$this->registerCoreMappingServices($builder);
+		$this->registerCorsMiddleware($builder);
 	}
 
 	public function beforeCompile(): void
 	{
 		$builder = $this->getContainerBuilder();
+		$config = $this->getConfig();
+
+		// Validate middleware configuration
+		$this->validateMiddlewareConfiguration($config);
 
 		// Schema
 		$builder->addDefinition($this->prefix('schema.hydrator'))
@@ -150,36 +132,32 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			}
 		}
 
-		// Decorators
-		$managerDefinition = $builder->getDefinition($this->prefix('decorator.manager'));
-		assert($managerDefinition instanceof Nette\DI\Definitions\ServiceDefinition);
-
-		// > Request decorators
-		$requestDecoratorDefinitions = $builder->findByType(Decorator\RequestDecorator::class);
-		$requestDecoratorDefinitions = Helpers::sortByPriorityInTag(self::DecoratorTag, $requestDecoratorDefinitions);
-
-		foreach ($requestDecoratorDefinitions as $decoratorDefinition) {
-			$managerDefinition->addSetup('addRequestDecorator', [$decoratorDefinition]);
-		}
-
-		// > Response decorators
-		$responseDecoratorDefinitions = $builder->findByType(Decorator\ResponseDecorator::class);
-		$responseDecoratorDefinitions = Helpers::sortByPriorityInTag(self::DecoratorTag, $responseDecoratorDefinitions);
-
-		foreach ($responseDecoratorDefinitions as $decoratorDefinition) {
-			$managerDefinition->addSetup('addResponseDecorator', [$decoratorDefinition]);
-		}
-
-		// > Error Decorators
-		$errorDecoratorDefinitions = $builder->findByType(Decorator\ErrorDecorator::class);
-		$errorDecoratorDefinitions = Helpers::sortByPriorityInTag(self::DecoratorTag, $errorDecoratorDefinitions);
-
-		foreach ($errorDecoratorDefinitions as $decoratorDefinition) {
-			$managerDefinition->addSetup('addErrorDecorator', [$decoratorDefinition]);
-		}
+		// Add CORS middleware to chain first (needs to run before other middlewares for preflight)
+		$this->compileCorsMiddleware();
 
 		// Register all middlewares
 		$this->compileDefinedMiddlewares();
+	}
+
+	/**
+	 * Validate middleware configuration for common issues.
+	 *
+	 * @throws RuntimeStateException When configuration has critical issues
+	 */
+	private function validateMiddlewareConfiguration(stdClass $config): void
+	{
+		// Validate CORS configuration
+		if ($config->cors->enabled && $config->cors->allowCredentials) {
+			if ($config->cors->allowedOrigins === []) {
+				throw new RuntimeStateException(
+					'CORS: allowCredentials requires explicit allowedOrigins. ' .
+					'Using credentials with wildcard origin is a security vulnerability.',
+				);
+			}
+		}
+
+		// Validate trustedProxies with maxRequestBodySize
+		// (Without trustedProxies, X-Forwarded-* headers are ignored which is correct behavior)
 	}
 
 	/**
@@ -187,23 +165,25 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 	 */
 	protected function compileSchema(): array
 	{
-		// Instance schema builder
-		$builder = new SchemaBuilder();
+		$loader = new OpenApiAttributeLoader($this->getContainerBuilder());
 
-		// Load schema
-		$builder = $this->loadSchema($builder);
-
-		// Convert schema to array (for DI)
-		$generator = new ArraySerializator();
-
-		return $generator->serialize($builder);
+		return $loader->load();
 	}
 
-	protected function loadSchema(SchemaBuilder $builder): SchemaBuilder
+	private function compileCorsMiddleware(): void
 	{
-		$loader = new DoctrineAnnotationLoader($this->getContainerBuilder());
+		$builder = $this->getContainerBuilder();
+		$config = $this->getConfig();
 
-		return $loader->load($builder);
+		if ($config->cors->enabled !== true) {
+			return;
+		}
+
+		$chain = $builder->getDefinition($this->prefix('middleware.chain'));
+		assert($chain instanceof Nette\DI\Definitions\ServiceDefinition);
+
+		$corsMiddleware = $builder->getDefinition($this->prefix('middleware.cors'));
+		$chain->addSetup('add', [$corsMiddleware]);
 	}
 
 	private function compileDefinedMiddlewares(): void
@@ -230,7 +210,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			}
 
 			if (!($service instanceof Nette\DI\Definitions\Statement || is_string($service))) {
-				throw new InvalidStateException('Unsupported middleware definition');
+				throw new RuntimeStateException('Unsupported middleware definition');
 			}
 
 			$middlewareDef = $builder
@@ -290,78 +270,92 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 	private function registerCoreServices(Nette\DI\ContainerBuilder $builder): void
 	{
+		$config = $this->getConfig();
+
 		$builder->addDefinition($this->prefix('middleware.chain'))
 			->setAutowired(false)
 			->setFactory(ChainBuilder::class);
 
 		$builder->addDefinition($this->prefix('dispatcher'))
-			->setFactory(JsonDispatcher::class)
-			->setType(Dispatcher::class);
+			->setFactory(ApiDispatcher::class);
 
 		$builder->addDefinition($this->prefix('errorHandler'))
-			->setFactory($this->getConfig()->errorHandler)
+			->setFactory($config->errorHandler)
 			->setType(ErrorHandler::class)
 			->addSetup('setDebugMode', [
-				$this->getConfig()->debug,
+				$config->debug,
 			]);
 
-		$builder->addDefinition($this->prefix('application'))
-			->setFactory(HttpApplication::class)
-			->setArguments([new Nette\DI\Definitions\Statement('@' . $this->prefix('middleware.chain') . '::create')]);
+		$applicationDef = $builder->addDefinition($this->prefix('application'))
+			->setFactory(Application\ApiApplication::class)
+			->setArguments([
+				new Nette\DI\Definitions\Statement('@' . $this->prefix('middleware.chain') . '::create'),
+				'@' . $this->prefix('errorHandler'),
+			])
+			->addSetup('setCatchExceptions', [!$config->debug]);
+
+		if ($config->trustedProxies !== []) {
+			$applicationDef->addSetup('setTrustedProxies', [$config->trustedProxies]);
+		}
+
+		if ($config->maxRequestBodySize !== null) {
+			$applicationDef->addSetup('setMaxRequestBodySize', [$config->maxRequestBodySize]);
+		}
 
 		$builder->addDefinition($this->prefix('router'))
-			->setType(Router\Router::class)
-			->setFactory(Router\SimpleRouter::class)
+			->setFactory(Router\Router::class, [
+				'cache' => $config->router->cache,
+			])
 			->addSetup('setBasePath', [
-				$this->getConfig()->router->basePath ?? null,
+				$config->router->basePath ?? null,
 			]);
 
 		$builder->addDefinition($this->prefix('handler'))
-			->setType(Handler::class)
-			->setFactory(ServiceHandler::class);
+			->setFactory(ServiceHandler::class, [
+				'serializer' => '@' . $this->prefix('request.entity.serializer'),
+				'validator' => $config->validator !== null ? '@' . $this->prefix('request.entity.validator') : null,
+				'cache' => $config->router->cache,
+			]);
 
 		$builder->addDefinition($this->prefix('schema'))
 			->setFactory(Schema::class);
-	}
-
-	private function registerCoreDecoratorServices(Nette\DI\ContainerBuilder $builder): void
-	{
-		$builder->addDefinition($this->prefix('decorator.manager'))
-			->setFactory(Decorator\DecoratorManager::class);
 	}
 
 	private function registerCoreMappingServices(Nette\DI\ContainerBuilder $builder): void
 	{
 		$config = $this->getConfig();
 
-		$builder->addDefinition($this->prefix('decorator.request.parameters'))
-			->setFactory(Decorator\RequestParametersDecorator::class);
-
 		$builder->addDefinition($this->prefix('request.parameters.mapping'))
 			->setFactory(RequestParameterMapping::class);
 
-		$builder->addDefinition($this->prefix('request.entity.validator'))
-			->setType(EntityValidator::class)
-			->setFactory($config->validator);
-
-		$typeProvider = $builder->addDefinition($this->prefix('request.entity.normalizer.typeProvider'))
-			->setType(NormalizerProvider::class)
-			->setFactory($config->normalizer->typeProvider->class);
-
-		$normalizers = count($config->normalizer->typeProvider->types)
-			? $config->normalizer->typeProvider->types
-			: $this->normalizerTypes;
-		foreach ($normalizers as $normalizer) {
-			$typeProvider->addSetup('addNormalizer', [$normalizer]);
+		if ($config->validator !== null) {
+			$builder->addDefinition($this->prefix('request.entity.validator'))
+				->setType(EntityValidator::class)
+				->setFactory($config->validator);
 		}
-
-		$builder->addDefinition($this->prefix('request.entity.normalizer'))
-			->setType(NormalizerProcessor::class)
-			->setFactory($config->normalizer->class);
 
 		$builder->addDefinition($this->prefix('request.entity.serializer'))
 			->setType(EntitySerializer::class)
 			->setFactory($config->serializer);
+	}
+
+	private function registerCorsMiddleware(Nette\DI\ContainerBuilder $builder): void
+	{
+		$config = $this->getConfig();
+
+		if ($config->cors->enabled !== true) {
+			return;
+		}
+
+		$builder->addDefinition($this->prefix('middleware.cors'))
+			->setFactory(CORSMiddleware::class, [
+				'allowedOrigins' => $config->cors->allowedOrigins,
+				'allowedMethods' => $config->cors->allowedMethods,
+				'allowedHeaders' => $config->cors->allowedHeaders,
+				'allowCredentials' => $config->cors->allowCredentials,
+				'maxAge' => $config->cors->maxAge,
+				'exposedHeaders' => $config->cors->exposedHeaders,
+			]);
 	}
 
 }

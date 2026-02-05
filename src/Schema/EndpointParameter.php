@@ -15,14 +15,6 @@ class EndpointParameter
 
 	public const TypeDateTime = 'datetime';
 
-	public const TYPES = [
-		self::TypeString,
-		self::TypeInteger,
-		self::TypeFloat,
-		self::TypeBoolean,
-		self::TypeDateTime,
-	];
-
 	public const InQuery = 'query';
 
 	public const InCookie = 'cookie';
@@ -30,13 +22,6 @@ class EndpointParameter
 	public const InHeader = 'header';
 
 	public const InPath = 'path';
-
-	public const IN = [
-		self::InQuery,
-		self::InCookie,
-		self::InHeader,
-		self::InPath,
-	];
 
 	private string|null $description = null;
 
@@ -46,9 +31,7 @@ class EndpointParameter
 
 	private bool $deprecated = false;
 
-	private bool $allowEmpty = false;
-
-	private string|null $denormalizer = null;
+	private bool $allowEmptyValue = false;
 
 	public function __construct(
 		private string $name,
@@ -107,24 +90,14 @@ class EndpointParameter
 		$this->deprecated = $deprecated;
 	}
 
-	public function isAllowEmpty(): bool
+	public function isAllowEmptyValue(): bool
 	{
-		return $this->allowEmpty;
+		return $this->allowEmptyValue;
 	}
 
-	public function setAllowEmpty(bool $allowEmpty): void
+	public function setAllowEmptyValue(bool $allowEmptyValue): void
 	{
-		$this->allowEmpty = $allowEmpty;
-	}
-
-	public function getDenormalizer(): string|null
-	{
-		return $this->denormalizer;
-	}
-
-	public function setDenormalizer(string|null $denormalizer): void
-	{
-		$this->denormalizer = $denormalizer;
+		$this->allowEmptyValue = $allowEmptyValue;
 	}
 
 }
