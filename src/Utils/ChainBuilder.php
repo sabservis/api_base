@@ -2,9 +2,9 @@
 
 namespace Sabservis\Api\Utils;
 
-use Psr\Http\Message\RequestInterface;
-use Psr\Http\Message\ResponseInterface;
-use Sabservis\Api\Exception\InvalidStateException;
+use Sabservis\Api\Exception\RuntimeStateException;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 use function array_pop;
 
 class ChainBuilder
@@ -12,17 +12,6 @@ class ChainBuilder
 
 	/** @var array<callable> */
 	protected array $middlewares = [];
-
-	/**
-	 * @param array<callable> $middlewares
-	 */
-	public static function factory(array $middlewares): callable
-	{
-		$chain = new self();
-		$chain->addAll($middlewares);
-
-		return $chain->create();
-	}
 
 	public function add(callable $middleware): void
 	{
@@ -42,15 +31,19 @@ class ChainBuilder
 	public function create(): callable
 	{
 		if ($this->middlewares === []) {
-			throw new InvalidStateException('At least one middleware is needed');
+			throw new RuntimeStateException('At least one middleware is needed');
 		}
 
-		$next = Lambda::leaf();
+		// Terminal handler - just returns response
+		$next = static fn (ApiRequest $request, ApiResponse $response): ApiResponse => $response;
 
 		$middlewares = $this->middlewares;
 
 		while ($middleware = array_pop($middlewares)) {
-			$next = static fn (RequestInterface $request, ResponseInterface $response): ResponseInterface => $middleware($request, $response, $next);
+			$currentMiddleware = $middleware;
+			$currentNext = $next;
+			$next = static fn (ApiRequest $request, ApiResponse $response): ApiResponse
+				=> $currentMiddleware($request, $response, $currentNext);
 		}
 
 		return $next;

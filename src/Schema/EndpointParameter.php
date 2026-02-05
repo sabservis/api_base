@@ -15,14 +15,6 @@ class EndpointParameter
 
 	public const TypeDateTime = 'datetime';
 
-	public const TYPES = [
-		self::TypeString,
-		self::TypeInteger,
-		self::TypeFloat,
-		self::TypeBoolean,
-		self::TypeDateTime,
-	];
-
 	public const InQuery = 'query';
 
 	public const InCookie = 'cookie';
@@ -30,13 +22,6 @@ class EndpointParameter
 	public const InHeader = 'header';
 
 	public const InPath = 'path';
-
-	public const IN = [
-		self::InQuery,
-		self::InCookie,
-		self::InHeader,
-		self::InPath,
-	];
 
 	private string|null $description = null;
 
@@ -46,9 +31,19 @@ class EndpointParameter
 
 	private bool $deprecated = false;
 
-	private bool $allowEmpty = false;
+	private bool $allowEmptyValue = false;
 
-	private string|null $denormalizer = null;
+	private mixed $example = null;
+
+	private string|null $style = null;
+
+	private bool|null $explode = null;
+
+	/** @var array<string, mixed>|null */
+	private array|null $schemaSpec = null;
+
+	/** @var class-string|null Original class reference for schema registration */
+	private string|null $schemaRef = null;
 
 	public function __construct(
 		private string $name,
@@ -107,24 +102,76 @@ class EndpointParameter
 		$this->deprecated = $deprecated;
 	}
 
-	public function isAllowEmpty(): bool
+	public function isAllowEmptyValue(): bool
 	{
-		return $this->allowEmpty;
+		return $this->allowEmptyValue;
 	}
 
-	public function setAllowEmpty(bool $allowEmpty): void
+	public function setAllowEmptyValue(bool $allowEmptyValue): void
 	{
-		$this->allowEmpty = $allowEmpty;
+		$this->allowEmptyValue = $allowEmptyValue;
 	}
 
-	public function getDenormalizer(): string|null
+	public function getExample(): mixed
 	{
-		return $this->denormalizer;
+		return $this->example;
 	}
 
-	public function setDenormalizer(string|null $denormalizer): void
+	public function setExample(mixed $example): void
 	{
-		$this->denormalizer = $denormalizer;
+		$this->example = $example;
+	}
+
+	public function getStyle(): string|null
+	{
+		return $this->style;
+	}
+
+	public function setStyle(string|null $style): void
+	{
+		$this->style = $style;
+	}
+
+	public function getExplode(): bool|null
+	{
+		return $this->explode;
+	}
+
+	public function setExplode(bool|null $explode): void
+	{
+		$this->explode = $explode;
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	public function getSchemaSpec(): array|null
+	{
+		return $this->schemaSpec;
+	}
+
+	/**
+	 * @param array<string, mixed>|null $schemaSpec
+	 */
+	public function setSchemaSpec(array|null $schemaSpec): void
+	{
+		$this->schemaSpec = $schemaSpec;
+	}
+
+	/**
+	 * @return class-string|null
+	 */
+	public function getSchemaRef(): string|null
+	{
+		return $this->schemaRef;
+	}
+
+	/**
+	 * @param class-string|null $schemaRef
+	 */
+	public function setSchemaRef(string|null $schemaRef): void
+	{
+		$this->schemaRef = $schemaRef;
 	}
 
 }

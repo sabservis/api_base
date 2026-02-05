@@ -2,10 +2,10 @@
 
 namespace Sabservis\Api\Schema\Serialization;
 
+use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Schema\Endpoint;
-use Sabservis\Api\Schema\EndpointHandler;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\EndpointRequestBody;
 use Sabservis\Api\Schema\EndpointResponse;
@@ -24,9 +24,25 @@ class ArrayHydrator implements Hydrator
 
 		$schema = new Schema();
 
-		foreach ($data as $endpoint) {
+		// Support both old format (array of endpoints) and new format (with tags)
+		$endpoints = $data['endpoints'] ?? $data;
+		$tags = $data['tags'] ?? [];
+
+		foreach ($endpoints as $endpoint) {
+			if (!is_array($endpoint)) {
+				continue;
+			}
+
 			$endpoint = $this->hydrateEndpoint($endpoint);
 			$schema->addEndpoint($endpoint);
+		}
+
+		// Hydrate tags
+		foreach ($tags as $name => $tagData) {
+			$schema->addTag(
+				$tagData['name'] ?? $name,
+				$tagData['description'] ?? null,
+			);
 		}
 
 		return $schema;
@@ -41,12 +57,11 @@ class ArrayHydrator implements Hydrator
 			throw new InvalidStateException("Schema route 'handler' is required");
 		}
 
-		$handler = new EndpointHandler(
+		$endpoint = new Endpoint(
 			$data['handler']['class'],
 			$data['handler']['method'],
 		);
 
-		$endpoint = new Endpoint($handler);
 		$endpoint->setMethods($data['methods']);
 		$endpoint->setMask($data['mask']);
 
@@ -60,8 +75,24 @@ class ArrayHydrator implements Hydrator
 			$endpoint->addTag(Endpoint::TAG_ID, $data['id']);
 		}
 
+		if (isset($data['summary'])) {
+			$endpoint->setSummary($data['summary']);
+		}
+
+		if (isset($data['description'])) {
+			$endpoint->setDescription($data['description']);
+		}
+
+		if (isset($data['deprecated']) && $data['deprecated'] === true) {
+			$endpoint->setDeprecated(true);
+		}
+
+		if (isset($data['security'])) {
+			$endpoint->setSecurity($data['security']);
+		}
+
 		if (isset($data['attributes']['pattern'])) {
-			$endpoint->setAttribute('pattern', $data['attributes']['pattern']);
+			$endpoint->getRouteDefinition()->setRawPattern($data['attributes']['pattern']);
 		}
 
 		if (isset($data['parameters'])) {
@@ -74,8 +105,12 @@ class ArrayHydrator implements Hydrator
 				$parameter->setIn($param['in']);
 				$parameter->setRequired($param['required']);
 				$parameter->setDeprecated($param['deprecated']);
-				$parameter->setAllowEmpty($param['allowEmpty']);
-				$parameter->setDenormalizer($param['denormalizer']);
+				$parameter->setAllowEmptyValue($param['allowEmptyValue'] ?? $param['allowEmpty'] ?? false);
+				$parameter->setExample($param['example'] ?? null);
+				$parameter->setStyle($param['style'] ?? null);
+				$parameter->setExplode($param['explode'] ?? null);
+				$parameter->setSchemaSpec($param['schemaSpec'] ?? null);
+				$parameter->setSchemaRef($param['schemaRef'] ?? null);
 
 				$endpoint->addParameter($parameter);
 			}
@@ -88,6 +123,31 @@ class ArrayHydrator implements Hydrator
 			$request->setDescription($requestData['description']);
 			$request->setEntity($requestData['entity']);
 			$request->setRequired($requestData['required']);
+			$request->setContentSpec($requestData['contentSpec'] ?? null);
+			$request->setAllowedContentTypes($requestData['allowedContentTypes'] ?? null);
+
+			// Hydrate file uploads
+			if (isset($requestData['fileUploads']) && is_array($requestData['fileUploads'])) {
+				$fileUploads = [];
+
+				foreach ($requestData['fileUploads'] as $uploadData) {
+					// FileUpload can be either already an object (from direct cache)
+					// or an array (from serialized cache)
+					if ($uploadData instanceof FileUpload) {
+						$fileUploads[] = $uploadData;
+					} elseif (is_array($uploadData)) {
+						$fileUploads[] = new FileUpload(
+							name: $uploadData['name'],
+							multiple: $uploadData['multiple'] ?? false,
+							required: $uploadData['required'] ?? true,
+							description: $uploadData['description'] ?? null,
+							allowedTypes: $uploadData['allowedTypes'] ?? null,
+						);
+					}
+				}
+
+				$request->setFileUploads($fileUploads);
+			}
 
 			$endpoint->setRequestBody($request);
 		}
@@ -101,6 +161,22 @@ class ArrayHydrator implements Hydrator
 
 				if (isset($res['entity'])) {
 					$response->setEntity($res['entity']);
+				}
+
+				if (isset($res['wrapperType'])) {
+					$response->setWrapperType($res['wrapperType']);
+				}
+
+				if (isset($res['fileResponse']['contentType'])) {
+					$response->setFileContentType($res['fileResponse']['contentType']);
+				}
+
+				if (isset($res['contentSpec'])) {
+					$response->setContentSpec($res['contentSpec']);
+				}
+
+				if (isset($res['referencedSchemas'])) {
+					$response->setReferencedSchemas($res['referencedSchemas']);
 				}
 
 				$endpoint->addResponse($response);

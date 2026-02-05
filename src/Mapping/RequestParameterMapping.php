@@ -2,206 +2,170 @@
 
 namespace Sabservis\Api\Mapping;
 
-use BackedEnum;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Http\ApiRequest;
-use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\RequestAttributes;
-use Sabservis\Api\Mapping\Normalizer\NormalizerProvider;
-use Sabservis\Api\Mapping\Normalizer\Types\TypeNormalizer;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointParameter;
-use Throwable;
-use UnitEnum;
 use function array_change_key_case;
 use function array_key_exists;
 use function assert;
-use function is_subclass_of;
 use function sprintf;
 use function strtolower;
 use function ucfirst;
 
+/**
+ * Maps request parameters from path/query/header/cookie to typed values.
+ *
+ * Responsibilities:
+ * - Locates parameters in the request (path, query, header, cookie)
+ * - Validates required parameters are present
+ * - Validates non-empty constraints
+ * - Delegates type conversion to ParameterTypeConverter
+ * - Updates request with converted values
+ */
 class RequestParameterMapping
 {
 
-	public function __construct(protected NormalizerProvider $normalizer)
+	private ParameterTypeConverter $converter;
+
+	public function __construct(ParameterTypeConverter|null $converter = null)
 	{
+		$this->converter = $converter ?? new ParameterTypeConverter();
 	}
 
-	public function map(ApiRequest $request, ApiResponse $response): ApiRequest
+	public function map(ApiRequest $request): ApiRequest
 	{
-		$endpoint = $request->getAttribute(RequestAttributes::Endpoint);
+		$endpoint = $request->getAttribute(RequestAttributes::Endpoint->value);
 		assert($endpoint instanceof Endpoint || $endpoint === null);
 
-		// Validate that we have an endpoint
 		if ($endpoint === null) {
-			throw new InvalidStateException(sprintf('Attribute "%s" is required', RequestAttributes::Endpoint));
+			throw new InvalidStateException(sprintf('Attribute "%s" is required', RequestAttributes::Endpoint->value));
 		}
 
-		// Get all parameters
 		$parameters = $endpoint->getParameters();
 
-		// Skip, if there are no parameters
 		if ($parameters === []) {
 			return $request;
 		}
 
-		$headerParameters = array_change_key_case($request->getHeaders());
-		$cookieParams = $request->getCookieParams();
-		// Get request parameters from attribute
-		$requestParameters = $request->getAttribute(RequestAttributes::Parameters);
+		$sources = $this->prepareSources($request);
 
-		// Iterate over all parameters
 		foreach ($parameters as $parameter) {
-			switch ($parameter->getIn()) {
-				case $parameter::InPath:
-				case $parameter::InQuery:
-					// Logical check
-					if (!array_key_exists($parameter->getName(), $requestParameters)) {
-						if (!$parameter->isRequired()) {
-							break;
-						}
-
-						throw new ClientErrorException(sprintf(
-							'%s request parameter "%s" should be provided.',
-							ucfirst($parameter->getIn()),
-							$parameter->getName(),
-						));
-					}
-
-					// Obtain request parameter values
-					$value = $requestParameters[$parameter->getName()];
-
-					$this->checkParameterProvided($parameter, $value);
-					$this->checkParameterNotEmpty($parameter, $value);
-
-					// Normalize value
-					$normalizedValue = $this->denormalize($value, $parameter);
-
-					// Update requests
-					$requestParameters[$parameter->getName()] = $normalizedValue;
-
-					$request = $request->withAttribute(RequestAttributes::Parameters, $requestParameters);
-
-					break;
-				case $parameter::InCookie:
-					// Logical check
-					if (!array_key_exists($parameter->getName(), $cookieParams)) {
-						if (!$parameter->isRequired()) {
-							break;
-						}
-
-						throw new ClientErrorException(sprintf(
-							'%s request parameter "%s" should be provided.',
-							ucfirst($parameter->getIn()),
-							$parameter->getName(),
-						));
-					}
-
-					// Obtain request parameter values
-					$value = $cookieParams[$parameter->getName()];
-
-					$this->checkParameterProvided($parameter, $value);
-					$this->checkParameterNotEmpty($parameter, $value);
-
-					// Normalize value
-					$normalizedValue = $this->denormalize($value, $parameter);
-
-					// Update requests
-					$cookieParams[$parameter->getName()] = $normalizedValue;
-					$request = $request->withCookieParams($cookieParams);
-
-					break;
-				case $parameter::InHeader:
-					$headerParameterName = strtolower($parameter->getName());
-
-					// Logical check
-					if (!array_key_exists($headerParameterName, $headerParameters)) {
-						if (!$parameter->isRequired()) {
-							break;
-						}
-
-						throw new ClientErrorException(sprintf(
-							'%s request parameter "%s" should be provided.',
-							ucfirst($parameter->getIn()),
-							$parameter->getName(),
-						));
-					}
-
-					// Obtain request parameter values
-					$values = $headerParameters[$headerParameterName];
-					$normalizedValues = [];
-
-					// Normalize value
-					foreach ($values as $index => $value) {
-						$this->checkParameterNotEmpty($parameter, $value);
-						$normalizedValues[$index] = $this->denormalize($value, $parameter);
-					}
-
-					// Update requests
-					$headerParameters[$headerParameterName] = $normalizedValues;
-					$request = $request->withHeader($headerParameterName, $normalizedValues);
-
-					break;
-			}
+			$request = $this->processParameter($request, $parameter, $sources);
 		}
 
 		return $request;
 	}
 
-	protected function checkParameterProvided(EndpointParameter $parameter, mixed $value): void
+	/**
+	 * @return array<string, array<string, mixed>>
+	 */
+	private function prepareSources(ApiRequest $request): array
+	{
+		// Use separate path/query attributes if available, fallback to combined for backward compatibility
+		$pathParams = $request->getAttribute(RequestAttributes::PathParameters->value);
+		$queryParams = $request->getAttribute(RequestAttributes::QueryParameters->value);
+		$combinedParams = $request->getAttribute(RequestAttributes::Parameters->value, []);
+
+		return [
+			EndpointParameter::InPath => $pathParams ?? $combinedParams,
+			EndpointParameter::InQuery => $queryParams ?? $combinedParams,
+			EndpointParameter::InCookie => $request->getCookies(),
+			EndpointParameter::InHeader => array_change_key_case($request->getHeaders()),
+		];
+	}
+
+	/**
+	 * @param array<string, array<string, mixed>> $sources
+	 */
+	private function processParameter(ApiRequest $request, EndpointParameter $parameter, array $sources): ApiRequest
+	{
+		$in = $parameter->getIn();
+		$name = $in === EndpointParameter::InHeader ? strtolower($parameter->getName()) : $parameter->getName();
+		$source = $sources[$in] ?? [];
+
+		if (!array_key_exists($name, $source)) {
+			if ($parameter->isRequired()) {
+				throw new ClientErrorException(sprintf(
+					ErrorMessages::PARAMETER_REQUIRED,
+					ucfirst($in),
+					$parameter->getName(),
+				));
+			}
+
+			return $request;
+		}
+
+		$value = $source[$name];
+
+		if ($in !== EndpointParameter::InHeader) {
+			$this->validateProvided($parameter, $value);
+		}
+
+		$this->validateNotEmpty($parameter, $value);
+
+		$convertedValue = $this->converter->convert($value, $parameter->getType(), $parameter);
+
+		return $this->updateRequest($request, $parameter, $name, $convertedValue);
+	}
+
+	private function validateProvided(EndpointParameter $parameter, mixed $value): void
 	{
 		if ($value === null && $parameter->isRequired()) {
 			throw new ClientErrorException(sprintf(
-				'%s request parameter "%s" should be provided.',
+				ErrorMessages::PARAMETER_REQUIRED,
 				ucfirst($parameter->getIn()),
 				$parameter->getName(),
 			));
 		}
 	}
 
-	protected function checkParameterNotEmpty(EndpointParameter $parameter, mixed $value): void
+	private function validateNotEmpty(EndpointParameter $parameter, mixed $value): void
 	{
-		if ($value === '' && !$parameter->isAllowEmpty()) {
+		if ($value === '' && !$parameter->isAllowEmptyValue()) {
 			throw new ClientErrorException(sprintf(
-				'%s request parameter "%s" should not be empty.',
+				ErrorMessages::PARAMETER_EMPTY,
 				ucfirst($parameter->getIn()),
 				$parameter->getName(),
 			));
 		}
 	}
 
-	protected function denormalize(mixed $value, EndpointParameter $parameter): mixed
+	private function updateRequest(
+		ApiRequest $request,
+		EndpointParameter $parameter,
+		string $name,
+		mixed $value,
+	): ApiRequest
 	{
-		if ($value === '' || $value === null) {
-			return null;
-		}
-
-		$type = $parameter->getType();
-		$args = [];
-
-		if (is_subclass_of($type, BackedEnum::class)) {
-			$type = BackedEnum::class;
-			$args[] = $parameter->getType();
-		} elseif (is_subclass_of($type, UnitEnum::class)) {
-			$type = UnitEnum::class;
-			$args[] = $parameter->getType();
-		}
-
-		try {
-			$normalizer = $this->normalizer->findNormalizer($type);
-
-			return $normalizer instanceof TypeNormalizer ? $normalizer->denormalize($value, ...$args) : $value;
-		} catch (Throwable) {
-			throw new ClientErrorException(sprintf(
-				'%s request parameter "%s" should be of type "%s"%s.',
-				ucfirst($parameter->getIn()),
-				$parameter->getName(),
-				$parameter->getType(),
-				$parameter->getDescription() !== null ? ' ' . $parameter->getDescription() : '',
-			));
-		}
+		return match ($parameter->getIn()) {
+			EndpointParameter::InPath => $request
+				->withAttribute(
+					RequestAttributes::PathParameters->value,
+					[$name => $value] + $request->getAttribute(RequestAttributes::PathParameters->value, []),
+				)
+				->withAttribute(
+					RequestAttributes::Parameters->value,
+					[$name => $value] + $request->getAttribute(RequestAttributes::Parameters->value, []),
+				),
+			EndpointParameter::InQuery => $request
+				->withAttribute(
+					RequestAttributes::QueryParameters->value,
+					[$name => $value] + $request->getAttribute(RequestAttributes::QueryParameters->value, []),
+				)
+				->withAttribute(
+					RequestAttributes::Parameters->value,
+					[$name => $value] + $request->getAttribute(RequestAttributes::Parameters->value, []),
+				),
+			EndpointParameter::InCookie => $request->withCookies(
+				[$name => $value] + $request->getCookies(),
+			),
+			EndpointParameter::InHeader => $request->withHeader($name, (string) $value),
+			default => $request,
+		};
 	}
 
 }

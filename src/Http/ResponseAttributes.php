@@ -2,13 +2,9 @@
 
 namespace Sabservis\Api\Http;
 
-interface ResponseAttributes
+enum ResponseAttributes: string
 {
 
-	public const Entity = 'api.entity';
-
-	public const Endpoint = 'api.endpoint';
-
-	public const Object = 'api.object';
+	case Object = 'api.object';
 
 }

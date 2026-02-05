@@ -2,10 +2,10 @@
 
 namespace Sabservis\Api\Middleware;
 
-use Psr\Http\Message\ResponseInterface;
-use Psr\Http\Message\ServerRequestInterface;
 use Psr\Log\LoggerInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 use function sprintf;
 
 #[MiddlewarePriority(10)]
@@ -17,13 +17,13 @@ class LoggingMiddleware implements Middleware
 	}
 
 	public function __invoke(
-		ServerRequestInterface $request,
-		ResponseInterface $response,
+		ApiRequest $request,
+		ApiResponse $response,
 		callable $next,
-	): ResponseInterface
+	): ApiResponse
 	{
 		$this->logger->info(
-			sprintf('Requested url: %s', (string) $request->getUri()->withUserInfo('', null)),
+			sprintf('Requested url: %s', $request->getUri()),
 		);
 
 		return $next($request, $response);
