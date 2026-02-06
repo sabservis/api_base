@@ -8,7 +8,10 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\Get;
 use Sabservis\Api\Attribute\OpenApi\PathParameter;
+use Sabservis\Api\Attribute\OpenApi\Post;
+use Sabservis\Api\Attribute\OpenApi\Put;
 use Sabservis\Api\Attribute\OpenApi\QueryParameter;
+use Sabservis\Api\Attribute\OpenApi\RequestBody;
 use Sabservis\Api\Attribute\OpenApi\Schema;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
@@ -240,6 +243,59 @@ final class ParameterInferenceTest extends TestCase
 		self::assertSame(['active', 'inactive', 'pending'], $param['schemaSpec']['enum']);
 	}
 
+	#[Test]
+	public function explicitRequestBodyDtoIsNotInferredAsQueryParameter(): void
+	{
+		$containerBuilder = new ContainerBuilder();
+		$containerBuilder->addDefinition('testController')
+			->setType(ExplicitRequestBodyController::class);
+
+		$loader = new OpenApiAttributeLoader($containerBuilder);
+		$result = $loader->load();
+
+		$endpoint = $result['endpoints'][0];
+
+		self::assertArrayHasKey('requestBody', $endpoint);
+		self::assertSame(RequestBodyCreateDto::class, $endpoint['requestBody']['entity']);
+		self::assertArrayNotHasKey('input', $endpoint['parameters']);
+	}
+
+	#[Test]
+	public function infersRequestBodyFromDtoParameterForPostMethod(): void
+	{
+		$containerBuilder = new ContainerBuilder();
+		$containerBuilder->addDefinition('testController')
+			->setType(InferredRequestBodyController::class);
+
+		$loader = new OpenApiAttributeLoader($containerBuilder);
+		$result = $loader->load();
+
+		$endpoint = $result['endpoints'][0];
+
+		self::assertArrayHasKey('requestBody', $endpoint);
+		self::assertSame(RequestBodyCreateDto::class, $endpoint['requestBody']['entity']);
+		self::assertArrayNotHasKey('input', $endpoint['parameters']);
+	}
+
+	#[Test]
+	public function infersRequestBodyFromDtoParameterAndKeepsPathParameter(): void
+	{
+		$containerBuilder = new ContainerBuilder();
+		$containerBuilder->addDefinition('testController')
+			->setType(InferredRequestBodyWithPathController::class);
+
+		$loader = new OpenApiAttributeLoader($containerBuilder);
+		$result = $loader->load();
+
+		$endpoint = $result['endpoints'][0];
+
+		self::assertArrayHasKey('id', $endpoint['parameters']);
+		self::assertSame(EndpointParameter::InPath, $endpoint['parameters']['id']['in']);
+		self::assertArrayNotHasKey('input', $endpoint['parameters']);
+		self::assertArrayHasKey('requestBody', $endpoint);
+		self::assertSame(RequestBodyUpdateDto::class, $endpoint['requestBody']['entity']);
+	}
+
 }
 
 // Test controllers
@@ -354,5 +410,53 @@ class SchemaEnumParameterController implements Controller
 	{
 		return [];
 	}
+
+}
+
+class ExplicitRequestBodyController implements Controller
+{
+
+	#[Post(path: '/users')]
+	#[RequestBody(ref: RequestBodyCreateDto::class, required: true)]
+	public function create(RequestBodyCreateDto $input): array
+	{
+		return [];
+	}
+
+}
+
+class InferredRequestBodyController implements Controller
+{
+
+	#[Post(path: '/users')]
+	public function create(RequestBodyCreateDto $input): array
+	{
+		return [];
+	}
+
+}
+
+class InferredRequestBodyWithPathController implements Controller
+{
+
+	#[Put(path: '/users/{id}')]
+	public function update(int $id, RequestBodyUpdateDto $input): array
+	{
+		return [];
+	}
+
+}
+
+class RequestBodyCreateDto
+{
+
+	public string $name;
+
+}
+
+class RequestBodyUpdateDto
+{
+
+	public string $name;
 
 }

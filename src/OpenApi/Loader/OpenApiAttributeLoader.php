@@ -343,8 +343,28 @@ final class OpenApiAttributeLoader
 		$this->parseTagAttributes($method, $parsed->tags);
 		$this->parseSecurityAttribute($method, $parsed);
 
+		// Infer request body from DTO method parameter when not explicitly defined
+		$parsed->requestBody ??= $this->parameterEngine->inferRequestBodyFromMethodSignature(
+			$method,
+			$parsed->path,
+			$parsed->parameters,
+			$parsed->httpMethods,
+		);
+
+		$requestBodyEntity = null;
+
+		if ($parsed->requestBody !== null && isset($parsed->requestBody['entity']) && is_string($parsed->requestBody['entity'])) {
+			$requestBodyEntity = $parsed->requestBody['entity'];
+		}
+
 		// Infer parameters from method signature (for parameters not explicitly defined)
-		$this->parameterEngine->inferFromMethodSignature($method, $parsed->path, $parsed->parameters);
+		$this->parameterEngine->inferFromMethodSignature(
+			$method,
+			$parsed->path,
+			$parsed->parameters,
+			$requestBodyEntity,
+			$parsed->httpMethods,
+		);
 
 		// Resolve inheritance: method overrides controller if defined
 		$tags = $this->resolveTags($parsed->tags, $controllerTags);

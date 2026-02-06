@@ -2,19 +2,26 @@
 
 namespace Sabservis\Api\OpenApi\Loader;
 
+use BackedEnum;
+use DateTimeInterface;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
+use ReflectionParameter;
 use ReflectionUnionType;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\RequestParameter;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Schema\EndpointParameter;
+use UnitEnum;
 use function array_flip;
 use function assert;
 use function class_exists;
+use function in_array;
+use function is_subclass_of;
 use function preg_match_all;
+use function strtoupper;
 
 /**
  * Infers API parameters from method signatures and DTO classes.
@@ -49,8 +56,15 @@ final class ParameterInferenceEngine
 	 * - Explicit #[RequestParameter] attributes take precedence
 	 *
 	 * @param array<string, array<mixed>> $parameters Existing parameters (from explicit attributes)
+	 * @param array<string> $httpMethods HTTP methods used by endpoint (for DTO body detection)
 	 */
-	public function inferFromMethodSignature(ReflectionMethod $method, string $path, array &$parameters): void
+	public function inferFromMethodSignature(
+		ReflectionMethod $method,
+		string $path,
+		array &$parameters,
+		string|null $requestBodyEntity = null,
+		array $httpMethods = [],
+	): void
 	{
 		$pathVariables = $this->extractPathVariables($path);
 
@@ -62,40 +76,22 @@ final class ParameterInferenceEngine
 				continue;
 			}
 
-			$paramType = $param->getType();
+			$typeInfo = $this->resolveParameterType($param);
 
-			// Skip parameters without type
-			if ($paramType === null) {
+			if ($typeInfo === null) {
 				continue;
 			}
 
-			// Handle union types (e.g., DateTimeImmutable|null) - extract first non-null type
-			$typeName = null;
-			$allowsNull = false;
-
-			if ($paramType instanceof ReflectionUnionType) {
-				$allowsNull = $paramType->allowsNull();
-
-				foreach ($paramType->getTypes() as $unionType) {
-					if ($unionType instanceof ReflectionNamedType && $unionType->getName() !== 'null') {
-						$typeName = $unionType->getName();
-
-						break;
-					}
-				}
-
-				if ($typeName === null) {
-					continue;
-				}
-			} elseif ($paramType instanceof ReflectionNamedType) {
-				$typeName = $paramType->getName();
-				$allowsNull = $paramType->allowsNull();
-			} else {
-				continue;
-			}
+			$typeName = $typeInfo['name'];
+			$allowsNull = $typeInfo['allowsNull'];
 
 			// Skip ApiRequest and ApiResponse - these are injected by ServiceHandler
 			if ($typeName === ApiRequest::class || $typeName === ApiResponse::class) {
+				continue;
+			}
+
+			// DTO from request body should not be inferred as query parameter
+			if ($this->isRequestBodyParameter($paramName, $typeName, $pathVariables, $requestBodyEntity, $httpMethods)) {
 				continue;
 			}
 
@@ -120,6 +116,66 @@ final class ParameterInferenceEngine
 				'allowEmptyValue' => false,
 			];
 		}
+	}
+
+	/**
+	 * Infer request body from method signature for HTTP methods with body support.
+	 *
+	 * @param array<string, array<mixed>> $parameters Existing explicit parameters (not inferred)
+	 * @param array<string> $httpMethods
+	 * @return array<string, mixed>|null
+	 */
+	public function inferRequestBodyFromMethodSignature(
+		ReflectionMethod $method,
+		string $path,
+		array $parameters,
+		array $httpMethods,
+	): array|null
+	{
+		if (!$this->allowsRequestBody($httpMethods)) {
+			return null;
+		}
+
+		$pathVariables = $this->extractPathVariables($path);
+
+		foreach ($method->getParameters() as $param) {
+			$paramName = $param->getName();
+
+			// Respect explicit parameter attributes
+			if (isset($parameters[$paramName])) {
+				continue;
+			}
+
+			$typeInfo = $this->resolveParameterType($param);
+
+			if ($typeInfo === null) {
+				continue;
+			}
+
+			$typeName = $typeInfo['name'];
+			$allowsNull = $typeInfo['allowsNull'];
+
+			if ($typeName === ApiRequest::class || $typeName === ApiResponse::class) {
+				continue;
+			}
+
+			if (isset($pathVariables[$paramName])) {
+				continue;
+			}
+
+			if (!$this->isDtoClass($typeName)) {
+				continue;
+			}
+
+			return [
+				'description' => '',
+				'entity' => $typeName,
+				'required' => !$allowsNull && !$param->isOptional(),
+				'contentSpec' => null,
+			];
+		}
+
+		return null;
 	}
 
 	/**
@@ -262,6 +318,113 @@ final class ParameterInferenceEngine
 			'array' => 'array',
 			default => $phpType, // class name (DateTimeImmutable, enum, etc.)
 		};
+	}
+
+	/**
+	 * @return array{name: string, allowsNull: bool}|null
+	 */
+	private function resolveParameterType(ReflectionParameter $parameter): array|null
+	{
+		$paramType = $parameter->getType();
+
+		if ($paramType === null) {
+			return null;
+		}
+
+		if ($paramType instanceof ReflectionUnionType) {
+			$allowsNull = $paramType->allowsNull();
+
+			foreach ($paramType->getTypes() as $unionType) {
+				if ($unionType instanceof ReflectionNamedType && $unionType->getName() !== 'null') {
+					return [
+						'name' => $unionType->getName(),
+						'allowsNull' => $allowsNull,
+					];
+				}
+			}
+
+			return null;
+		}
+
+		if (!$paramType instanceof ReflectionNamedType) {
+			return null;
+		}
+
+		return [
+			'name' => $paramType->getName(),
+			'allowsNull' => $paramType->allowsNull(),
+		];
+	}
+
+	/**
+	 * @param array<string, int> $pathVariables
+	 * @param array<string> $httpMethods
+	 */
+	private function isRequestBodyParameter(
+		string $parameterName,
+		string $typeName,
+		array $pathVariables,
+		string|null $requestBodyEntity,
+		array $httpMethods,
+	): bool
+	{
+		if (isset($pathVariables[$parameterName])) {
+			return false;
+		}
+
+		if ($requestBodyEntity !== null && $typeName === $requestBodyEntity) {
+			return true;
+		}
+
+		if (!$this->allowsRequestBody($httpMethods)) {
+			return false;
+		}
+
+		return $this->isDtoClass($typeName);
+	}
+
+	/**
+	 * @param array<string> $httpMethods
+	 */
+	private function allowsRequestBody(array $httpMethods): bool
+	{
+		foreach ($httpMethods as $method) {
+			if (in_array(strtoupper($method), ['GET', 'HEAD', 'OPTIONS'], true)) {
+				continue;
+			}
+
+			return true;
+		}
+
+		return false;
+	}
+
+	private function isDtoClass(string $typeName): bool
+	{
+		if (!class_exists($typeName)) {
+			return false;
+		}
+
+		if ($this->isSpecialValueObjectType($typeName)) {
+			return false;
+		}
+
+		$reflection = new ReflectionClass($typeName);
+
+		return !$reflection->isInternal();
+	}
+
+	private function isSpecialValueObjectType(string $typeName): bool
+	{
+		if ($typeName === DateTimeInterface::class || is_subclass_of($typeName, DateTimeInterface::class)) {
+			return true;
+		}
+
+		if (is_subclass_of($typeName, BackedEnum::class) || is_subclass_of($typeName, UnitEnum::class)) {
+			return true;
+		}
+
+		return false;
 	}
 
 }
