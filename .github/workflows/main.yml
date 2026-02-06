@@ -71,6 +71,25 @@ jobs:
                 run: |
                     ./vendor/bin/phpunit --coverage-clover build/coverage.xml
 
+            -   name: Summarize coverage
+                if: always()
+                run: |
+                    if [ -f build/coverage.xml ]; then
+                        php tools/coverage-summary.php build/coverage.xml "${COVERAGE_MIN}"
+                    else
+                        echo "### PHPUnit Coverage" >> "${GITHUB_STEP_SUMMARY}"
+                        echo "" >> "${GITHUB_STEP_SUMMARY}"
+                        echo "Coverage report not available." >> "${GITHUB_STEP_SUMMARY}"
+                    fi
+
+            -   name: Upload coverage artifact
+                if: always()
+                uses: actions/upload-artifact@v4
+                with:
+                    name: phpunit-coverage-clover
+                    path: build/coverage.xml
+                    if-no-files-found: warn
+
             -   name: Check coverage threshold
                 run: |
                     php tools/check-coverage.php build/coverage.xml "${COVERAGE_MIN}"
