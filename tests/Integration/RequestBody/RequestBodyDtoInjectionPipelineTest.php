@@ -95,6 +95,43 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 	}
 
 	#[Test]
+	public function putInferredRequiredRequestBodyRejectsEmptyBody(): void
+	{
+		$dispatcher = $this->createDefaultDispatcher();
+
+		$request = new ApiRequest(
+			method: 'PUT',
+			uri: '/users/42',
+		);
+		$response = new ApiResponse();
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionCode(400);
+		$this->expectExceptionMessage('Request body is empty');
+
+		$dispatcher->dispatch($request, $response);
+	}
+
+	#[Test]
+	public function putInferredRequiredRequestBodyRejectsMissingContentTypeWhenBodyPresent(): void
+	{
+		$dispatcher = $this->createDefaultDispatcher();
+
+		$request = new ApiRequest(
+			method: 'PUT',
+			uri: '/users/42',
+			body: '{"name":"Updated Name"}',
+		);
+		$response = new ApiResponse();
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionCode(415);
+		$this->expectExceptionMessage('Unsupported Content-Type');
+
+		$dispatcher->dispatch($request, $response);
+	}
+
+	#[Test]
 	public function postInferredRequestBodyReturnsValidationError422(): void
 	{
 		$dispatcher = $this->createValidatedDispatcher();
@@ -129,6 +166,23 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 		self::assertSame(200, $result->getStatusCode());
 		self::assertSame('application/json', $result->getHeader('content-type'));
 		self::assertSame('{"id":42,"name":null}', $result->getBody());
+	}
+
+	#[Test]
+	public function getWithDtoParameterAndProvidedQueryTriggersTypeError(): void
+	{
+		$dispatcher = $this->createDefaultDispatcher();
+
+		$request = new ApiRequest(
+			method: 'GET',
+			uri: '/users/search?input=john',
+			queryParams: ['input' => 'john'],
+		);
+		$response = new ApiResponse();
+
+		$this->expectException(\TypeError::class);
+
+		$dispatcher->dispatch($request, $response);
 	}
 
 	#[Test]
