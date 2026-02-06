@@ -115,11 +115,23 @@ final class ApiDispatcher
 			return $request;
 		}
 
+		$body = $request->getContents();
+
+		// Optional request body: skip deserialization when body is empty.
+		// This allows signatures like ?Dto $input = null.
+		if ($body === '') {
+			if ($requestBody->isRequired()) {
+				throw new ClientErrorException(ErrorMessages::JSON_EMPTY_BODY, 400);
+			}
+
+			return $request;
+		}
+
 		// Validate Content-Type before attempting deserialization
 		$this->validateContentType($request, $requestBody->getAllowedContentTypes());
 
 		$dto = $this->serializer->deserialize(
-			$request->getContents(),
+			$body,
 			$requestBody->getEntity(),
 		);
 
