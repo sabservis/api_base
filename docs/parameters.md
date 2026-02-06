@@ -152,14 +152,21 @@ Při nevalidních datech se vrací `422 Unprocessable Entity`:
 
 ```json
 {
-    "error": "Validation failed",
+    "message": "Invalid request data",
     "code": 422,
-    "fields": {
-        "email": ["Invalid email format"],
-        "name": ["Name is required", "Name must be at least 2 characters"]
+    "context": {
+        "validation": {
+            "client.companyIdentificationNumber": [
+                "This value is too long. It should have 12 characters or less."
+            ]
+        }
     }
 }
 ```
+
+Validační klíče jsou cesty k fieldům:
+- nested objekt: `client.companyIdentificationNumber`
+- pole: `client.addresses[1].companyIdentificationNumber`
 
 ## Query Parameters DTO (zkratka)
 

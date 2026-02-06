@@ -248,7 +248,8 @@ return ApiResponse::list($items, total: 100, limit: 20, offset: 0);  // s pagina
 ```php
 throw new ClientErrorException('Not found', 404);
 throw new ClientErrorException('Invalid data', 400);
-throw new ValidationException(['email' => ['Invalid email']]);
+throw (new ValidationException('Invalid request data'))
+    ->withFields(['email' => ['Invalid email']]);
 ```
 
 ## Konfigurace (config.neon)
