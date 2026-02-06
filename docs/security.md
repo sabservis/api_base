@@ -212,6 +212,47 @@ $request->getClientIp();  // Vrací skutečnou IP klienta
 
 **SECURITY:** Bez `trustedProxies` je `X-Forwarded-For` ignorován, aby útočník nemohl spoofovat svou IP adresu.
 
+## Runtime Authorizers
+
+Kromě middleware můžeš definovat autorizaci přímo na endpointu pomocí `#[Authorize]`.
+Authorizer je služba z DI, která dostane `ApiRequest`, `Endpoint` a `activity`.
+
+```php
+use Sabservis\Api\Attribute\Core\Authorize;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Security\Authorizer;
+
+final class InvoiceAuthorizer implements Authorizer
+{
+    public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+    {
+        $user = $request->getAttribute('user');
+        return $user !== null && in_array($activity, $user->permissions, true);
+    }
+}
+
+final class InvoiceController implements Controller
+{
+    #[Get(path: '/invoices/{id}')]
+    #[Authorize(activity: 'invoice.read', authorizer: InvoiceAuthorizer::class)]
+    public function getInvoice(int $id): array { /* ... */ }
+}
+```
+
+Registrace v DI:
+
+```neon
+services:
+    - App\Security\InvoiceAuthorizer
+```
+
+### Kombinace pravidel (AND)
+
+- Pokud má endpoint více `#[Authorize]`, musí projít **všechny**.
+- Pokud už máš existující autorizaci (middleware / vlastní kontrola) a zároveň `#[Authorize]`, musí projít **obě**.
+- Při zamítnutí vrací knihovna `403 Forbidden`.
+
 ## OpenAPI Security
 
 Definování security requirements pro OpenAPI dokumentaci:

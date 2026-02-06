@@ -6,10 +6,13 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
+use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
+use Sabservis\Api\Security\Authorizer;
+use function array_values;
 
 final class ArrayHydratorTest extends TestCase
 {
@@ -134,6 +137,35 @@ final class ArrayHydratorTest extends TestCase
 		self::assertSame('App\\DTO\\CreateUserDTO', $endpoint->getRequestBody()->getEntity());
 		self::assertTrue($endpoint->getRequestBody()->isRequired());
 		self::assertSame('User data', $endpoint->getRequestBody()->getDescription());
+	}
+
+	#[Test]
+	public function hydrateEndpointWithAuthorizations(): void
+	{
+		$hydrator = new ArrayHydrator();
+
+		$data = [
+			'endpoints' => [
+				[
+					'handler' => ['class' => 'TestController', 'method' => 'create'],
+					'methods' => ['POST'],
+					'mask' => '/users',
+					'authorizations' => [
+						[
+							'activity' => 'users.create',
+							'authorizer' => TestArrayHydratorAuthorizer::class,
+						],
+					],
+				],
+			],
+		];
+
+		$schema = $hydrator->hydrate($data);
+		$endpoint = $schema->getEndpoints()[0];
+
+		self::assertTrue($endpoint->hasAuthorizations());
+		self::assertCount(1, $endpoint->getAuthorizations());
+		self::assertSame('users.create', array_values($endpoint->getAuthorizations())[0]->getActivity());
 	}
 
 	#[Test]
@@ -311,6 +343,16 @@ final class ArrayHydratorTest extends TestCase
 
 		self::assertSame('form', $param->getStyle());
 		self::assertTrue($param->getExplode());
+	}
+
+}
+
+final class TestArrayHydratorAuthorizer implements Authorizer
+{
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		return true;
 	}
 
 }

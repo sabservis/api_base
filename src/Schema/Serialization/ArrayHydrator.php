@@ -6,6 +6,7 @@ use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Schema\EndpointAuthorization;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\EndpointRequestBody;
 use Sabservis\Api\Schema\EndpointResponse;
@@ -150,6 +151,27 @@ class ArrayHydrator implements Hydrator
 			}
 
 			$endpoint->setRequestBody($request);
+		}
+
+		if (isset($data['authorizations']) && is_array($data['authorizations'])) {
+			$authorizations = [];
+
+			foreach ($data['authorizations'] as $authorizationData) {
+				if (!is_array($authorizationData)) {
+					continue;
+				}
+
+				if (!isset($authorizationData['activity'], $authorizationData['authorizer'])) {
+					continue;
+				}
+
+				$authorizations[] = new EndpointAuthorization(
+					$authorizationData['activity'],
+					$authorizationData['authorizer'],
+				);
+			}
+
+			$endpoint->setAuthorizations($authorizations);
 		}
 
 		if (isset($data['responses'])) {

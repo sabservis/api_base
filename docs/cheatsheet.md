@@ -177,6 +177,7 @@ class UserDto
 #[Hidden]                                               // skryje z OpenAPI
 #[Security([['Bearer' => []]])]                         // auth requirement
 #[Security([])]                                         // verejny endpoint
+#[Authorize(activity: 'users.read', authorizer: UsersAuthorizer::class)] // runtime autorizace
 ```
 
 ### Property constraints

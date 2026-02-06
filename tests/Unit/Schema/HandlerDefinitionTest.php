@@ -4,9 +4,14 @@ namespace Tests\Unit\Schema;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Schema\EndpointAuthorization;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\EndpointRequestBody;
 use Sabservis\Api\Schema\HandlerDefinition;
+use Sabservis\Api\Security\Authorizer;
+use function array_values;
 
 final class HandlerDefinitionTest extends TestCase
 {
@@ -81,6 +86,36 @@ final class HandlerDefinitionTest extends TestCase
 		$handler->setRequestBody($requestBody);
 
 		self::assertSame($requestBody, $handler->getRequestBody());
+	}
+
+	#[Test]
+	public function authorizations(): void
+	{
+		$handler = new HandlerDefinition('TestController', 'test');
+		self::assertFalse($handler->hasAuthorizations());
+
+		$authorization = new EndpointAuthorization(
+			'invoice.read',
+			TestHandlerDefinitionAuthorizer::class,
+		);
+		$handler->addAuthorization($authorization);
+
+		self::assertTrue($handler->hasAuthorizations());
+		self::assertCount(1, $handler->getAuthorizations());
+		self::assertSame(
+			'invoice.read',
+			array_values($handler->getAuthorizations())[0]->getActivity(),
+		);
+	}
+
+}
+
+final class TestHandlerDefinitionAuthorizer implements Authorizer
+{
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		return true;
 	}
 
 }

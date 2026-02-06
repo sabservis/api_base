@@ -25,6 +25,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\Router;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
+use Sabservis\Api\Security\AuthorizationChecker;
 use Sabservis\Api\Utils\ChainBuilder;
 use stdClass;
 use function assert;
@@ -278,6 +279,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		$builder->addDefinition($this->prefix('dispatcher'))
 			->setFactory(ApiDispatcher::class);
+
+		$builder->addDefinition($this->prefix('authorization.checker'))
+			->setFactory(AuthorizationChecker::class);
 
 		$builder->addDefinition($this->prefix('errorHandler'))
 			->setFactory($config->errorHandler)

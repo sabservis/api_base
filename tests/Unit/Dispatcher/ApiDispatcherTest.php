@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Dispatcher;
 
+use Nette\DI\Container;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
@@ -12,18 +13,26 @@ use Sabservis\Api\Exception\Runtime\EarlyReturnResponseException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
-use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Schema\EndpointAuthorization;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\EndpointRequestBody;
 use Sabservis\Api\Schema\Schema;
+use Sabservis\Api\Security\AuthorizationChecker;
+use Sabservis\Api\Security\Authorizer;
 use stdClass;
-use const UPLOAD_ERR_NO_FILE;
+use function file_put_contents;
+use function preg_match_all;
+use function preg_replace;
+use function str_contains;
+use function sys_get_temp_dir;
+use function tempnam;
+use function unlink;
 use const UPLOAD_ERR_OK;
 
 final class ApiDispatcherTest extends TestCase
@@ -184,6 +193,79 @@ final class ApiDispatcherTest extends TestCase
 		$response = new ApiResponse();
 
 		$dispatcher->dispatch($request, $response);
+	}
+
+	#[Test]
+	public function dispatchInvokesAuthorizationCheckerBeforeHandler(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/users');
+		$endpoint->addAuthorization(
+			new EndpointAuthorization('users.read', AllowAllDispatcherAuthorizer::class),
+		);
+		$router = $this->createRouter($endpoint);
+
+		$handler = $this->createMock(ServiceHandler::class);
+		$handler->expects($this->once())->method('handle')->willReturn(['ok' => true]);
+
+		$serializer = $this->createMock(EntitySerializer::class);
+		$serializer->method('serialize')->willReturn('{"ok":true}');
+		$parameterMapping = new RequestParameterMapping();
+
+		$authContainer = $this->createMock(Container::class);
+		$authContainer->method('getByType')
+			->with(AllowAllDispatcherAuthorizer::class, false)
+			->willReturn(new AllowAllDispatcherAuthorizer());
+
+		$authorizationChecker = new AuthorizationChecker($authContainer);
+		$dispatcher = new ApiDispatcher(
+			$router,
+			$handler,
+			$serializer,
+			$parameterMapping,
+			null,
+			$authorizationChecker,
+		);
+
+		$result = $dispatcher->dispatch(new ApiRequest(method: 'GET', uri: '/users'), new ApiResponse());
+
+		self::assertSame(200, $result->getStatusCode());
+	}
+
+	#[Test]
+	public function dispatchStopsBeforeHandlerWhenAuthorizationDenied(): void
+	{
+		$endpoint = $this->createEndpoint('DELETE', '/users/1');
+		$endpoint->addAuthorization(
+			new EndpointAuthorization('users.delete', DenyAllDispatcherAuthorizer::class),
+		);
+		$router = $this->createRouter($endpoint);
+
+		$handler = $this->createMock(ServiceHandler::class);
+		$handler->expects($this->never())->method('handle');
+
+		$serializer = $this->createMock(EntitySerializer::class);
+		$parameterMapping = new RequestParameterMapping();
+
+		$authContainer = $this->createMock(Container::class);
+		$authContainer->method('getByType')
+			->with(DenyAllDispatcherAuthorizer::class, false)
+			->willReturn(new DenyAllDispatcherAuthorizer());
+
+		$authorizationChecker = new AuthorizationChecker($authContainer);
+		$dispatcher = new ApiDispatcher(
+			$router,
+			$handler,
+			$serializer,
+			$parameterMapping,
+			null,
+			$authorizationChecker,
+		);
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionCode(403);
+		$this->expectExceptionMessage('users.delete');
+
+		$dispatcher->dispatch(new ApiRequest(method: 'DELETE', uri: '/users/1'), new ApiResponse());
 	}
 
 	#[Test]
@@ -454,7 +536,8 @@ final class ApiDispatcherTest extends TestCase
 		string $method,
 		string $mask,
 		FileUpload $fileUpload,
-	): Endpoint {
+	): Endpoint
+	{
 		$endpoint = $this->createEndpoint($method, $mask, 'uploadFile');
 
 		$requestBody = new EndpointRequestBody();
@@ -467,10 +550,7 @@ final class ApiDispatcherTest extends TestCase
 	#[Test]
 	public function dispatchValidatesRequiredFileUpload(): void
 	{
-		$fileUpload = new FileUpload(
-			name: 'avatar',
-			required: true,
-		);
+		$fileUpload = new FileUpload(name: 'avatar', required: true);
 
 		$endpoint = $this->createEndpointWithFileUpload('POST', '/upload', $fileUpload);
 		$router = $this->createRouter($endpoint);
@@ -964,5 +1044,25 @@ class TestCreateUserDto
 {
 
 	public string $name = '';
+
+}
+
+final class AllowAllDispatcherAuthorizer implements Authorizer
+{
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		return true;
+	}
+
+}
+
+final class DenyAllDispatcherAuthorizer implements Authorizer
+{
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		return false;
+	}
 
 }

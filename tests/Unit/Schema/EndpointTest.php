@@ -6,9 +6,13 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
+use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Schema\EndpointAuthorization;
 use Sabservis\Api\Schema\EndpointParameter;
+use Sabservis\Api\Security\Authorizer;
 use Sabservis\Api\Utils\Regex;
+use function array_values;
 
 final class EndpointTest extends TestCase
 {
@@ -159,6 +163,36 @@ final class EndpointTest extends TestCase
 
 		self::assertSame('App\\Controller\\UserController', $endpoint->getControllerClass());
 		self::assertSame('getUsers', $endpoint->getControllerMethod());
+	}
+
+	#[Test]
+	public function authorizations(): void
+	{
+		$endpoint = new Endpoint('TestController', 'testMethod');
+		self::assertFalse($endpoint->hasAuthorizations());
+
+		$authorization = new EndpointAuthorization(
+			'invoice.read',
+			TestEndpointAuthorizer::class,
+		);
+		$endpoint->addAuthorization($authorization);
+
+		self::assertTrue($endpoint->hasAuthorizations());
+		self::assertCount(1, $endpoint->getAuthorizations());
+		self::assertSame(
+			'invoice.read',
+			array_values($endpoint->getAuthorizations())[0]->getActivity(),
+		);
+	}
+
+}
+
+final class TestEndpointAuthorizer implements Authorizer
+{
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		return true;
 	}
 
 }

@@ -43,6 +43,7 @@ PHP knihovna pro REST API v Nette.
 | `#[FileResponse]` | File download (s `response`, `description`) |
 | `#[Alias('/alt-path')]` | Alternativní URL |
 | `#[Security]` | Auth requirement na endpoint/controller |
+| `#[Authorize(activity: 'x', authorizer: X::class)]` | Runtime autorizace přes DI authorizer |
 | `#[ExternalDocumentation]` | Odkaz na externí docs |
 
 ### Tier 4 - Expert

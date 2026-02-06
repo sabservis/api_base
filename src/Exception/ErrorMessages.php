@@ -30,6 +30,9 @@ final class ErrorMessages
 	// HTTPS
 	public const HTTPS_REQUIRED = 'Encrypted connection is required. Please use https connection.';
 
+	// Authorization
+	public const FORBIDDEN_ACTIVITY = 'Forbidden. Missing permission for activity "%s".';
+
 	// CORS
 	public const CORS_CREDENTIALS_WILDCARD = 'CORS configuration error: allowCredentials cannot be used with wildcard origin "*". This is a security vulnerability. Specify explicit allowed origins instead.';
 

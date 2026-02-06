@@ -4,8 +4,10 @@ namespace Sabservis\Api\OpenApi\Loader;
 
 use Nette\DI\ContainerBuilder;
 use Nette\DI\Definitions\ServiceDefinition;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
+use Sabservis\Api\Attribute\Core\Authorize;
 use Sabservis\Api\Attribute\OpenApi\Alias;
 use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\OpenApiMerge;
@@ -16,6 +18,7 @@ use Sabservis\Api\Attribute\OpenApi\Security;
 use Sabservis\Api\Attribute\OpenApi\Tag;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Schema\EndpointParameter;
+use Sabservis\Api\Security\Authorizer;
 use Sabservis\Api\UI\Controller\Controller as ControllerInterface;
 use Sabservis\Api\Utils\Regex;
 use function array_filter;
@@ -186,6 +189,7 @@ final class OpenApiAttributeLoader
 		$controllerTags = [];
 		$controllerPath = '';
 		$controllerSecurity = null;
+		$controllerAuthorizations = $this->parseAuthorizeAttributesFromClass($reflectionClass);
 
 		// Parse class-level tags
 		foreach ($reflectionClass->getAttributes(Tag::class) as $attribute) {
@@ -214,14 +218,15 @@ final class OpenApiAttributeLoader
 				continue;
 			}
 
-			$endpoint = $this->parseMethod(
-				$controllerClass,
-				$controllerPath,
-				$controllerTags,
-				$controllerSecurity,
-				$method,
-				$operationAttributes,
-			);
+				$endpoint = $this->parseMethod(
+					$controllerClass,
+					$controllerPath,
+					$controllerTags,
+					$controllerSecurity,
+					$controllerAuthorizations,
+					$method,
+					$operationAttributes,
+				);
 
 			if ($endpoint !== null) {
 				$endpoints[] = $endpoint;
@@ -311,6 +316,7 @@ final class OpenApiAttributeLoader
 	 * @param class-string $controllerClass
 	 * @param array<string, mixed> $controllerTags
 	 * @param array<array<string, array<string>>>|null $controllerSecurity
+	 * @param array<array{activity: string, authorizer: class-string<Authorizer>}> $controllerAuthorizations
 	 * @param array<RequestOperationAttribute> $operationAttributes
 	 * @return array<mixed>|null
 	 */
@@ -319,6 +325,7 @@ final class OpenApiAttributeLoader
 		string $controllerPath,
 		array $controllerTags,
 		array|null $controllerSecurity,
+		array $controllerAuthorizations,
 		ReflectionMethod $method,
 		array $operationAttributes,
 	): array|null
@@ -353,7 +360,11 @@ final class OpenApiAttributeLoader
 
 		$requestBodyEntity = null;
 
-		if ($parsed->requestBody !== null && isset($parsed->requestBody['entity']) && is_string($parsed->requestBody['entity'])) {
+		if (
+			$parsed->requestBody !== null
+			&& isset($parsed->requestBody['entity'])
+			&& is_string($parsed->requestBody['entity'])
+		) {
 			$requestBodyEntity = $parsed->requestBody['entity'];
 		}
 
@@ -369,6 +380,10 @@ final class OpenApiAttributeLoader
 		// Resolve inheritance: method overrides controller if defined
 		$tags = $this->resolveTags($parsed->tags, $controllerTags);
 		$security = $this->resolveSecurity($parsed->security, $controllerSecurity);
+		$authorizations = array_merge(
+			$controllerAuthorizations,
+			$this->parseAuthorizeAttributesFromMethod($method),
+		);
 
 		// Build full mask
 		$mask = $this->buildMask($controllerPath, $parsed->path);
@@ -390,6 +405,7 @@ final class OpenApiAttributeLoader
 			'responses' => $parsed->responses,
 			'tags' => $tags,
 			'security' => $security,
+			'authorizations' => $authorizations,
 		];
 
 		$this->processPatternAndParameters($endpoint, $parsed->parameters);
@@ -625,6 +641,68 @@ final class OpenApiAttributeLoader
 			$security = $securityAttributes[0]->newInstance();
 			assert($security instanceof Security);
 			$parsed->security = $security->getSecurity();
+		}
+	}
+
+	/**
+	 * @param ReflectionClass<object> $reflectionClass
+	 * @return array<array{activity: string, authorizer: class-string<Authorizer>}>
+	 */
+	private function parseAuthorizeAttributesFromClass(ReflectionClass $reflectionClass): array
+	{
+		return $this->parseAuthorizeAttributes($reflectionClass->getAttributes(Authorize::class));
+	}
+
+	/**
+	 * @return array<array{activity: string, authorizer: class-string<Authorizer>}>
+	 */
+	private function parseAuthorizeAttributesFromMethod(ReflectionMethod $method): array
+	{
+		return $this->parseAuthorizeAttributes($method->getAttributes(Authorize::class));
+	}
+
+	/**
+	 * @param array<ReflectionAttribute<object>> $attributes
+	 * @return array<array{activity: string, authorizer: class-string<Authorizer>}>
+	 */
+	private function parseAuthorizeAttributes(array $attributes): array
+	{
+		$authorizations = [];
+
+		foreach ($attributes as $attribute) {
+			$authorize = $attribute->newInstance();
+			assert($authorize instanceof Authorize);
+
+			if ($authorize->activity === '') {
+				throw new InvalidStateException('Authorize attribute requires non-empty activity.');
+			}
+
+			$this->assertValidAuthorizer($authorize->authorizer);
+
+			$authorizations[] = [
+				'activity' => $authorize->activity,
+				'authorizer' => $authorize->authorizer,
+			];
+		}
+
+		return $authorizations;
+	}
+
+	/**
+	 * @param class-string $authorizerClass
+	 */
+	private function assertValidAuthorizer(string $authorizerClass): void
+	{
+		if (!class_exists($authorizerClass)) {
+			throw new InvalidStateException(
+				sprintf('Authorizer class %s does not exist', $authorizerClass),
+			);
+		}
+
+		if (!is_subclass_of($authorizerClass, Authorizer::class)) {
+			throw new InvalidStateException(
+				sprintf('Authorizer class %s must implement %s', $authorizerClass, Authorizer::class),
+			);
 		}
 	}
 

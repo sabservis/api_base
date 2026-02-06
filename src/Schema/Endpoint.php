@@ -165,6 +165,34 @@ class Endpoint
 		return $this->handler->getRequestBody();
 	}
 
+	// === Authorization (delegated to HandlerDefinition) ===
+
+	/**
+	 * @return array<EndpointAuthorization>
+	 */
+	public function getAuthorizations(): array
+	{
+		return $this->handler->getAuthorizations();
+	}
+
+	public function hasAuthorizations(): bool
+	{
+		return $this->handler->hasAuthorizations();
+	}
+
+	public function addAuthorization(EndpointAuthorization $authorization): void
+	{
+		$this->handler->addAuthorization($authorization);
+	}
+
+	/**
+	 * @param array<EndpointAuthorization> $authorizations
+	 */
+	public function setAuthorizations(array $authorizations): void
+	{
+		$this->handler->setAuthorizations($authorizations);
+	}
+
 	// === Responses (delegated to OpenApiDefinition) ===
 
 	/**

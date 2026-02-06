@@ -17,6 +17,7 @@ use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Schema;
+use Sabservis\Api\Security\AuthorizationChecker;
 use function sys_get_temp_dir;
 use function uniqid;
 
@@ -34,6 +35,7 @@ final class ApiExtensionTest extends TestCase
 		self::assertTrue($container->hasService('api.router'));
 		self::assertTrue($container->hasService('api.handler'));
 		self::assertTrue($container->hasService('api.schema'));
+		self::assertTrue($container->hasService('api.authorization.checker'));
 		self::assertTrue($container->hasService('api.request.parameters.mapping'));
 	}
 
@@ -48,6 +50,7 @@ final class ApiExtensionTest extends TestCase
 		self::assertInstanceOf(Router::class, $container->getService('api.router'));
 		self::assertInstanceOf(ServiceHandler::class, $container->getService('api.handler'));
 		self::assertInstanceOf(Schema::class, $container->getService('api.schema'));
+		self::assertInstanceOf(AuthorizationChecker::class, $container->getService('api.authorization.checker'));
 		self::assertInstanceOf(
 			RequestParameterMapping::class,
 			$container->getService('api.request.parameters.mapping'),

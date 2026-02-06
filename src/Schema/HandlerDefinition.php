@@ -13,6 +13,9 @@ final class HandlerDefinition
 	/** @var array<EndpointParameter> */
 	private array $parameters = [];
 
+	/** @var array<EndpointAuthorization> */
+	private array $authorizations = [];
+
 	private EndpointRequestBody|null $requestBody = null;
 
 	/**
@@ -85,6 +88,35 @@ final class HandlerDefinition
 	public function setRequestBody(EndpointRequestBody|null $requestBody): void
 	{
 		$this->requestBody = $requestBody;
+	}
+
+	/**
+	 * @return array<EndpointAuthorization>
+	 */
+	public function getAuthorizations(): array
+	{
+		return $this->authorizations;
+	}
+
+	public function hasAuthorizations(): bool
+	{
+		return $this->authorizations !== [];
+	}
+
+	public function addAuthorization(EndpointAuthorization $authorization): void
+	{
+		$key = $authorization->getAuthorizer() . "\0" . $authorization->getActivity();
+		$this->authorizations[$key] = $authorization;
+	}
+
+	/**
+	 * @param array<EndpointAuthorization> $authorizations
+	 */
+	public function setAuthorizations(array $authorizations): void
+	{
+		foreach ($authorizations as $authorization) {
+			$this->addAuthorization($authorization);
+		}
 	}
 
 }

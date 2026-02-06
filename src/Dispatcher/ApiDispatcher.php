@@ -17,6 +17,7 @@ use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Endpoint;
+use Sabservis\Api\Security\AuthorizationChecker;
 use function assert;
 use function explode;
 use function implode;
@@ -39,6 +40,7 @@ final class ApiDispatcher
 		private readonly EntitySerializer $serializer,
 		private readonly RequestParameterMapping $parameterMapping,
 		private readonly EntityValidator|null $validator = null,
+		private readonly AuthorizationChecker|null $authorizationChecker = null,
 	)
 	{
 	}
@@ -58,13 +60,16 @@ final class ApiDispatcher
 		// 2. Map parameters (path, query, header, cookie)
 		$matchedRequest = $this->parameterMapping->map($matchedRequest);
 
-		// 3. Validate file uploads (MIME types, required files)
+		// 3. Runtime authorization checks
+		$this->authorize($matchedRequest);
+
+		// 4. Validate file uploads (MIME types, required files)
 		$this->validateFileUploads($matchedRequest);
 
-		// 4. Transform request body to DTO
+		// 5. Transform request body to DTO
 		$matchedRequest = $this->transformRequest($matchedRequest);
 
-		// 5. Execute handler and transform response
+		// 6. Execute handler and transform response
 		try {
 			$result = $this->handler->handle($matchedRequest, $response);
 
@@ -74,6 +79,22 @@ final class ApiDispatcher
 			// Controller wants to return a specific response and skip serialization
 			return $e->getResponse();
 		}
+	}
+
+	private function authorize(ApiRequest $request): void
+	{
+		if ($this->authorizationChecker === null) {
+			return;
+		}
+
+		$endpoint = $request->getAttribute(RequestAttributes::Endpoint->value);
+		assert($endpoint instanceof Endpoint);
+
+		if (!$endpoint->hasAuthorizations()) {
+			return;
+		}
+
+		$this->authorizationChecker->authorize($request, $endpoint);
 	}
 
 	/**
