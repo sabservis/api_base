@@ -25,7 +25,10 @@ class UserControllerTest extends TestCase
 
         $response->assertOk();
         $response->assertJsonHasKey('id');
-        $response->assertJsonPath('name', 'John');
+
+        $data = $response->json();
+        self::assertIsArray($data);
+        self::assertSame('John', $data['name'] ?? null);
     }
 
     public function testCreateUser(): void
@@ -52,25 +55,26 @@ $client->putJson('/api/users/1', ['name' => 'John']);
 $client->patch('/api/users/1', $body);
 $client->patchJson('/api/users/1', ['name' => 'John']);
 $client->delete('/api/users/1');
+$client->request('POST', '/api/users', '{}', ['content-type' => 'application/json']);
 ```
 
 ## Headers a autentizace
 
 ```php
-// Přidání headeru
-$client->withHeader('X-Custom', 'value');
+// Výchozí headery pro všechny requesty
+$client->withHeaders([
+    'x-custom' => 'value',
+    'x-request-id' => 'test-123',
+]);
 
-// Bearer token
+// Bearer token (Authorization header)
 $client->withToken('your-jwt-token');
-
-// Basic auth
-$client->withBasicAuth('username', 'password');
 
 // Chainování
 $response = $this->client
     ->withToken($token)
-    ->withHeader('X-Request-ID', 'test-123')
-    ->get('/api/users');
+    ->withHeaders(['x-request-id' => 'test-123'])
+    ->get('/api/users', ['accept' => 'application/json']);
 ```
 
 ## TestResponse assertions
@@ -81,41 +85,39 @@ $response = $this->client
 $response->assertOk();              // 200
 $response->assertCreated();         // 201
 $response->assertNoContent();       // 204
-$response->assertBadRequest();      // 400
 $response->assertUnauthorized();    // 401
 $response->assertForbidden();       // 403
 $response->assertNotFound();        // 404
 $response->assertUnprocessable();   // 422
-$response->assertStatus(418);       // Konkrétní kód
+$response->assertStatus(400);       // Libovolný konkrétní kód
 ```
 
 ### JSON assertions
 
 ```php
-// Kontrola struktury
+// Přesná shoda JSON payloadu
+$response->assertJson(['id' => 1, 'name' => 'John']);
+
+// Kontrola podmnožiny klíčů/hodnot
+$response->assertJsonContains(['id' => 1]);
+
+// Kontrola existence klíče
 $response->assertJsonHasKey('id');
-$response->assertJsonHasKeys(['id', 'name', 'email']);
-$response->assertJsonMissingKey('password');
-
-// Kontrola hodnot
-$response->assertJsonPath('name', 'John');
-$response->assertJsonPath('roles.0', 'admin');
-
-// Kontrola počtu
-$response->assertJsonCount(10);           // Root array
-$response->assertJsonCount(2, 'roles');   // Nested
 
 // Získání dat
 $data = $response->json();
-$name = $response->json('name');
-$firstRole = $response->json('roles.0');
+self::assertIsArray($data);
+self::assertSame('John', $data['name'] ?? null);
 ```
 
 ### Headers
 
 ```php
 $response->assertHeader('Content-Type', 'application/json');
-$response->assertHeaderContains('Content-Type', 'json');
+$response->assertHeaderExists('X-Request-ID');
+
+$contentType = $response->getHeaderLine('Content-Type');
+self::assertStringContainsString('application/json', $contentType);
 ```
 
 ## Testování validace
@@ -130,20 +132,10 @@ public function testValidationErrors(): void
 
     $response->assertUnprocessable();
     $response->assertJsonHasKey('fields');
-    $response->assertJsonPath('fields.name.0', 'Name is required');
-}
-```
 
-## Testování file upload
-
-```php
-public function testAvatarUpload(): void
-{
-    $response = $this->client
-        ->withFile('avatar', '/path/to/test.jpg', 'image/jpeg')
-        ->post('/api/users/1/avatar');
-
-    $response->assertOk();
+    $payload = $response->json();
+    self::assertIsArray($payload);
+    self::assertSame('Name is required', $payload['fields']['name'][0] ?? null);
 }
 ```
 
