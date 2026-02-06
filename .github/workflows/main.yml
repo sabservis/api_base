@@ -50,7 +50,7 @@ jobs:
         runs-on: ubuntu-latest
 
         env:
-            COVERAGE_MIN: '60'
+            COVERAGE_MIN: '65'
 
         steps:
             -   name: Checkout repository

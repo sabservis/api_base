@@ -28,7 +28,7 @@
 		"test:coverage": "vendor/bin/phpunit --coverage-clover build/coverage.xml",
 		"test:coverage:check": [
 			"@test:coverage",
-			"php tools/check-coverage.php build/coverage.xml 60"
+			"php tools/check-coverage.php build/coverage.xml 65"
 		]
 	},
 	"config": {
