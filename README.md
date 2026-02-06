@@ -8,7 +8,7 @@ Moderní PHP REST API framework pro Nette s automatickou OpenAPI dokumentací.
 [![Coverage Gate](https://img.shields.io/badge/coverage_gate-%E2%89%A565%25-brightgreen.svg)](.github/workflows/main.yml)
 [![Tests](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/sabservis/api_base/main/.github/badges/tests.json)](https://github.com/sabservis/api_base/actions/workflows/main.yml)
 [![Assertions](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/sabservis/api_base/main/.github/badges/assertions.json)](https://github.com/sabservis/api_base/actions/workflows/main.yml)
-[![PHPStan](https://img.shields.io/badge/PHPStan-level_max-brightgreen.svg)](https://phpstan.org/)
+[![PHPStan](https://img.shields.io/badge/PHPStan-level_8-brightgreen.svg)](https://phpstan.org/)
 [![Code Style](https://img.shields.io/badge/code_style-Slevomat_CS-blue.svg)](https://github.com/slevomat/coding-standard)
 
 ## Features

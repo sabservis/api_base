@@ -48,10 +48,17 @@ jobs:
 
     tests:
         if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
-        name: PHPUnit with coverage
+        name: PHPUnit (PHP ${{ matrix.php-version }})
         runs-on: ubuntu-latest
         permissions:
             contents: write
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version:
+                    - '8.1'
+                    - '8.2'
+                    - '8.3'
 
         env:
             COVERAGE_MIN: '65'
@@ -60,27 +67,32 @@ jobs:
             -   name: Checkout repository
                 uses: actions/checkout@v4
 
-            -   name: Set up PHP with PCOV
+            -   name: Set up PHP
                 uses: shivammathur/setup-php@v2
                 with:
-                    php-version: '8.1'
+                    php-version: ${{ matrix.php-version }}
                     extensions: mbstring, intl, pdo_mysql, gd, zip, pcntl, bcmath, soap, tokenizer
-                    coverage: pcov
+                    coverage: ${{ matrix.php-version == '8.1' && 'pcov' || 'none' }}
 
             -   name: Install dependencies
                 run: |
                     composer install --prefer-dist --no-progress --no-suggest
 
-            -   name: Run PHPUnit with coverage
+            -   name: Run PHPUnit
                 run: |
-                    ./vendor/bin/phpunit --coverage-clover build/coverage.xml --log-junit build/junit.xml
+                    if [ "${{ matrix.php-version }}" = "8.1" ]; then
+                        ./vendor/bin/phpunit --coverage-clover build/coverage.xml --log-junit build/junit.xml
+                    else
+                        ./vendor/bin/phpunit
+                    fi
 
             -   name: Generate test count badges
+                if: matrix.php-version == '8.1'
                 run: |
                     php tools/update-test-badges.php build/junit.xml .github/badges/tests.json .github/badges/assertions.json
 
             -   name: Summarize coverage
-                if: always()
+                if: always() && matrix.php-version == '8.1'
                 run: |
                     if [ -f build/coverage.xml ]; then
                         php tools/coverage-summary.php build/coverage.xml "${COVERAGE_MIN}"
@@ -91,7 +103,7 @@ jobs:
                     fi
 
             -   name: Upload coverage artifact
-                if: always()
+                if: always() && matrix.php-version == '8.1'
                 uses: actions/upload-artifact@v4
                 with:
                     name: phpunit-coverage-clover
@@ -99,11 +111,12 @@ jobs:
                     if-no-files-found: warn
 
             -   name: Check coverage threshold
+                if: matrix.php-version == '8.1'
                 run: |
                     php tools/check-coverage.php build/coverage.xml "${COVERAGE_MIN}"
 
             -   name: Commit badge updates
-                if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+                if: github.event_name == 'push' && github.ref == 'refs/heads/main' && matrix.php-version == '8.1'
                 run: |
                     if git diff --quiet -- .github/badges/tests.json .github/badges/assertions.json; then
                         echo "No badge updates to commit."
