@@ -23,6 +23,14 @@
 		"slevomat/coding-standard": "^8.27",
 		"phpunit/phpunit": "^10.5"
 	},
+	"scripts": {
+		"test": "vendor/bin/phpunit",
+		"test:coverage": "vendor/bin/phpunit --coverage-clover build/coverage.xml",
+		"test:coverage:check": [
+			"@test:coverage",
+			"php tools/check-coverage.php build/coverage.xml 60"
+		]
+	},
 	"config": {
 		"allow-plugins": {
 			"dealerdirect/phpcodesniffer-composer-installer": true

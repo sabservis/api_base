@@ -44,3 +44,33 @@ jobs:
 #            -   name: Run Tester
 #                run: |
 #                    ./vendor/bin/tester tests
+
+    tests:
+        name: PHPUnit with coverage
+        runs-on: ubuntu-latest
+
+        env:
+            COVERAGE_MIN: '60'
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Set up PHP with PCOV
+                uses: shivammathur/setup-php@v2
+                with:
+                    php-version: '8.1'
+                    extensions: mbstring, intl, pdo_mysql, gd, zip, pcntl, bcmath, soap, tokenizer
+                    coverage: pcov
+
+            -   name: Install dependencies
+                run: |
+                    composer install --prefer-dist --no-progress --no-suggest
+
+            -   name: Run PHPUnit with coverage
+                run: |
+                    ./vendor/bin/phpunit --coverage-clover build/coverage.xml
+
+            -   name: Check coverage threshold
+                run: |
+                    php tools/check-coverage.php build/coverage.xml "${COVERAGE_MIN}"

@@ -19,7 +19,9 @@ use function move_uploaded_file;
 use function pathinfo;
 use function preg_replace;
 use function rename;
+use function restore_error_handler;
 use function rtrim;
+use function set_error_handler;
 use function str_replace;
 use function stream_copy_to_stream;
 use function strtolower;
@@ -368,10 +370,16 @@ final class UploadedFile
 			throw new InvalidStateException("Target file already exists: {$targetPath}");
 		}
 
-		// For testing or non-standard uploads, use rename instead of move_uploaded_file
-		$success = is_uploaded_file($this->tmpName)
-			? move_uploaded_file($this->tmpName, $targetPath)
-			: rename($this->tmpName, $targetPath);
+		// Convert filesystem warnings to controlled exception path.
+		set_error_handler(static fn (): bool => true);
+		try {
+			// For testing or non-standard uploads, use rename instead of move_uploaded_file.
+			$success = is_uploaded_file($this->tmpName)
+				? move_uploaded_file($this->tmpName, $targetPath)
+				: rename($this->tmpName, $targetPath);
+		} finally {
+			restore_error_handler();
+		}
 
 		if (!$success) {
 			throw new InvalidStateException("Failed to move uploaded file to: {$targetPath}");
