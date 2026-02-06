@@ -4,8 +4,8 @@ Moderní PHP REST API framework pro Nette s automatickou OpenAPI dokumentací.
 
 [![PHP](https://img.shields.io/badge/PHP-8.1+-blue.svg)](https://php.net)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/tests-1258_passed-brightgreen.svg)](tests/)
-[![Assertions](https://img.shields.io/badge/assertions-2817-blue.svg)](tests/)
+[![CI](https://github.com/sabservis/api_base/actions/workflows/main.yml/badge.svg)](https://github.com/sabservis/api_base/actions/workflows/main.yml)
+[![Coverage Gate](https://img.shields.io/badge/coverage_gate-%E2%89%A565%25-brightgreen.svg)](.github/workflows/main.yml)
 [![PHPStan](https://img.shields.io/badge/PHPStan-level_max-brightgreen.svg)](https://phpstan.org/)
 [![Code Style](https://img.shields.io/badge/code_style-Slevomat_CS-blue.svg)](https://github.com/slevomat/coding-standard)
 
