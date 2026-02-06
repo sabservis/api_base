@@ -57,6 +57,60 @@ final class AuthorizationCheckerTest extends TestCase
 	}
 
 	#[Test]
+	public function allowsRequestWhenBothAuthorizationsPass(): void
+	{
+		$first = new AllowAllAuthorizer();
+		$second = new AllowAllSecondAuthorizer();
+		$container = $this->createMock(Container::class);
+		$container->method('getByType')
+			->willReturnCallback(
+				static fn (string $type, bool $throw = true): object|null => match ($type) {
+					AllowAllAuthorizer::class => $first,
+					AllowAllSecondAuthorizer::class => $second,
+					default => null,
+				},
+			);
+
+		$checker = new AuthorizationChecker($container);
+		$endpoint = new Endpoint('TestController', 'method');
+		$endpoint->addAuthorization(new EndpointAuthorization('users.read', AllowAllAuthorizer::class));
+		$endpoint->addAuthorization(new EndpointAuthorization('users.export', AllowAllSecondAuthorizer::class));
+
+		$checker->authorize(new ApiRequest(method: 'GET', uri: '/users'), $endpoint);
+
+		self::assertCount(1, $first->calls);
+		self::assertCount(1, $second->calls);
+		self::assertSame('users.read', $first->calls[0]['activity']);
+		self::assertSame('users.export', $second->calls[0]['activity']);
+	}
+
+	#[Test]
+	public function deniesRequestWhenAnyOfTwoAuthorizationsFails(): void
+	{
+		$first = new AllowAllAuthorizer();
+		$container = $this->createMock(Container::class);
+		$container->method('getByType')
+			->willReturnCallback(
+				static fn (string $type, bool $throw = true): object|null => match ($type) {
+					AllowAllAuthorizer::class => $first,
+					DenyAllAuthorizer::class => new DenyAllAuthorizer(),
+					default => null,
+				},
+			);
+
+		$checker = new AuthorizationChecker($container);
+		$endpoint = new Endpoint('TestController', 'method');
+		$endpoint->addAuthorization(new EndpointAuthorization('users.read', AllowAllAuthorizer::class));
+		$endpoint->addAuthorization(new EndpointAuthorization('users.delete', DenyAllAuthorizer::class));
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionCode(403);
+		$this->expectExceptionMessage('users.delete');
+
+		$checker->authorize(new ApiRequest(method: 'DELETE', uri: '/users/1'), $endpoint);
+	}
+
+	#[Test]
 	public function throwsWhenAuthorizerServiceIsMissing(): void
 	{
 		$container = $this->createMock(Container::class);
@@ -118,6 +172,24 @@ final class DenyAllAuthorizer implements Authorizer
 	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
 	{
 		return false;
+	}
+
+}
+
+final class AllowAllSecondAuthorizer implements Authorizer
+{
+
+	/** @var array<array{activity: string, endpoint: string}> */
+	public array $calls = [];
+
+	public function isAllowed(ApiRequest $request, Endpoint $endpoint, string $activity): bool
+	{
+		$this->calls[] = [
+			'activity' => $activity,
+			'endpoint' => $endpoint->getControllerClass() . '::' . $endpoint->getControllerMethod(),
+		];
+
+		return true;
 	}
 
 }
