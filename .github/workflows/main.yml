@@ -11,6 +11,7 @@ on:
 
 jobs:
     lint:
+        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
         name: PHPStan and PHP Code Sniffer
         runs-on: ubuntu-latest
 
@@ -46,8 +47,11 @@ jobs:
 #                    ./vendor/bin/tester tests
 
     tests:
+        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
         name: PHPUnit with coverage
         runs-on: ubuntu-latest
+        permissions:
+            contents: write
 
         env:
             COVERAGE_MIN: '65'
@@ -69,7 +73,11 @@ jobs:
 
             -   name: Run PHPUnit with coverage
                 run: |
-                    ./vendor/bin/phpunit --coverage-clover build/coverage.xml
+                    ./vendor/bin/phpunit --coverage-clover build/coverage.xml --log-junit build/junit.xml
+
+            -   name: Generate test count badges
+                run: |
+                    php tools/update-test-badges.php build/junit.xml .github/badges/tests.json .github/badges/assertions.json
 
             -   name: Summarize coverage
                 if: always()
@@ -93,3 +101,17 @@ jobs:
             -   name: Check coverage threshold
                 run: |
                     php tools/check-coverage.php build/coverage.xml "${COVERAGE_MIN}"
+
+            -   name: Commit badge updates
+                if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+                run: |
+                    if git diff --quiet -- .github/badges/tests.json .github/badges/assertions.json; then
+                        echo "No badge updates to commit."
+                        exit 0
+                    fi
+
+                    git config user.name "github-actions[bot]"
+                    git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+                    git add .github/badges/tests.json .github/badges/assertions.json
+                    git commit -m "chore: update test badges [skip ci]"
+                    git push
