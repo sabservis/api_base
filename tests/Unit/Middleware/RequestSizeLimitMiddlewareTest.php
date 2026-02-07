@@ -8,6 +8,7 @@ use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RequestSizeLimitMiddleware;
+use function str_repeat;
 
 final class RequestSizeLimitMiddlewareTest extends TestCase
 {
@@ -15,7 +16,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 	#[Test]
 	public function allowsRequestUnderLimit(): void
 	{
-		$middleware = new RequestSizeLimitMiddleware(maxBodySize: 1024);
+		$middleware = new RequestSizeLimitMiddleware(maxBodySize: 1_024);
 
 		$request = new ApiRequest(
 			method: 'POST',
@@ -23,7 +24,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('a', 500),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -42,7 +43,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: '', // Body not actually read yet
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Payload Too Large');
@@ -61,7 +62,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('x', 200),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Payload Too Large');
@@ -80,7 +81,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('x', 100),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		try {
 			$middleware($request, $response, $next);
@@ -101,7 +102,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('a', 100),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -113,13 +114,9 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 	{
 		$middleware = new RequestSizeLimitMiddleware(maxBodySize: 100);
 
-		$request = new ApiRequest(
-			method: 'GET',
-			uri: '/',
-			body: '',
-		);
+		$request = new ApiRequest(method: 'GET', uri: '/', body: '');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -129,7 +126,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 	#[Test]
 	public function formatsMessageWithMB(): void
 	{
-		$middleware = new RequestSizeLimitMiddleware(maxBodySize: 10 * 1024 * 1024); // 10MB
+		$middleware = new RequestSizeLimitMiddleware(maxBodySize: 10 * 1_024 * 1_024); // 10MB
 
 		$request = new ApiRequest(
 			method: 'POST',
@@ -138,7 +135,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: '',
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		try {
 			$middleware($request, $response, $next);
@@ -160,7 +157,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('a', 50),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Non-numeric Content-Length is treated as 0, so actual body size is checked
 		$result = $middleware($request, $response, $next);
@@ -180,7 +177,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('x', 100),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Payload Too Large');
@@ -200,7 +197,7 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 			body: str_repeat('x', 150),
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Negative Content-Length is treated as 0, so actual body size is checked
 		$this->expectException(ClientErrorException::class);

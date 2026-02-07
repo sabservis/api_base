@@ -9,6 +9,7 @@ use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\EnforceHttpsMiddleware;
 use Sabservis\Api\Middleware\RequestIdMiddleware;
 use Sabservis\Api\Utils\ChainBuilder;
+use function is_string;
 
 final class HttpsRequestIdPipelineIntegrationTest extends TestCase
 {

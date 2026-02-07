@@ -9,6 +9,7 @@ use Sabservis\Api\Attribute\OpenApi\ServerVariable;
 use Sabservis\Api\OpenApi\Generator\OpenApiGenerator;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Schema;
+use function assert;
 use function json_decode;
 use function json_encode;
 

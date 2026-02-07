@@ -16,7 +16,7 @@ final class RequestUriTest extends TestCase
 
 		self::assertSame('https', $uri->getScheme());
 		self::assertSame('api.example.com', $uri->getHost());
-		self::assertSame(8443, $uri->getPort());
+		self::assertSame(8_443, $uri->getPort());
 		self::assertSame('/v1/users', $uri->getPath());
 		self::assertSame('page=2', $uri->getQuery());
 		self::assertSame('details', $uri->getFragment());

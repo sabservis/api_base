@@ -15,6 +15,7 @@ final class LogicalExceptionTest extends TestCase
 	{
 		$exception = new class('Invalid state') extends LogicalException
 		{
+
 		};
 
 		self::assertInstanceOf(LogicalException::class, $exception);

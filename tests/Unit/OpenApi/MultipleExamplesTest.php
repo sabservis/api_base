@@ -78,7 +78,11 @@ final class MultipleExamplesTest extends TestCase
 			type: 'object',
 			examples: [
 				new Examples(example: 'user', summary: 'User object', value: ['id' => 1, 'name' => 'John']),
-				new Examples(example: 'admin', summary: 'Admin object', value: ['id' => 2, 'name' => 'Admin', 'role' => 'admin']),
+				new Examples(
+					example: 'admin',
+					summary: 'Admin object',
+					value: ['id' => 2, 'name' => 'Admin', 'role' => 'admin'],
+				),
 			],
 		);
 

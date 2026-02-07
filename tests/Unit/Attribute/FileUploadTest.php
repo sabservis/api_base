@@ -4,7 +4,9 @@ namespace Tests\Unit\Attribute;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionClass;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use function assert;
 
 final class FileUploadTest extends TestCase
 {
@@ -42,20 +44,20 @@ final class FileUploadTest extends TestCase
 	#[Test]
 	public function canBeUsedAsAttribute(): void
 	{
-		$reflectionClass = new \ReflectionClass(TestControllerWithFileUpload::class);
+		$reflectionClass = new ReflectionClass(TestControllerWithFileUpload::class);
 		$method = $reflectionClass->getMethod('upload');
 
 		$attributes = $method->getAttributes(FileUpload::class);
 
 		self::assertCount(2, $attributes);
 
-		/** @var FileUpload $avatar */
 		$avatar = $attributes[0]->newInstance();
+		assert($avatar instanceof FileUpload);
 		self::assertSame('avatar', $avatar->name);
 		self::assertFalse($avatar->multiple);
 
-		/** @var FileUpload $documents */
 		$documents = $attributes[1]->newInstance();
+		assert($documents instanceof FileUpload);
 		self::assertSame('documents', $documents->name);
 		self::assertTrue($documents->multiple);
 	}
@@ -69,6 +71,7 @@ class TestControllerWithFileUpload
 	#[FileUpload(name: 'documents', multiple: true)]
 	public function upload(): void
 	{
+		// Intentionally empty helper endpoint for attribute reflection tests.
 	}
 
 }

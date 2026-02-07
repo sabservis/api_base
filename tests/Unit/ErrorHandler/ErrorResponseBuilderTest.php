@@ -8,6 +8,9 @@ use RuntimeException;
 use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
+use stdClass;
+use function array_keys;
+use function json_decode;
 
 final class ErrorResponseBuilderTest extends TestCase
 {
@@ -347,7 +350,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function sanitizesObjectsInContext(): void
 	{
-		$user = new \stdClass();
+		$user = new stdClass();
 		$user->id = 1;
 		$user->password = 'secret';
 
@@ -368,7 +371,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function customContextFilterIsApplied(): void
 	{
-		$this->builder->setContextFilter(function (array $context): array {
+		$this->builder->setContextFilter(static function (array $context): array {
 			// Custom filter: remove 'internal_code' key
 			unset($context['internal_code']);
 
@@ -394,12 +397,14 @@ final class ErrorResponseBuilderTest extends TestCase
 		$filterCalled = false;
 		$receivedContext = null;
 
-		$this->builder->setContextFilter(function (array $context) use (&$filterCalled, &$receivedContext): array {
-			$filterCalled = true;
-			$receivedContext = $context;
+		$this->builder->setContextFilter(
+			static function (array $context) use (&$filterCalled, &$receivedContext): array {
+				$filterCalled = true;
+				$receivedContext = $context;
 
-			return $context;
-		});
+				return $context;
+			},
+		);
 
 		$exception = (new ClientErrorException('Error', 400))
 			->withContext([
@@ -488,7 +493,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function buildWithTraceIdProvider(): void
 	{
-		$this->builder->setTraceIdProvider(fn () => 'trace-abc-123');
+		$this->builder->setTraceIdProvider(static fn () => 'trace-abc-123');
 
 		$exception = new ClientErrorException('Not found', 404);
 		$response = $this->builder->build($exception);
@@ -500,7 +505,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function buildWithTraceIdProviderReturningNull(): void
 	{
-		$this->builder->setTraceIdProvider(fn () => null);
+		$this->builder->setTraceIdProvider(static fn () => null);
 
 		$exception = new ClientErrorException('Not found', 404);
 		$response = $this->builder->build($exception);
@@ -512,7 +517,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function buildFatalWithTraceIdProvider(): void
 	{
-		$this->builder->setTraceIdProvider(fn () => 'fatal-trace-456');
+		$this->builder->setTraceIdProvider(static fn () => 'fatal-trace-456');
 
 		$exception = new RuntimeException('Fatal');
 		$response = $this->builder->buildFatal($exception, debugMode: false);
@@ -524,7 +529,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function buildFatalWithTraceIdProviderReturningNull(): void
 	{
-		$this->builder->setTraceIdProvider(fn () => null);
+		$this->builder->setTraceIdProvider(static fn () => null);
 
 		$exception = new RuntimeException('Fatal');
 		$response = $this->builder->buildFatal($exception, debugMode: false);
@@ -536,7 +541,7 @@ final class ErrorResponseBuilderTest extends TestCase
 	#[Test]
 	public function traceIdAppearsBeforeContext(): void
 	{
-		$this->builder->setTraceIdProvider(fn () => 'trace-order-test');
+		$this->builder->setTraceIdProvider(static fn () => 'trace-order-test');
 
 		$exception = (new ClientErrorException('Error', 400))
 			->withContext(['field' => 'email']);

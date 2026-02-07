@@ -119,10 +119,7 @@ final class OpenApiSupportObjectsTest extends TestCase
 				'env' => new ServerVariableObject(default: 'prod', enum: ['prod']),
 			],
 		);
-		$link = new LinkObject(
-			operationId: 'getUser',
-			server: $server,
-		);
+		$link = new LinkObject(operationId: 'getUser', server: $server);
 		$oauthFlow = new OAuthFlowObject(
 			scopes: ['read' => 'Read access'],
 			tokenUrl: 'https://example.com/oauth/token',

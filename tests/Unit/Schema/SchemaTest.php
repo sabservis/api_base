@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\Schema;
+use function strlen;
 
 final class SchemaTest extends TestCase
 {

@@ -4,6 +4,8 @@ namespace Tests\Unit\Exception\Api;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
+use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 
@@ -89,7 +91,7 @@ final class ValidationExceptionTest extends TestCase
 	{
 		$exception = new ValidationException();
 
-		self::assertInstanceOf(\Sabservis\Api\Exception\Api\ClientErrorException::class, $exception);
+		self::assertInstanceOf(ClientErrorException::class, $exception);
 	}
 
 	#[Test]
@@ -111,7 +113,7 @@ final class ValidationExceptionTest extends TestCase
 	#[Test]
 	public function previousExceptionIsSet(): void
 	{
-		$previous = new \RuntimeException('Original error');
+		$previous = new RuntimeException('Original error');
 		$exception = new ValidationException('Validation failed', 422, $previous);
 
 		self::assertSame($previous, $exception->getPrevious());

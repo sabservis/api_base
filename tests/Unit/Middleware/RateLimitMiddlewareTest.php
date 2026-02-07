@@ -9,7 +9,6 @@ use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RateLimitMiddleware;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
-use Symfony\Contracts\Cache\ItemInterface;
 
 final class RateLimitMiddlewareTest extends TestCase
 {
@@ -26,7 +25,7 @@ final class RateLimitMiddlewareTest extends TestCase
 			serverParams: ['REMOTE_ADDR' => '127.0.0.1'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -45,7 +44,7 @@ final class RateLimitMiddlewareTest extends TestCase
 			serverParams: ['REMOTE_ADDR' => '127.0.0.1'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -66,7 +65,7 @@ final class RateLimitMiddlewareTest extends TestCase
 			serverParams: ['REMOTE_ADDR' => '127.0.0.1'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// First two requests should pass
 		$middleware($request, $response, $next);
@@ -86,7 +85,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		$middleware = new RateLimitMiddleware($cache, maxRequests: 1, windowSeconds: 60);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// First IP
 		$request1 = new ApiRequest(
@@ -121,7 +120,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// IP with custom limit
 		$request = new ApiRequest(
@@ -150,7 +149,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// IP within CIDR range
 		$request = new ApiRequest(
@@ -177,7 +176,7 @@ final class RateLimitMiddlewareTest extends TestCase
 			serverParams: ['REMOTE_ADDR' => '127.0.0.1'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result1 = $middleware($request, $response, $next);
 		self::assertSame('4', $result1->getHeader('x-ratelimit-remaining'));
@@ -203,7 +202,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Request with X-Forwarded-For but no trusted proxies configured
 		// Should use REMOTE_ADDR, not the forwarded IP
@@ -239,7 +238,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Request through trusted proxy
 		$request1 = new ApiRequest(
@@ -275,7 +274,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Request from untrusted IP with spoofed X-Forwarded-For
 		$request1 = new ApiRequest(
@@ -311,7 +310,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Chain: client -> proxy2 -> proxy1 -> server
 		// X-Forwarded-For: client_ip, proxy2_ip
@@ -348,7 +347,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Request from any 10.x.x.x proxy
 		$request1 = new ApiRequest(
@@ -383,7 +382,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Invalid IP in X-Forwarded-For - should fallback to REMOTE_ADDR
 		$request = new ApiRequest(
@@ -411,7 +410,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Empty X-Forwarded-For
 		$request = new ApiRequest(
@@ -439,7 +438,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Request with Cloudflare header
 		$request1 = new ApiRequest(
@@ -474,7 +473,7 @@ final class RateLimitMiddlewareTest extends TestCase
 		);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		// Attacker sends request directly (not through proxy)
 		// trying to spoof X-Forwarded-For

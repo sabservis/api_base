@@ -74,9 +74,6 @@ final class ExamplesSupportTest extends TestCase
 		self::assertSame(['nested' => ['data' => 123]], $result['test']['value']);
 	}
 
-	/**
-	 * @return object
-	 */
 	private function createHelper(): object
 	{
 		return new class {

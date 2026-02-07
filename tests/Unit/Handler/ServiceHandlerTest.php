@@ -408,6 +408,7 @@ class NotAController
 
 	public function doSomething(): void
 	{
+		// Intentionally empty method for negative controller-type test.
 	}
 
 }
@@ -450,10 +451,7 @@ class DtoController implements Controller
 class CreateUserDto
 {
 
-	public function __construct(
-		public string $name,
-		public string $email,
-	)
+	public function __construct(public string $name, public string $email)
 	{
 	}
 
@@ -465,9 +463,7 @@ class CreateUserDto
 class UpdateUserDto
 {
 
-	public function __construct(
-		public string $name,
-	)
+	public function __construct(public string $name)
 	{
 	}
 

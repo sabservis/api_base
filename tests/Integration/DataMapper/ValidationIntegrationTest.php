@@ -256,13 +256,14 @@ final class ValidationIntegrationTest extends TestCase
 }
 
 // Test DTOs
+// phpcs:disable SlevomatCodingStandard.Attributes.AttributeAndTargetSpacing.IncorrectLinesCountBetweenAttributeAndTarget
 
 class UserWithNotNull
 {
 
 	public function __construct(
 		#[NotNull]
-		public ?string $name,
+		public string|null $name,
 		public string $email,
 	)
 	{
@@ -286,10 +287,7 @@ class UserWithEmail
 class UserWithRange
 {
 
-	public function __construct(
-		#[Range(min: 18, max: 120)]
-		public int $age,
-	)
+	public function __construct(#[Range(min: 18, max: 120)] public int $age)
 	{
 	}
 
@@ -310,14 +308,13 @@ class UserWithLength
 class PaymentWithPositive
 {
 
-	public function __construct(
-		#[Positive]
-		public float $amount,
-	)
+	public function __construct(#[Positive] public float $amount)
 	{
 	}
 
 }
+
+// phpcs:enable SlevomatCodingStandard.Attributes.AttributeAndTargetSpacing.IncorrectLinesCountBetweenAttributeAndTarget
 
 class AddressDto
 {
@@ -466,9 +463,7 @@ class CompanyDto
 class OrganizationDto
 {
 
-	public function __construct(
-		public CompanyDto $company,
-	)
+	public function __construct(public CompanyDto $company)
 	{
 	}
 

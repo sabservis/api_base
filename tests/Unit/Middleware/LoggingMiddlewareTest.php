@@ -24,7 +24,7 @@ final class LoggingMiddlewareTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: 'https://example.com/api/users');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -36,7 +36,7 @@ final class LoggingMiddlewareTest extends TestCase
 		$middleware = new LoggingMiddleware($logger);
 
 		$nextCalled = false;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
 			$nextCalled = true;
 
 			return $res->withStatus(200);
@@ -56,7 +56,7 @@ final class LoggingMiddlewareTest extends TestCase
 		$logger = $this->createMock(LoggerInterface::class);
 		$middleware = new LoggingMiddleware($logger);
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res
 			->withStatus(201)
 			->withHeader('X-Custom', 'value');
 
@@ -78,14 +78,14 @@ final class LoggingMiddlewareTest extends TestCase
 
 		$logger = $this->createMock(LoggerInterface::class);
 		$logger->method('info')
-			->willReturnCallback(function () use (&$logCalled, &$nextCalled, &$logCalledBeforeNext): void {
+			->willReturnCallback(static function () use (&$logCalled, &$nextCalled, &$logCalledBeforeNext): void {
 				$logCalled = true;
 				$logCalledBeforeNext = !$nextCalled;
 			});
 
 		$middleware = new LoggingMiddleware($logger);
 
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
 			$nextCalled = true;
 
 			return $res->withStatus(200);

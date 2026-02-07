@@ -10,6 +10,7 @@ use Sabservis\Api\OpenApi\Controller\OpenApiController;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\Schema;
+use function json_decode;
 
 final class OpenApiControllerTest extends TestCase
 {

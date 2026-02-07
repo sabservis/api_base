@@ -4,7 +4,6 @@ namespace Tests\Unit\OpenApi\Generator;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use Sabservis\Api\Http\ErrorResponse;
 use Sabservis\Api\OpenApi\Generator\OpenApiGenerator;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Endpoint;

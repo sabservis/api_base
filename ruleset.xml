@@ -17,6 +17,7 @@
 
 	<file>src/</file>
 	<file>tests/</file>
+	<exclude-pattern>*/tests/tmp/*</exclude-pattern>
 
 	<!-- Configure PSR-4 rule -->
 	<rule ref="SlevomatCodingStandard.Files.TypeNameMatchesFileName">

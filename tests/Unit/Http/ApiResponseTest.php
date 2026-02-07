@@ -7,6 +7,10 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\ListResponse;
+use stdClass;
+use function fopen;
+use function fwrite;
+use function rewind;
 
 final class ApiResponseTest extends TestCase
 {
@@ -166,7 +170,7 @@ final class ApiResponseTest extends TestCase
 	public function withObject(): void
 	{
 		$response = new ApiResponse();
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$entity->name = 'test';
 
 		$newResponse = $response->withObject($entity);
@@ -179,7 +183,7 @@ final class ApiResponseTest extends TestCase
 	#[Test]
 	public function okFactory(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$entity->name = 'test';
 
 		$response = ApiResponse::ok($entity);
@@ -192,7 +196,7 @@ final class ApiResponseTest extends TestCase
 	#[Test]
 	public function createdFactory(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$entity->id = 123;
 
 		$response = ApiResponse::created($entity);

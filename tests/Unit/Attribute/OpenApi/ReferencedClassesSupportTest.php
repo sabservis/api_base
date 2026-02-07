@@ -159,9 +159,6 @@ final class ReferencedClassesSupportTest extends TestCase
 		self::assertSame([], $result);
 	}
 
-	/**
-	 * @return object
-	 */
 	private function createHelper(): object
 	{
 		return new class {

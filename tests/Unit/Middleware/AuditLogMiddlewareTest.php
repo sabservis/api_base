@@ -9,6 +9,8 @@ use RuntimeException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\AuditLogMiddleware;
+use stdClass;
+use function strlen;
 
 final class AuditLogMiddlewareTest extends TestCase
 {
@@ -21,7 +23,7 @@ final class AuditLogMiddlewareTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: '/api/users');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -37,20 +39,18 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(function (array $context): bool {
-					return isset($context['request_id'])
+				$this->callback(static fn (array $context): bool => isset($context['request_id'])
 						&& $context['method'] === 'GET'
 						&& $context['path'] === '/api/users'
 						&& $context['status'] === 200
-						&& isset($context['duration_ms']);
-				}),
+						&& isset($context['duration_ms'])),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
 
 		$request = new ApiRequest(method: 'GET', uri: '/api/users');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -65,19 +65,17 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('error')
 			->with(
 				'API Error',
-				$this->callback(function (array $context) use ($exception): bool {
-					return isset($context['request_id'])
+				$this->callback(static fn (array $context): bool => isset($context['request_id'])
 						&& $context['method'] === 'POST'
 						&& $context['error_class'] === RuntimeException::class
-						&& $context['error_message'] === 'Test error';
-				}),
+						&& $context['error_message'] === 'Test error'),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
 
 		$request = new ApiRequest(method: 'POST', uri: '/api/users');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw $exception;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw $exception;
 
 		$this->expectException(RuntimeException::class);
 
@@ -92,7 +90,9 @@ final class AuditLogMiddlewareTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw new RuntimeException('Original error');
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw new RuntimeException(
+			'Original error',
+		);
 
 		$this->expectException(RuntimeException::class);
 		$this->expectExceptionMessage('Original error');
@@ -107,7 +107,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		$middleware = new AuditLogMiddleware($logger);
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -129,10 +129,8 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(function (array $context): bool {
-					return $context['ip'] === '192.168.1.1'
-						&& $context['user_agent'] === 'TestClient/1.0';
-				}),
+				$this->callback(static fn (array $context): bool => $context['ip'] === '192.168.1.1'
+						&& $context['user_agent'] === 'TestClient/1.0'),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -144,7 +142,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			serverParams: ['REMOTE_ADDR' => '192.168.1.1'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -157,18 +155,18 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(fn (array $context): bool => $context['user_id'] === 42),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === 42),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
 
-		$user = new \stdClass();
+		$user = new stdClass();
 		$user->id = 42;
 
 		$request = (new ApiRequest(method: 'GET', uri: '/'))
 			->withAttribute('user', $user);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -181,7 +179,7 @@ final class AuditLogMiddlewareTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result1 = $middleware($request, $response, $next);
 		$result2 = $middleware($request, $response, $next);
@@ -200,7 +198,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(fn (array $context): bool => $context['user_id'] === null),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === null),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -208,7 +206,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		// No user attribute set (null)
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -221,7 +219,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(fn (array $context): bool => $context['user_id'] === null),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === null),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -230,7 +228,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		$request = (new ApiRequest(method: 'GET', uri: '/'))
 			->withAttribute('user', 'some-string-value');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -243,7 +241,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(fn (array $context): bool => $context['user_id'] === null),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === null),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -252,7 +250,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		$request = (new ApiRequest(method: 'GET', uri: '/'))
 			->withAttribute('user', ['id' => 42, 'name' => 'test']);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -265,19 +263,19 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(fn (array $context): bool => $context['user_id'] === null),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === null),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
 
 		// User object without id property
-		$user = new \stdClass();
+		$user = new stdClass();
 		$user->name = 'test';
 
 		$request = (new ApiRequest(method: 'GET', uri: '/'))
 			->withAttribute('user', $user);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -292,7 +290,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('error')
 			->with(
 				'API Error',
-				$this->callback(fn (array $context): bool => $context['user_id'] === null),
+				$this->callback(static fn (array $context): bool => $context['user_id'] === null),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -300,7 +298,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		// No user attribute
 		$request = new ApiRequest(method: 'POST', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw $exception;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => throw $exception;
 
 		$this->expectException(RuntimeException::class);
 
@@ -315,10 +313,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(function (array $context): bool {
-					// Should log the real client IP from X-Forwarded-For, not the proxy IP
-					return $context['ip'] === '203.0.113.50';
-				}),
+				$this->callback(static fn (array $context): bool => $context['ip'] === '203.0.113.50'),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -334,7 +329,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		$request = $request->withTrustedProxies(['10.0.0.0/8']);
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}
@@ -347,10 +342,7 @@ final class AuditLogMiddlewareTest extends TestCase
 			->method('info')
 			->with(
 				'API Request',
-				$this->callback(function (array $context): bool {
-					// Without trusted proxies, should log REMOTE_ADDR (ignoring X-Forwarded-For)
-					return $context['ip'] === '10.0.0.1';
-				}),
+				$this->callback(static fn (array $context): bool => $context['ip'] === '10.0.0.1'),
 			);
 
 		$middleware = new AuditLogMiddleware($logger);
@@ -365,7 +357,7 @@ final class AuditLogMiddlewareTest extends TestCase
 		// No trusted proxies - X-Forwarded-For should be ignored
 
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
 	}

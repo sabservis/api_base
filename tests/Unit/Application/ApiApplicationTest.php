@@ -9,7 +9,16 @@ use Sabservis\Api\Application\ApiApplication;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use function file_put_contents;
+use function fopen;
+use function ob_end_clean;
+use function ob_get_clean;
+use function ob_start;
+use function str_repeat;
 use function strlen;
+use function sys_get_temp_dir;
+use function tempnam;
+use function unlink;
 
 final class ApiApplicationTest extends TestCase
 {
@@ -17,12 +26,10 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function runWithExecutesMiddlewareChain(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response
-				->withStatus(200)
-				->withHeader('X-Custom', 'test')
-				->writeBody('Hello World');
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response
+			->withStatus(200)
+			->withHeader('X-Custom', 'test')
+			->writeBody('Hello World');
 
 		$app = new ApiApplication($chain);
 
@@ -43,7 +50,7 @@ final class ApiApplicationTest extends TestCase
 	{
 		$receivedRequest = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
 			$receivedRequest = $request;
 
 			return $response->withStatus(200);
@@ -69,7 +76,7 @@ final class ApiApplicationTest extends TestCase
 	{
 		$nextCalled = false;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$nextCalled): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$nextCalled): ApiResponse {
 			$response = $response->withStatus(200);
 			$result = $next($request, $response);
 			$nextCalled = true;
@@ -89,7 +96,7 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function exceptionBubblesUpByDefault(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
 			throw new RuntimeException('Test error');
 		};
 
@@ -104,7 +111,7 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function catchExceptionsSuppressesException(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
 			throw new RuntimeException('Test error');
 		};
 
@@ -126,7 +133,7 @@ final class ApiApplicationTest extends TestCase
 		$order = [];
 
 		// Simulate a chain where outer wraps inner
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
 			// Outer middleware - before
 			$order[] = 'outer-before';
 
@@ -153,7 +160,7 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function middlewareCanModifyResponse(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
 			$response = $response
 				->withStatus(201)
 				->withHeader('X-Created-By', 'test');
@@ -174,12 +181,9 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function middlewareCanShortCircuit(): void
 	{
-		$innerCalled = false;
-
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$innerCalled): ApiResponse {
-			// Don't call next - short circuit
-			return $response->withStatus(401)->writeBody('Unauthorized');
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			401,
+		)->writeBody('Unauthorized');
 
 		$app = new ApiApplication($chain);
 
@@ -197,7 +201,7 @@ final class ApiApplicationTest extends TestCase
 		$tempFile = tempnam(sys_get_temp_dir(), 'test');
 		file_put_contents($tempFile, 'File content here');
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use ($tempFile): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use ($tempFile): ApiResponse {
 			$handle = fopen($tempFile, 'r');
 
 			return $response->withStatus(200)->withBody($handle);
@@ -217,9 +221,7 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function defaultStatusIs200(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $next($request, $response);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $next($request, $response);
 
 		$app = new ApiApplication($chain);
 
@@ -235,7 +237,7 @@ final class ApiApplicationTest extends TestCase
 	{
 		$receivedRequest = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
 			$receivedRequest = $request;
 
 			return $response->withStatus(200);
@@ -265,7 +267,7 @@ final class ApiApplicationTest extends TestCase
 	{
 		$receivedRequest = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
 			$receivedRequest = $request;
 
 			return $response->withStatus(200);
@@ -292,9 +294,9 @@ final class ApiApplicationTest extends TestCase
 	#[Test]
 	public function maxRequestBodySizeRejectsLargeRequest(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		);
 
 		$app = new ApiApplication($chain);
 		$app->setMaxRequestBodySize(100); // 100 bytes limit
@@ -317,14 +319,14 @@ final class ApiApplicationTest extends TestCase
 	{
 		$receivedRequest = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
 			$receivedRequest = $request;
 
 			return $response->withStatus(200);
 		};
 
 		$app = new ApiApplication($chain);
-		$app->setMaxRequestBodySize(1000); // 1000 bytes limit
+		$app->setMaxRequestBodySize(1_000); // 1000 bytes limit
 
 		$request = new ApiRequest(
 			method: 'POST',
@@ -344,7 +346,7 @@ final class ApiApplicationTest extends TestCase
 	{
 		$receivedRequest = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedRequest): ApiResponse {
 			$receivedRequest = $request;
 
 			return $response->withStatus(200);
@@ -356,14 +358,14 @@ final class ApiApplicationTest extends TestCase
 		$request = new ApiRequest(
 			method: 'POST',
 			uri: '/',
-			body: str_repeat('x', 100000),
+			body: str_repeat('x', 100_000),
 		);
 
 		ob_start();
 		$app->runWith($request);
 		ob_end_clean();
 
-		self::assertSame(100000, strlen($receivedRequest->getContents()));
+		self::assertSame(100_000, strlen($receivedRequest->getContents()));
 	}
 
 }

@@ -5,6 +5,7 @@ namespace Tests\Unit\Attribute\OpenApi;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\EnumSupport;
+use UnitEnum;
 
 final class EnumSupportTest extends TestCase
 {
@@ -81,9 +82,6 @@ final class EnumSupportTest extends TestCase
 		self::assertSame(['a', 'b'], $result2); // Cached!
 	}
 
-	/**
-	 * @return object
-	 */
 	private function createEnumHelper(): object
 	{
 		return new class {
@@ -91,7 +89,7 @@ final class EnumSupportTest extends TestCase
 			use EnumSupport;
 
 			/**
-			 * @param class-string|\UnitEnum|array<mixed>|string|null $enum
+			 * @param class-string|UnitEnum|array<mixed>|string|null $enum
 			 * @return array<mixed>
 			 */
 			public function testResolveEnum(string|array|null $enum): array
@@ -108,7 +106,9 @@ enum TestBackedStatus: string
 {
 
 	case Active = 'active';
+
 	case Inactive = 'inactive';
+
 	case Pending = 'pending';
 
 }
@@ -117,7 +117,9 @@ enum TestIntPriority: int
 {
 
 	case Low = 1;
+
 	case Medium = 2;
+
 	case High = 3;
 
 }
@@ -126,7 +128,9 @@ enum TestUnitStatus
 {
 
 	case Active;
+
 	case Inactive;
+
 	case Pending;
 
 }

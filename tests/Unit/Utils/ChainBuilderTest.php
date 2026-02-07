@@ -27,9 +27,12 @@ final class ChainBuilderTest extends TestCase
 	public function singleMiddleware(): void
 	{
 		$chain = new ChainBuilder();
-		$chain->add(function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withHeader('X-Test', 'value');
-		});
+		$chain->add(
+			static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withHeader(
+				'X-Test',
+				'value',
+			),
+		);
 
 		$handler = $chain->create();
 
@@ -46,19 +49,25 @@ final class ChainBuilderTest extends TestCase
 		$chain = new ChainBuilder();
 		$order = [];
 
-		$chain->add(function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
-			$order[] = 'first-before';
-			$response = $next($request, $response);
-			$order[] = 'first-after';
-			return $response;
-		});
+		$chain->add(
+			static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
+				$order[] = 'first-before';
+				$response = $next($request, $response);
+				$order[] = 'first-after';
 
-		$chain->add(function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
-			$order[] = 'second-before';
-			$response = $next($request, $response);
-			$order[] = 'second-after';
-			return $response;
-		});
+				return $response;
+			},
+		);
+
+		$chain->add(
+			static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$order): ApiResponse {
+				$order[] = 'second-before';
+				$response = $next($request, $response);
+				$order[] = 'second-after';
+
+				return $response;
+			},
+		);
 
 		$handler = $chain->create();
 
@@ -75,12 +84,14 @@ final class ChainBuilderTest extends TestCase
 		$chain = new ChainBuilder();
 
 		$middlewares = [
-			function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-				return $next($request, $response)->withHeader('X-First', '1');
-			},
-			function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-				return $next($request, $response)->withHeader('X-Second', '2');
-			},
+			static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $next($request, $response)->withHeader(
+				'X-First',
+				'1',
+			),
+			static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $next($request, $response)->withHeader(
+				'X-Second',
+				'2',
+			),
 		];
 
 		$chain->addAll($middlewares);

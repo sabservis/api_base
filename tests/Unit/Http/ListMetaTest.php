@@ -5,6 +5,7 @@ namespace Tests\Unit\Http;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Http\ListMeta;
+use function json_encode;
 
 final class ListMetaTest extends TestCase
 {

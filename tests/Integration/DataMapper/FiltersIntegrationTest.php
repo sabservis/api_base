@@ -193,14 +193,12 @@ final class FiltersIntegrationTest extends TestCase
 }
 
 // Test DTOs
+// phpcs:disable SlevomatCodingStandard.Attributes.AttributeAndTargetSpacing.IncorrectLinesCountBetweenAttributeAndTarget
 
 class DtoWithTrim
 {
 
-	public function __construct(
-		#[StringTrimFilter]
-		public string $name,
-	)
+	public function __construct(#[StringTrimFilter] public string $name)
 	{
 	}
 
@@ -209,10 +207,7 @@ class DtoWithTrim
 class DtoWithLowerCase
 {
 
-	public function __construct(
-		#[StringToLowerFilter]
-		public string $code,
-	)
+	public function __construct(#[StringToLowerFilter] public string $code)
 	{
 	}
 
@@ -221,10 +216,7 @@ class DtoWithLowerCase
 class DtoWithUpperCase
 {
 
-	public function __construct(
-		#[StringToUpperFilter]
-		public string $code,
-	)
+	public function __construct(#[StringToUpperFilter] public string $code)
 	{
 	}
 
@@ -233,10 +225,7 @@ class DtoWithUpperCase
 class DtoWithNormalizedEmail
 {
 
-	public function __construct(
-		#[NormalizeEmailFilter]
-		public string $email,
-	)
+	public function __construct(#[NormalizeEmailFilter] public string $email)
 	{
 	}
 
@@ -245,10 +234,7 @@ class DtoWithNormalizedEmail
 class DtoWithNormalizedPhone
 {
 
-	public function __construct(
-		#[NormalizePhoneFilter]
-		public string $phone,
-	)
+	public function __construct(#[NormalizePhoneFilter] public string $phone)
 	{
 	}
 
@@ -269,10 +255,7 @@ class DtoWithNormalizedPhoneKeepPlus
 class DtoWithSlugify
 {
 
-	public function __construct(
-		#[SlugifyFilter]
-		public string $slug,
-	)
+	public function __construct(#[SlugifyFilter] public string $slug)
 	{
 	}
 
@@ -281,10 +264,7 @@ class DtoWithSlugify
 class DtoWithDefaultValue
 {
 
-	public function __construct(
-		#[DefaultValueFilter('draft')]
-		public ?string $status,
-	)
+	public function __construct(#[DefaultValueFilter('draft')] public string|null $status)
 	{
 	}
 
@@ -324,10 +304,7 @@ class DtoWithUniqueArray
 	/**
 	 * @param array<string> $tags
 	 */
-	public function __construct(
-		#[UniqueArrayFilter]
-		public array $tags,
-	)
+	public function __construct(#[UniqueArrayFilter] public array $tags)
 	{
 	}
 
@@ -352,14 +329,13 @@ class DtoWithTrimAndUniqueArray
 class DtoWithNullableFilter
 {
 
-	public function __construct(
-		#[StringTrimFilter]
-		public ?string $name,
-	)
+	public function __construct(#[StringTrimFilter] public string|null $name)
 	{
 	}
 
 }
+
+// phpcs:enable SlevomatCodingStandard.Attributes.AttributeAndTargetSpacing.IncorrectLinesCountBetweenAttributeAndTarget
 
 class DtoWithMultipleFilters
 {

@@ -15,11 +15,9 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function getRequestReturnsTestResponse(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response
-				->withStatus(200)
-				->writeJsonBody(['id' => 1, 'name' => 'Test']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response
+			->withStatus(200)
+			->writeJsonBody(['id' => 1, 'name' => 'Test']);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -35,8 +33,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedBody = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
 			$receivedBody = $request->getJsonBody();
+
 			return $response->withStatus(201)->writeJsonBody(['id' => 1]);
 		};
 
@@ -55,9 +54,10 @@ final class ApiTestClientTest extends TestCase
 		$receivedBody = null;
 		$receivedMethod = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody, &$receivedMethod): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody, &$receivedMethod): ApiResponse {
 			$receivedBody = $request->getJsonBody();
 			$receivedMethod = $request->getMethod();
+
 			return $response->withStatus(200)->writeJsonBody(['updated' => true]);
 		};
 
@@ -77,16 +77,17 @@ final class ApiTestClientTest extends TestCase
 		$receivedBody = null;
 		$receivedMethod = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody, &$receivedMethod): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody, &$receivedMethod): ApiResponse {
 			$receivedBody = $request->getJsonBody();
 			$receivedMethod = $request->getMethod();
+
 			return $response->withStatus(200)->writeJsonBody(['patched' => true]);
 		};
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
 
-		$response = $client->patchJson('/users/1', ['status' => 'active']);
+		$client->patchJson('/users/1', ['status' => 'active']);
 
 		self::assertSame('PATCH', $receivedMethod);
 		self::assertSame(['status' => 'active'], $receivedBody);
@@ -97,8 +98,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedMethod = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedMethod): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedMethod): ApiResponse {
 			$receivedMethod = $request->getMethod();
+
 			return $response->withStatus(204);
 		};
 
@@ -116,8 +118,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedHeaders = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
 			$receivedHeaders = $request->getHeaders();
+
 			return $response->withStatus(200);
 		};
 
@@ -135,8 +138,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedHeaders = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
 			$receivedHeaders = $request->getHeaders();
+
 			return $response->withStatus(200);
 		};
 
@@ -154,8 +158,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedHeaders = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedHeaders): ApiResponse {
 			$receivedHeaders = $request->getHeaders();
+
 			return $response->withStatus(200);
 		};
 
@@ -171,9 +176,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertOk(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeJsonBody(['success' => true]);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeJsonBody(
+			['success' => true],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -188,9 +195,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertCreated(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(201)->writeJsonBody(['id' => 1]);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			201,
+		)->writeJsonBody(
+			['id' => 1],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -203,9 +212,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertNotFound(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(404)->writeJsonBody(['error' => 'Not found']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			404,
+		)->writeJsonBody(
+			['error' => 'Not found'],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -218,9 +229,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertJson(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeJsonBody(['id' => 1, 'name' => 'Test']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeJsonBody(
+			['id' => 1, 'name' => 'Test'],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -233,9 +246,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertJsonContains(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeJsonBody(['id' => 1, 'name' => 'Test', 'email' => 'test@example.com']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeJsonBody(
+			['id' => 1, 'name' => 'Test', 'email' => 'test@example.com'],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -248,9 +263,11 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertJsonHasKey(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeJsonBody(['id' => 1, 'name' => 'Test']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeJsonBody(
+			['id' => 1, 'name' => 'Test'],
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -264,12 +281,10 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseAssertHeader(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response
-				->withStatus(200)
-				->withHeader('x-custom', 'value123')
-				->writeJsonBody([]);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response
+			->withStatus(200)
+			->withHeader('x-custom', 'value123')
+			->writeJsonBody([]);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -283,12 +298,10 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function testResponseChainableAssertions(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response
-				->withStatus(200)
-				->withHeader('content-type', 'application/json')
-				->writeJsonBody(['id' => 1, 'name' => 'Test']);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response
+			->withStatus(200)
+			->withHeader('content-type', 'application/json')
+			->writeJsonBody(['id' => 1, 'name' => 'Test']);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -308,8 +321,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedBody = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
 			$receivedBody = $request->getContents();
+
 			return $response->withStatus(200);
 		};
 
@@ -326,8 +340,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedBody = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
 			$receivedBody = $request->getContents();
+
 			return $response->withStatus(200);
 		};
 
@@ -344,8 +359,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedBody = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedBody): ApiResponse {
 			$receivedBody = $request->getContents();
+
 			return $response->withStatus(200);
 		};
 
@@ -362,8 +378,9 @@ final class ApiTestClientTest extends TestCase
 	{
 		$receivedMethod = null;
 
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedMethod): ApiResponse {
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$receivedMethod): ApiResponse {
 			$receivedMethod = $request->getMethod();
+
 			return $response->withStatus(200);
 		};
 
@@ -378,9 +395,9 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function getBodyReturnsRawOutput(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeBody('plain text response');
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeBody('plain text response');
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -393,11 +410,9 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function getResponseReturnsOriginalApiResponse(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response
-				->withStatus(200)
-				->withAttribute('custom', 'value');
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response
+			->withStatus(200)
+			->withAttribute('custom', 'value');
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -413,9 +428,9 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function jsonReturnsNullForNonJsonBody(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(200)->writeBody('not json');
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			200,
+		)->writeBody('not json');
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);
@@ -428,9 +443,9 @@ final class ApiTestClientTest extends TestCase
 	#[Test]
 	public function jsonReturnsNullForEmptyBody(): void
 	{
-		$chain = function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
-			return $response->withStatus(204);
-		};
+		$chain = static fn (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse => $response->withStatus(
+			204,
+		);
 
 		$app = new ApiApplication($chain);
 		$client = new ApiTestClient($app);

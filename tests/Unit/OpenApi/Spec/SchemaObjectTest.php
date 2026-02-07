@@ -104,11 +104,7 @@ final class SchemaObjectTest extends TestCase
 	#[Test]
 	public function numericConstraints(): void
 	{
-		$schema = new SchemaObject(
-			type: 'integer',
-			minimum: 0,
-			maximum: 100,
-		);
+		$schema = new SchemaObject(type: 'integer', minimum: 0, maximum: 100);
 
 		$result = $schema->jsonSerialize();
 

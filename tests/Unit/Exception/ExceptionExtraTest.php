@@ -2,10 +2,10 @@
 
 namespace Tests\Unit\Exception;
 
-use Exception;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use ReflectionProperty;
+use RuntimeException;
 use Sabservis\Api\Exception\ExceptionExtra;
 
 final class ExceptionExtraTest extends TestCase
@@ -96,14 +96,14 @@ final class ExceptionExtraTest extends TestCase
 	 */
 	private function getMessageProperty(TestExtraException $exception): string|array
 	{
-		$property = new ReflectionProperty(Exception::class, 'message');
+		$property = new ReflectionProperty(RuntimeException::class, 'message');
 
 		return $property->getValue($exception);
 	}
 
 }
 
-class TestExtraException extends Exception
+class TestExtraException extends RuntimeException
 {
 
 	use ExceptionExtra;

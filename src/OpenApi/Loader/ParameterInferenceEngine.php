@@ -91,7 +91,13 @@ final class ParameterInferenceEngine
 			}
 
 			// DTO from request body should not be inferred as query parameter
-			if ($this->isRequestBodyParameter($paramName, $typeName, $pathVariables, $requestBodyEntity, $httpMethods)) {
+			if ($this->isRequestBodyParameter(
+				$paramName,
+				$typeName,
+				$pathVariables,
+				$requestBodyEntity,
+				$httpMethods,
+			)) {
 				continue;
 			}
 
@@ -420,11 +426,7 @@ final class ParameterInferenceEngine
 			return true;
 		}
 
-		if (is_subclass_of($typeName, BackedEnum::class) || is_subclass_of($typeName, UnitEnum::class)) {
-			return true;
-		}
-
-		return false;
+		return is_subclass_of($typeName, BackedEnum::class) || is_subclass_of($typeName, UnitEnum::class);
 	}
 
 }

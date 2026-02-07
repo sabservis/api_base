@@ -18,7 +18,7 @@ final class EnforceHttpsMiddlewareTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: 'http://example.com/api');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$result = $middleware($request, $response, $next);
 
@@ -37,7 +37,7 @@ final class EnforceHttpsMiddlewareTest extends TestCase
 			serverParams: ['HTTPS' => 'on'],
 		);
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200)->writeBody('OK');
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200)->writeBody('OK');
 
 		$result = $middleware($request, $response, $next);
 
@@ -51,7 +51,7 @@ final class EnforceHttpsMiddlewareTest extends TestCase
 		$middleware = new EnforceHttpsMiddleware();
 
 		$nextCalled = false;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
 			$nextCalled = true;
 
 			return $res->withStatus(200);
@@ -75,7 +75,7 @@ final class EnforceHttpsMiddlewareTest extends TestCase
 		$middleware = new EnforceHttpsMiddleware();
 
 		$nextCalled = false;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
 			$nextCalled = true;
 
 			return $res->withStatus(200);

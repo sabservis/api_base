@@ -4,7 +4,9 @@ namespace Tests\Unit\Attribute\OpenApi;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use ReflectionMethod;
 use Sabservis\Api\Attribute\OpenApi\Hidden;
+use function assert;
 
 /**
  * Tests for #[Hidden] attribute.
@@ -31,21 +33,21 @@ final class HiddenTest extends TestCase
 	#[Test]
 	public function attributeCanBeUsedOnMethod(): void
 	{
-		$reflectionMethod = new \ReflectionMethod(HiddenTestController::class, 'debugEndpoint');
+		$reflectionMethod = new ReflectionMethod(HiddenTestController::class, 'debugEndpoint');
 
 		$attributes = $reflectionMethod->getAttributes(Hidden::class);
 
 		self::assertCount(1, $attributes);
 
-		/** @var Hidden $hidden */
 		$hidden = $attributes[0]->newInstance();
+		assert($hidden instanceof Hidden);
 		self::assertSame('Internal debug endpoint', $hidden->reason);
 	}
 
 	#[Test]
 	public function attributeIsNotInherited(): void
 	{
-		$reflectionMethod = new \ReflectionMethod(HiddenTestController::class, 'publicEndpoint');
+		$reflectionMethod = new ReflectionMethod(HiddenTestController::class, 'publicEndpoint');
 
 		$attributes = $reflectionMethod->getAttributes(Hidden::class);
 
@@ -61,10 +63,12 @@ class HiddenTestController
 	#[Hidden(reason: 'Internal debug endpoint')]
 	public function debugEndpoint(): void
 	{
+		// Intentionally empty helper endpoint for attribute reflection tests.
 	}
 
 	public function publicEndpoint(): void
 	{
+		// Intentionally empty helper endpoint for attribute reflection tests.
 	}
 
 }

@@ -4,11 +4,10 @@ namespace Tests\Unit\Middleware;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
-use Sabservis\Api\Middleware\ApiMiddleware;
-use RuntimeException;
 use Throwable;
 
 /**
@@ -24,10 +23,16 @@ final class ApiMiddlewareTest extends TestCase
 		$expectedResponse = (new ApiResponse())->withStatus(200)->writeBody('OK');
 
 		$dispatcher = new class ($expectedResponse) {
-			public function __construct(private ApiResponse $response) {}
-			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse {
+
+			public function __construct(private ApiResponse $response)
+			{
+			}
+
+			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse
+			{
 				return $this->response;
 			}
+
 		};
 
 		$errorHandler = $this->createMock(ErrorHandler::class);
@@ -35,10 +40,13 @@ final class ApiMiddlewareTest extends TestCase
 
 		// Use reflection to create ApiMiddleware with our test dispatcher
 		$middleware = new class ($dispatcher, $errorHandler) {
+
 			public function __construct(
 				private object $dispatcher,
-				private ErrorHandler $errorHandler
-			) {}
+				private ErrorHandler $errorHandler,
+			)
+			{
+			}
 
 			public function __invoke(ApiRequest $request, ApiResponse $response, callable $next): ApiResponse
 			{
@@ -50,11 +58,12 @@ final class ApiMiddlewareTest extends TestCase
 
 				return $next($request, $response);
 			}
+
 		};
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 
 		$result = $middleware($request, $response, $next);
 
@@ -68,10 +77,16 @@ final class ApiMiddlewareTest extends TestCase
 		$errorResponse = (new ApiResponse())->withStatus(500)->writeBody('Error');
 
 		$dispatcher = new class ($exception) {
-			public function __construct(private Throwable $exception) {}
-			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse {
+
+			public function __construct(private Throwable $exception)
+			{
+			}
+
+			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse
+			{
 				throw $this->exception;
 			}
+
 		};
 
 		$errorHandler = $this->createMock(ErrorHandler::class);
@@ -80,10 +95,13 @@ final class ApiMiddlewareTest extends TestCase
 			->willReturn($errorResponse);
 
 		$middleware = new class ($dispatcher, $errorHandler) {
+
 			public function __construct(
 				private object $dispatcher,
-				private ErrorHandler $errorHandler
-			) {}
+				private ErrorHandler $errorHandler,
+			)
+			{
+			}
 
 			public function __invoke(ApiRequest $request, ApiResponse $response, callable $next): ApiResponse
 			{
@@ -95,11 +113,12 @@ final class ApiMiddlewareTest extends TestCase
 
 				return $next($request, $response);
 			}
+
 		};
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 
 		$result = $middleware($request, $response, $next);
 
@@ -112,19 +131,28 @@ final class ApiMiddlewareTest extends TestCase
 		$dispatchedResponse = (new ApiResponse())->withStatus(200);
 
 		$dispatcher = new class ($dispatchedResponse) {
-			public function __construct(private ApiResponse $response) {}
-			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse {
+
+			public function __construct(private ApiResponse $response)
+			{
+			}
+
+			public function dispatch(ApiRequest $request, ApiResponse $response): ApiResponse
+			{
 				return $this->response;
 			}
+
 		};
 
 		$errorHandler = $this->createMock(ErrorHandler::class);
 
 		$middleware = new class ($dispatcher, $errorHandler) {
+
 			public function __construct(
 				private object $dispatcher,
-				private ErrorHandler $errorHandler
-			) {}
+				private ErrorHandler $errorHandler,
+			)
+			{
+			}
 
 			public function __invoke(ApiRequest $request, ApiResponse $response, callable $next): ApiResponse
 			{
@@ -136,14 +164,16 @@ final class ApiMiddlewareTest extends TestCase
 
 				return $next($request, $response);
 			}
+
 		};
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
 
 		$nextCalled = false;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalled): ApiResponse {
 			$nextCalled = true;
+
 			return $res->withHeader('X-Next', 'called');
 		};
 

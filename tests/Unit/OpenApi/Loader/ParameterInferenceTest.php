@@ -337,7 +337,7 @@ class InferredNullableParamController implements Controller
 {
 
 	#[Get(path: '/users')]
-	public function list(?string $filter): array
+	public function list(string|null $filter): array
 	{
 		return [];
 	}

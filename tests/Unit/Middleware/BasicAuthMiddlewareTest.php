@@ -7,6 +7,9 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\BasicAuthMiddleware;
+use function base64_encode;
+use function password_hash;
+use const PASSWORD_DEFAULT;
 
 final class BasicAuthMiddlewareTest extends TestCase
 {
@@ -18,7 +21,7 @@ final class BasicAuthMiddlewareTest extends TestCase
 
 	private function createNext(): callable
 	{
-		return fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		return static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 	}
 
 	#[Test]
@@ -112,7 +115,7 @@ final class BasicAuthMiddlewareTest extends TestCase
 	public function usernameAttributeSetOnSuccess(): void
 	{
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);

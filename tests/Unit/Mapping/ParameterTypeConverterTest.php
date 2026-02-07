@@ -15,6 +15,7 @@ enum TestStatus: int
 {
 
 	case Active = 1;
+
 	case Inactive = 0;
 
 }
@@ -23,7 +24,9 @@ enum TestColor: string
 {
 
 	case Red = 'red';
+
 	case Green = 'green';
+
 	case Blue = 'blue';
 
 }
@@ -32,7 +35,9 @@ enum TestPriority
 {
 
 	case Low;
+
 	case Medium;
+
 	case High;
 
 }
@@ -41,7 +46,9 @@ enum TestRole: string
 {
 
 	case Admin = 'administrator';
+
 	case User = 'regular_user';
+
 	case Guest = 'guest_visitor';
 
 }
@@ -190,7 +197,9 @@ final class ParameterTypeConverterTest extends TestCase
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionCode(400);
-		$this->expectExceptionMessage("Parameter 'active': invalid value '$value'. Expected boolean (true/false, 1/0, yes/no, on/off).");
+		$this->expectExceptionMessage(
+			"Parameter 'active': invalid value '$value'. Expected boolean (true/false, 1/0, yes/no, on/off).",
+		);
 
 		$this->converter->convert($value, 'bool', $param);
 	}
@@ -364,7 +373,9 @@ final class ParameterTypeConverterTest extends TestCase
 		$param = new EndpointParameter('color', TestColor::class);
 
 		$this->expectException(ClientErrorException::class);
-		$this->expectExceptionMessage("Parameter 'color': invalid value 'yellow'. Expected one of: Red (red), Green (green), Blue (blue).");
+		$this->expectExceptionMessage(
+			"Parameter 'color': invalid value 'yellow'. Expected one of: Red (red), Green (green), Blue (blue).",
+		);
 
 		$this->converter->convert('yellow', TestColor::class, $param);
 	}
@@ -387,7 +398,9 @@ final class ParameterTypeConverterTest extends TestCase
 		$param = new EndpointParameter('priority', TestPriority::class);
 
 		$this->expectException(ClientErrorException::class);
-		$this->expectExceptionMessage("Parameter 'priority': invalid value 'Critical'. Expected one of: Low, Medium, High.");
+		$this->expectExceptionMessage(
+			"Parameter 'priority': invalid value 'Critical'. Expected one of: Low, Medium, High.",
+		);
 
 		$this->converter->convert('Critical', TestPriority::class, $param);
 	}

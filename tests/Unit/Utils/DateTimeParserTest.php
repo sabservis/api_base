@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Utils;
 
+use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -82,7 +83,7 @@ final class DateTimeParserTest extends TestCase
 			'ISO 8601 no tz' => ['2024-06-15T14:30:00', '2024-06-15'],
 			'date only' => ['2024-06-15', '2024-06-15'],
 			'with Z timezone' => ['2024-06-15T14:30:00Z', '2024-06-15'],
-			'relative date' => ['tomorrow', (new \DateTimeImmutable('tomorrow'))->format('Y-m-d')],
+			'relative date' => ['tomorrow', (new DateTimeImmutable('tomorrow'))->format('Y-m-d')],
 		];
 	}
 

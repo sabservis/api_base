@@ -26,7 +26,10 @@ final class RegexTest extends TestCase
 	#[Test]
 	public function replaceCallback(): void
 	{
-		self::assertSame('barfoo', Regex::replaceCallback('foo', '#(foo)#', static fn ($matches) => 'bar' . $matches[1]));
+		self::assertSame(
+			'barfoo',
+			Regex::replaceCallback('foo', '#(foo)#', static fn ($matches) => 'bar' . $matches[1]),
+		);
 	}
 
 }

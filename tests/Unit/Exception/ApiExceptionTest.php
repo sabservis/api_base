@@ -4,6 +4,7 @@ namespace Tests\Unit\Exception;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\Exception\ApiException;
 
 final class ApiExceptionTest extends TestCase
@@ -36,7 +37,7 @@ final class ApiExceptionTest extends TestCase
 	#[Test]
 	public function previousExceptionIsSet(): void
 	{
-		$previous = new \RuntimeException('Original');
+		$previous = new RuntimeException('Original');
 		$exception = new ApiException('Wrapped', 400, $previous);
 
 		self::assertSame($previous, $exception->getPrevious());
@@ -109,7 +110,7 @@ final class ApiExceptionTest extends TestCase
 	{
 		$exception = new ApiException('Test');
 
-		self::assertInstanceOf(\RuntimeException::class, $exception);
+		self::assertInstanceOf(RuntimeException::class, $exception);
 	}
 
 	#[Test]

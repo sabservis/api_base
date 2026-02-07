@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\ContentBuilderSupport;
 use Sabservis\Api\Attribute\OpenApi\JsonContent;
 use Sabservis\Api\Attribute\OpenApi\MediaType;
+use Sabservis\Api\Attribute\OpenApi\Schema;
 
 final class ContentBuilderSupportTest extends TestCase
 {
@@ -40,7 +41,7 @@ final class ContentBuilderSupportTest extends TestCase
 		$helper = $this->createContentHelper();
 		$mediaType = new MediaType(
 			mediaType: 'application/xml',
-			schema: new \Sabservis\Api\Attribute\OpenApi\Schema(type: 'string'),
+			schema: new Schema(type: 'string'),
 		);
 
 		$result = $helper->testBuildContentSpec([$mediaType]);
@@ -55,7 +56,7 @@ final class ContentBuilderSupportTest extends TestCase
 		$jsonContent = new JsonContent(type: 'object');
 		$mediaType = new MediaType(
 			mediaType: 'application/xml',
-			schema: new \Sabservis\Api\Attribute\OpenApi\Schema(type: 'string'),
+			schema: new Schema(type: 'string'),
 		);
 
 		$result = $helper->testBuildContentSpec([$jsonContent, $mediaType]);
@@ -78,9 +79,6 @@ final class ContentBuilderSupportTest extends TestCase
 		], $result);
 	}
 
-	/**
-	 * @return object
-	 */
 	private function createContentHelper(): object
 	{
 		return new class {
@@ -88,7 +86,7 @@ final class ContentBuilderSupportTest extends TestCase
 			use ContentBuilderSupport;
 
 			/**
-			 * @param array<\Sabservis\Api\Attribute\OpenApi\JsonContent|\Sabservis\Api\Attribute\OpenApi\MediaType>|null $contentArray
+			 * @param array<JsonContent|MediaType>|null $contentArray
 			 * @return array<string, mixed>
 			 */
 			public function testBuildContentSpec(array|null $contentArray): array

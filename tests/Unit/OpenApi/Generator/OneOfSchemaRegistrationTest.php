@@ -7,8 +7,6 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\Items;
 use Sabservis\Api\Attribute\OpenApi\JsonContent;
 use Sabservis\Api\Attribute\OpenApi\Property;
-use function json_decode;
-use function json_encode;
 
 final class OneOfSchemaRegistrationTest extends TestCase
 {
@@ -65,9 +63,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function itemsGetReferencedClassesExtractsFromRef(): void
 	{
-		$items = new Items(
-			ref: OneOfClassA::class,
-		);
+		$items = new Items(ref: OneOfClassA::class);
 
 		$classes = $items->getReferencedClasses();
 
@@ -78,9 +74,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function itemsToOpenApiSpecUsesShortClassNameInRef(): void
 	{
-		$items = new Items(
-			ref: OneOfClassA::class,
-		);
+		$items = new Items(ref: OneOfClassA::class);
 
 		$spec = $items->toOpenApiSpec();
 
@@ -108,10 +102,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function propertyGetReferencedClassesExtractsFromRef(): void
 	{
-		$property = new Property(
-			property: 'test',
-			ref: OneOfClassA::class,
-		);
+		$property = new Property(property: 'test', ref: OneOfClassA::class);
 
 		$classes = $property->getReferencedClasses();
 
@@ -141,10 +132,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function propertyToOpenApiSpecUsesShortClassNameInRef(): void
 	{
-		$property = new Property(
-			property: 'test',
-			ref: OneOfClassA::class,
-		);
+		$property = new Property(property: 'test', ref: OneOfClassA::class);
 
 		$spec = $property->toOpenApiSpec();
 
@@ -154,9 +142,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function jsonContentGetReferencedClassesExtractsFromRef(): void
 	{
-		$content = new JsonContent(
-			ref: OneOfClassA::class,
-		);
+		$content = new JsonContent(ref: OneOfClassA::class);
 
 		$classes = $content->getReferencedClasses();
 
@@ -227,9 +213,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	#[Test]
 	public function jsonContentToOpenApiSpecUsesShortClassNameInRef(): void
 	{
-		$content = new JsonContent(
-			ref: OneOfClassA::class,
-		);
+		$content = new JsonContent(ref: OneOfClassA::class);
 
 		$spec = $content->toOpenApiSpec();
 
@@ -240,9 +224,7 @@ final class OneOfSchemaRegistrationTest extends TestCase
 	public function shortClassNameWorksWithSimpleNames(): void
 	{
 		// Test with simple name (no namespace) - should be used as-is
-		$items = new Items(
-			ref: 'SimpleRef',
-		);
+		$items = new Items(ref: 'SimpleRef');
 
 		$spec = $items->toOpenApiSpec();
 

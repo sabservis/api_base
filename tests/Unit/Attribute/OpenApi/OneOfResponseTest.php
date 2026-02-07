@@ -15,6 +15,8 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Sabservis\Api\UI\Controller\Controller;
+use function json_decode;
+use function json_encode;
 
 final class OneOfResponseTest extends TestCase
 {

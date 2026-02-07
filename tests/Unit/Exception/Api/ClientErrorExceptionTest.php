@@ -4,6 +4,7 @@ namespace Tests\Unit\Exception\Api;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 
@@ -86,7 +87,7 @@ final class ClientErrorExceptionTest extends TestCase
 	#[Test]
 	public function previousExceptionIsSet(): void
 	{
-		$previous = new \RuntimeException('Original error');
+		$previous = new RuntimeException('Original error');
 		$exception = new ClientErrorException('Wrapped error', 400, $previous);
 
 		self::assertSame($previous, $exception->getPrevious());

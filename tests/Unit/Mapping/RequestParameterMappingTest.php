@@ -2,12 +2,13 @@
 
 namespace Tests\Unit\Mapping;
 
+use DateTimeImmutable;
+use DateTimeInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Http\ApiRequest;
-use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Schema\Endpoint;
@@ -27,8 +28,6 @@ final class RequestParameterMappingTest extends TestCase
 	public function mapWithoutEndpointThrows(): void
 	{
 		$request = new ApiRequest(method: 'GET', uri: '/');
-		$response = new ApiResponse();
-
 		$this->expectException(InvalidStateException::class);
 
 		$this->mapping->map($request);
@@ -41,8 +40,6 @@ final class RequestParameterMappingTest extends TestCase
 
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$request = $request->withAttribute(RequestAttributes::Endpoint->value, $endpoint);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertInstanceOf(ApiRequest::class, $result);
@@ -61,8 +58,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['id' => '42']);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertSame(42, $result->getAttribute(RequestAttributes::Parameters->value)['id']);
@@ -81,8 +76,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['price' => '19.99']);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertSame(19.99, $result->getAttribute(RequestAttributes::Parameters->value)['price']);
@@ -101,8 +94,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['active' => 'true']);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertTrue($result->getAttribute(RequestAttributes::Parameters->value)['active']);
@@ -121,8 +112,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['page' => '5']);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertSame(5, $result->getAttribute(RequestAttributes::Parameters->value)['page']);
@@ -143,8 +132,6 @@ final class RequestParameterMappingTest extends TestCase
 			headers: ['x-api-key' => 'secret123'],
 		);
 		$request = $request->withAttribute(RequestAttributes::Endpoint->value, $endpoint);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertSame('secret123', $result->getHeader('x-api-key'));
@@ -165,8 +152,6 @@ final class RequestParameterMappingTest extends TestCase
 			cookies: ['session' => 'abc123'],
 		);
 		$request = $request->withAttribute(RequestAttributes::Endpoint->value, $endpoint);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertSame('abc123', $result->getCookie('session'));
@@ -186,8 +171,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, []);
-		$response = new ApiResponse();
-
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Path request parameter "id" should be provided.');
 
@@ -208,8 +191,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, []);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 
 		self::assertInstanceOf(ApiRequest::class, $result);
@@ -229,8 +210,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['name' => '']);
-		$response = new ApiResponse();
-
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Path request parameter "name" should not be empty.');
 
@@ -250,8 +229,6 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['id' => 'not-a-number']);
-		$response = new ApiResponse();
-
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage("Parameter 'id': invalid value 'not-a-number'. Expected integer.");
 
@@ -263,7 +240,7 @@ final class RequestParameterMappingTest extends TestCase
 	{
 		$endpoint = new Endpoint('TestController', 'testMethod');
 
-		$param = new EndpointParameter('date', \DateTimeInterface::class);
+		$param = new EndpointParameter('date', DateTimeInterface::class);
 		$param->setIn(EndpointParameter::InQuery);
 		$endpoint->addParameter($param);
 
@@ -271,12 +248,10 @@ final class RequestParameterMappingTest extends TestCase
 		$request = $request
 			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
 			->withAttribute(RequestAttributes::Parameters->value, ['date' => '2024-01-15']);
-		$response = new ApiResponse();
-
 		$result = $this->mapping->map($request);
 		$dateValue = $result->getAttribute(RequestAttributes::Parameters->value)['date'];
 
-		self::assertInstanceOf(\DateTimeImmutable::class, $dateValue);
+		self::assertInstanceOf(DateTimeImmutable::class, $dateValue);
 		self::assertSame('2024-01-15', $dateValue->format('Y-m-d'));
 	}
 
@@ -325,7 +300,7 @@ final class RequestParameterMappingTest extends TestCase
 	{
 		$endpoint = new Endpoint('TestController', 'testMethod');
 
-		$param = new EndpointParameter('date', \DateTimeInterface::class);
+		$param = new EndpointParameter('date', DateTimeInterface::class);
 		$param->setIn(EndpointParameter::InQuery);
 		$endpoint->addParameter($param);
 
@@ -335,7 +310,9 @@ final class RequestParameterMappingTest extends TestCase
 			->withAttribute(RequestAttributes::Parameters->value, ['date' => 'invalid-date']);
 
 		$this->expectException(ClientErrorException::class);
-		$this->expectExceptionMessage("Parameter 'date': invalid value 'invalid-date'. Expected date/datetime (e.g. 2024-01-30 or 2024-01-30T15:30:00).");
+		$this->expectExceptionMessage(
+			"Parameter 'date': invalid value 'invalid-date'. Expected date/datetime (e.g. 2024-01-30 or 2024-01-30T15:30:00).",
+		);
 
 		$this->mapping->map($request);
 	}

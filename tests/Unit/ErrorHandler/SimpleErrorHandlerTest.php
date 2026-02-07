@@ -4,13 +4,14 @@ namespace Tests\Unit\ErrorHandler;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\Runtime\SnapshotException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
-use RuntimeException;
+use function json_decode;
 
 final class SimpleErrorHandlerTest extends TestCase
 {

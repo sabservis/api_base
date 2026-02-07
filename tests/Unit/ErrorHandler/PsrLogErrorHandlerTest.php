@@ -8,11 +8,13 @@ use Psr\Log\LoggerInterface;
 use Psr\Log\LogLevel;
 use RuntimeException;
 use Sabservis\Api\ErrorHandler\PsrLogErrorHandler;
+use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\Runtime\SnapshotException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use function json_decode;
 
 final class PsrLogErrorHandlerTest extends TestCase
 {
@@ -33,7 +35,7 @@ final class PsrLogErrorHandlerTest extends TestCase
 			->method('error')
 			->with(
 				'Database connection failed',
-				$this->callback(fn (array $ctx): bool => $ctx['exception'] === $exception),
+				$this->callback(static fn (array $ctx): bool => $ctx['exception'] === $exception),
 			);
 
 		$handler = new PsrLogErrorHandler($logger);
@@ -68,7 +70,7 @@ final class PsrLogErrorHandlerTest extends TestCase
 			->with(
 				LogLevel::ERROR,
 				'Original database error',
-				$this->callback(fn (array $ctx): bool => $ctx['exception'] === $previous),
+				$this->callback(static fn (array $ctx): bool => $ctx['exception'] === $previous),
 			);
 
 		$handler = new PsrLogErrorHandler($logger);
@@ -89,7 +91,7 @@ final class PsrLogErrorHandlerTest extends TestCase
 			->with(
 				LogLevel::DEBUG,
 				'Validation detail',
-				$this->callback(fn (array $ctx): bool => $ctx['exception'] === $previous),
+				$this->callback(static fn (array $ctx): bool => $ctx['exception'] === $previous),
 			);
 
 		$handler = new PsrLogErrorHandler($logger);
@@ -141,7 +143,7 @@ final class PsrLogErrorHandlerTest extends TestCase
 			->method('error')
 			->with(
 				'Real error',
-				$this->callback(fn (array $ctx): bool => $ctx['exception'] === $original),
+				$this->callback(static fn (array $ctx): bool => $ctx['exception'] === $original),
 			);
 
 		$handler = new PsrLogErrorHandler($logger);
@@ -171,7 +173,7 @@ final class PsrLogErrorHandlerTest extends TestCase
 		$logger = $this->createMock(LoggerInterface::class);
 		$handler = new PsrLogErrorHandler($logger);
 
-		self::assertInstanceOf(\Sabservis\Api\ErrorHandler\SimpleErrorHandler::class, $handler);
+		self::assertInstanceOf(SimpleErrorHandler::class, $handler);
 	}
 
 	#[Test]

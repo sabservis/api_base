@@ -19,7 +19,7 @@ final class CORSMiddlewareTest extends TestCase
 		$request = new ApiRequest(method: 'OPTIONS', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame(204, $result->getStatusCode());
@@ -35,7 +35,7 @@ final class CORSMiddlewareTest extends TestCase
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame(200, $result->getStatusCode());
@@ -56,7 +56,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('https://example.com', $result->getHeader('access-control-allow-origin'));
@@ -77,7 +77,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertNull($result->getHeader('access-control-allow-origin'));
@@ -98,7 +98,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('true', $result->getHeader('access-control-allow-credentials'));
@@ -121,7 +121,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		// Origin not allowed, no CORS headers
@@ -183,7 +183,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('*', $result->getHeader('access-control-allow-origin'));
@@ -206,7 +206,7 @@ final class CORSMiddlewareTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		// '*' is in allowedOrigins but doesn't match the actual origin
@@ -224,7 +224,7 @@ final class CORSMiddlewareTest extends TestCase
 		$request = new ApiRequest(method: 'OPTIONS', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('GET, POST', $result->getHeader('access-control-allow-methods'));
@@ -240,7 +240,7 @@ final class CORSMiddlewareTest extends TestCase
 		$request = new ApiRequest(method: 'OPTIONS', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('X-Custom-Header, Authorization', $result->getHeader('access-control-allow-headers'));
@@ -249,14 +249,12 @@ final class CORSMiddlewareTest extends TestCase
 	#[Test]
 	public function maxAge(): void
 	{
-		$middleware = new CORSMiddleware(
-			maxAge: 3600,
-		);
+		$middleware = new CORSMiddleware(maxAge: 3_600);
 
 		$request = new ApiRequest(method: 'OPTIONS', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('3600', $result->getHeader('access-control-max-age'));
@@ -272,7 +270,7 @@ final class CORSMiddlewareTest extends TestCase
 		$request = new ApiRequest(method: 'GET', uri: '/');
 		$response = new ApiResponse();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
 		$result = $middleware($request, $response, $next);
 
 		self::assertSame('X-Request-Id, X-Total-Count', $result->getHeader('access-control-expose-headers'));

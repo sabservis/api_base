@@ -25,6 +25,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Sabservis\Api\UI\Controller\Controller;
+use TypeError;
 use function assert;
 use function is_string;
 use function json_decode;
@@ -99,10 +100,7 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 	{
 		$dispatcher = $this->createDefaultDispatcher();
 
-		$request = new ApiRequest(
-			method: 'PUT',
-			uri: '/users/42',
-		);
+		$request = new ApiRequest(method: 'PUT', uri: '/users/42');
 		$response = new ApiResponse();
 
 		$this->expectException(ClientErrorException::class);
@@ -155,10 +153,7 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 	{
 		$dispatcher = $this->createDefaultDispatcher();
 
-		$request = new ApiRequest(
-			method: 'PUT',
-			uri: '/users/42/optional',
-		);
+		$request = new ApiRequest(method: 'PUT', uri: '/users/42/optional');
 		$response = new ApiResponse();
 
 		$result = $dispatcher->dispatch($request, $response);
@@ -180,7 +175,7 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 		);
 		$response = new ApiResponse();
 
-		$this->expectException(\TypeError::class);
+		$this->expectException(TypeError::class);
 
 		$dispatcher->dispatch($request, $response);
 	}
@@ -190,10 +185,7 @@ final class RequestBodyDtoInjectionPipelineTest extends TestCase
 	{
 		$dispatcher = $this->createDefaultDispatcher();
 
-		$request = new ApiRequest(
-			method: 'GET',
-			uri: '/users/search',
-		);
+		$request = new ApiRequest(method: 'GET', uri: '/users/search');
 		$response = new ApiResponse();
 
 		$this->expectException(ClientErrorException::class);

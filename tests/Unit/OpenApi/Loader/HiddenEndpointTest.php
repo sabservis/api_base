@@ -10,6 +10,7 @@ use Sabservis\Api\Attribute\OpenApi\Get;
 use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\UI\Controller\Controller;
+use function array_column;
 
 /**
  * Tests for #[Hidden] attribute integration with OpenApiAttributeLoader.

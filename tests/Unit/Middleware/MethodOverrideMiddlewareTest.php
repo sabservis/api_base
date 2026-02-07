@@ -17,7 +17,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -41,7 +41,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -61,7 +61,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -85,7 +85,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -109,7 +109,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -132,7 +132,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 	{
 		$middleware = new MethodOverrideMiddleware();
 
-		$next = fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res
 			->withStatus(204)
 			->withHeader('X-Custom', 'value');
 
@@ -151,7 +151,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -176,7 +176,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -202,7 +202,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware();
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -211,7 +211,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$request = new ApiRequest(
 			method: 'POST',
 			uri: '/api/users/1',
-			headers: ['x-http-method-override' => 'delete'],  // lowercase
+			headers: ['x-http-method-override' => 'delete'], // lowercase
 		);
 		$response = new ApiResponse();
 
@@ -228,7 +228,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware(['PUT', 'PATCH']);
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);
@@ -253,7 +253,7 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		$middleware = new MethodOverrideMiddleware(['PUT', 'PATCH']);
 
 		$capturedRequest = null;
-		$next = function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$capturedRequest): ApiResponse {
 			$capturedRequest = $req;
 
 			return $res->withStatus(200);

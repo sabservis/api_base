@@ -2,13 +2,22 @@
 
 namespace Tests\Unit\Http;
 
+use ArrayObject;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Schema\Endpoint;
+use stdClass;
+use function fclose;
+use function fopen;
+use function fwrite;
+use function rewind;
+use function str_repeat;
+use function strlen;
 use const UPLOAD_ERR_INI_SIZE;
 use const UPLOAD_ERR_NO_FILE;
 use const UPLOAD_ERR_OK;
@@ -20,10 +29,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function parameters(): void
 	{
-		$apiRequest = new ApiRequest(
-			method: 'GET',
-			uri: 'http://example.com/',
-		);
+		$apiRequest = new ApiRequest(method: 'GET', uri: 'http://example.com/');
 
 		self::assertFalse($apiRequest->hasParameter('name'));
 		self::assertFalse($apiRequest->hasParameter('fake'));
@@ -35,11 +41,11 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function parametersWithAttribute(): void
 	{
-		$apiRequest = new ApiRequest(
-			method: 'GET',
-			uri: 'http://example.com/',
+		$apiRequest = new ApiRequest(method: 'GET', uri: 'http://example.com/');
+		$apiRequest = $apiRequest->withAttribute(
+			RequestAttributes::Parameters->value,
+			['name' => 'John Doe', 'title' => null],
 		);
-		$apiRequest = $apiRequest->withAttribute(RequestAttributes::Parameters->value, ['name' => 'John Doe', 'title' => null]);
 
 		self::assertTrue($apiRequest->hasParameter('name'));
 		self::assertTrue($apiRequest->hasParameter('title'));
@@ -265,30 +271,30 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function getTypedEntityReturnsTypedObject(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$entity->name = 'test';
 
 		$request = new ApiRequest(method: 'POST', uri: '/');
 		$request = $request->withAttribute(RequestAttributes::RequestEntity->value, $entity);
 
-		$result = $request->getTypedEntity(\stdClass::class);
+		$result = $request->getTypedEntity(stdClass::class);
 
-		self::assertInstanceOf(\stdClass::class, $result);
+		self::assertInstanceOf(stdClass::class, $result);
 		self::assertSame('test', $result->name);
 	}
 
 	#[Test]
 	public function getTypedEntityThrowsOnTypeMismatch(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 
 		$request = new ApiRequest(method: 'POST', uri: '/');
 		$request = $request->withAttribute(RequestAttributes::RequestEntity->value, $entity);
 
-		$this->expectException(\Sabservis\Api\Exception\RuntimeStateException::class);
+		$this->expectException(RuntimeStateException::class);
 		$this->expectExceptionMessage('Expected entity of type ArrayObject, got stdClass');
 
-		$request->getTypedEntity(\ArrayObject::class);
+		$request->getTypedEntity(ArrayObject::class);
 	}
 
 	#[Test]
@@ -296,10 +302,10 @@ final class ApiRequestTest extends TestCase
 	{
 		$request = new ApiRequest(method: 'POST', uri: '/');
 
-		$this->expectException(\Sabservis\Api\Exception\RuntimeStateException::class);
+		$this->expectException(RuntimeStateException::class);
 		$this->expectExceptionMessage('No request entity found');
 
-		$request->getTypedEntity(\stdClass::class);
+		$request->getTypedEntity(stdClass::class);
 	}
 
 	// === Uploaded Files Tests ===
@@ -326,7 +332,7 @@ final class ApiRequestTest extends TestCase
 				'avatar' => [
 					'name' => 'photo.jpg',
 					'type' => 'image/jpeg',
-					'size' => 12345,
+					'size' => 12_345,
 					'tmp_name' => '/tmp/phpABC123',
 					'error' => UPLOAD_ERR_OK,
 				],
@@ -340,7 +346,7 @@ final class ApiRequestTest extends TestCase
 		self::assertInstanceOf(UploadedFile::class, $file);
 		self::assertSame('photo.jpg', $file->getName());
 		self::assertSame('image/jpeg', $file->getContentType());
-		self::assertSame(12345, $file->getSize());
+		self::assertSame(12_345, $file->getSize());
 
 		// getUploadedFiles returns array even for single file
 		$files = $request->getUploadedFiles('avatar');
@@ -394,7 +400,7 @@ final class ApiRequestTest extends TestCase
 				'avatar' => [
 					'name' => 'photo.jpg',
 					'type' => 'image/jpeg',
-					'size' => 5000,
+					'size' => 5_000,
 					'tmp_name' => '/tmp/phpAvatar',
 					'error' => UPLOAD_ERR_OK,
 				],
@@ -591,7 +597,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function hasEntityReturnsTrueWhenEntitySet(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$request = (new ApiRequest(method: 'POST', uri: '/'))
 			->withAttribute(RequestAttributes::RequestEntity->value, $entity);
 
@@ -610,7 +616,7 @@ final class ApiRequestTest extends TestCase
 	public function getEntityReturnsDefaultWhenNoEntity(): void
 	{
 		$request = new ApiRequest(method: 'POST', uri: '/');
-		$default = new \stdClass();
+		$default = new stdClass();
 
 		self::assertSame($default, $request->getEntity($default));
 	}
@@ -618,7 +624,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function getEntityReturnsEntityWhenSet(): void
 	{
-		$entity = new \stdClass();
+		$entity = new stdClass();
 		$entity->name = 'test';
 
 		$request = (new ApiRequest(method: 'POST', uri: '/'))
@@ -648,11 +654,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function getJsonBodyReturnsNullForEmptyBody(): void
 	{
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: '',
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: '');
 
 		self::assertNull($request->getJsonBody());
 	}
@@ -688,11 +690,7 @@ final class ApiRequestTest extends TestCase
 		$depth = 70;
 		$json = str_repeat('{"a":', $depth) . '1' . str_repeat('}', $depth);
 
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: $json,
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: $json);
 
 		// Should return null (depth exceeded causes json_decode to fail)
 		self::assertNull($request->getJsonBody());
@@ -705,11 +703,7 @@ final class ApiRequestTest extends TestCase
 		$depth = 60;
 		$json = str_repeat('{"a":', $depth) . '1' . str_repeat('}', $depth);
 
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: $json,
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: $json);
 
 		$result = $request->getJsonBody();
 
@@ -737,11 +731,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function getJsonBodyOrFailThrowsForEmptyBody(): void
 	{
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: '',
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: '');
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionCode(400);
@@ -804,11 +794,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function getJsonBodyOrFailThrowsForJsonNumber(): void
 	{
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: '42',
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: '42');
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionCode(400);
@@ -823,11 +809,7 @@ final class ApiRequestTest extends TestCase
 		$depth = 70;
 		$json = str_repeat('{"a":', $depth) . '1' . str_repeat('}', $depth);
 
-		$request = new ApiRequest(
-			method: 'POST',
-			uri: '/',
-			body: $json,
-		);
+		$request = new ApiRequest(method: 'POST', uri: '/', body: $json);
 
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionCode(400);
@@ -1133,7 +1115,7 @@ final class ApiRequestTest extends TestCase
 		fwrite($stream, $content);
 		rewind($stream);
 
-		$result = ApiRequest::readBodyWithLimit($stream, 1000);
+		$result = ApiRequest::readBodyWithLimit($stream, 1_000);
 
 		self::assertSame($content, $result);
 
@@ -1143,7 +1125,7 @@ final class ApiRequestTest extends TestCase
 	#[Test]
 	public function readBodyWithLimitThrowsWhenExceedingLimit(): void
 	{
-		$content = str_repeat('x', 1000);
+		$content = str_repeat('x', 1_000);
 		$stream = fopen('php://temp', 'r+');
 		fwrite($stream, $content);
 		rewind($stream);
@@ -1178,7 +1160,7 @@ final class ApiRequestTest extends TestCase
 	{
 		$stream = fopen('php://temp', 'r+');
 
-		$result = ApiRequest::readBodyWithLimit($stream, 1000);
+		$result = ApiRequest::readBodyWithLimit($stream, 1_000);
 
 		self::assertSame('', $result);
 
@@ -1189,15 +1171,15 @@ final class ApiRequestTest extends TestCase
 	public function readBodyWithLimitReadsInChunks(): void
 	{
 		// Create content larger than default chunk size (8KB) but within limit
-		$content = str_repeat('a', 20000);
+		$content = str_repeat('a', 20_000);
 		$stream = fopen('php://temp', 'r+');
 		fwrite($stream, $content);
 		rewind($stream);
 
-		$result = ApiRequest::readBodyWithLimit($stream, 50000);
+		$result = ApiRequest::readBodyWithLimit($stream, 50_000);
 
 		self::assertSame($content, $result);
-		self::assertSame(20000, strlen($result));
+		self::assertSame(20_000, strlen($result));
 
 		fclose($stream);
 	}
@@ -1217,7 +1199,7 @@ final class ApiRequestTest extends TestCase
 		$this->expectExceptionMessage('Invalid Content-Length header');
 		$this->expectExceptionCode(400);
 
-		ApiRequest::fromGlobalsWithLimit(10000);
+		ApiRequest::fromGlobalsWithLimit(10_000);
 	}
 
 	#[Test]
@@ -1231,7 +1213,7 @@ final class ApiRequestTest extends TestCase
 		$this->expectExceptionMessage('Invalid Content-Length header');
 		$this->expectExceptionCode(400);
 
-		ApiRequest::fromGlobalsWithLimit(10000);
+		ApiRequest::fromGlobalsWithLimit(10_000);
 	}
 
 	#[Test]
@@ -1241,8 +1223,8 @@ final class ApiRequestTest extends TestCase
 		$_SERVER['REQUEST_URI'] = '/test';
 		$_SERVER['CONTENT_LENGTH'] = '100';
 
-		// This should not throw since 100 < 10000
-		$request = ApiRequest::fromGlobalsWithLimit(10000);
+		// This should not throw since 100 < 10_000
+		$request = ApiRequest::fromGlobalsWithLimit(10_000);
 
 		self::assertSame('POST', $request->getMethod());
 	}
@@ -1255,7 +1237,7 @@ final class ApiRequestTest extends TestCase
 		$_SERVER['CONTENT_LENGTH'] = '0';
 
 		// Zero is valid (empty body)
-		$request = ApiRequest::fromGlobalsWithLimit(10000);
+		$request = ApiRequest::fromGlobalsWithLimit(10_000);
 
 		self::assertSame('POST', $request->getMethod());
 		self::assertSame('', $request->getContents());

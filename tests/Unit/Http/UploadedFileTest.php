@@ -6,9 +6,27 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Http\UploadedFile;
+use function fclose;
+use function file_get_contents;
+use function file_put_contents;
+use function fopen;
+use function mkdir;
+use function rmdir;
+use function str_repeat;
+use function stream_get_contents;
+use function strlen;
+use function sys_get_temp_dir;
+use function tempnam;
+use function uniqid;
+use function unlink;
+use const UPLOAD_ERR_CANT_WRITE;
+use const UPLOAD_ERR_EXTENSION;
+use const UPLOAD_ERR_FORM_SIZE;
 use const UPLOAD_ERR_INI_SIZE;
 use const UPLOAD_ERR_NO_FILE;
+use const UPLOAD_ERR_NO_TMP_DIR;
 use const UPLOAD_ERR_OK;
+use const UPLOAD_ERR_PARTIAL;
 
 final class UploadedFileTest extends TestCase
 {
@@ -19,14 +37,14 @@ final class UploadedFileTest extends TestCase
 		$file = UploadedFile::fromArray([
 			'name' => 'test.pdf',
 			'type' => 'application/pdf',
-			'size' => 12345,
+			'size' => 12_345,
 			'tmp_name' => '/tmp/php12345',
 			'error' => UPLOAD_ERR_OK,
 		]);
 
 		self::assertSame('test.pdf', $file->getName());
 		self::assertSame('application/pdf', $file->getContentType());
-		self::assertSame(12345, $file->getSize());
+		self::assertSame(12_345, $file->getSize());
 		self::assertSame('/tmp/php12345', $file->getTempPath());
 		self::assertSame(UPLOAD_ERR_OK, $file->getError());
 		self::assertTrue($file->isOk());

@@ -52,7 +52,10 @@ final class OperationTest extends TestCase
 		$spec = $get->toOpenApiSpec();
 
 		self::assertSame('Get user', $spec['summary']);
-		self::assertSame('Returns detailed user information including profile data and preferences.', $spec['description']);
+		self::assertSame(
+			'Returns detailed user information including profile data and preferences.',
+			$spec['description'],
+		);
 	}
 
 	#[Test]

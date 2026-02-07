@@ -7,7 +7,8 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
-use stdClass;
+use function json_decode;
+use function str_repeat;
 
 final class DataMapperSerializerTest extends TestCase
 {

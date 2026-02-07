@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\OpenApi\Generator\SchemaBuilder;
 use Sabservis\Api\OpenApi\Spec\SchemaObject;
+use function assert;
 use function json_decode;
 use function json_encode;
 
@@ -85,10 +86,7 @@ final class NullableRefTest extends TestCase
 	#[Test]
 	public function schemaObjectWithNullableRefGeneratesCorrectJson(): void
 	{
-		$schema = new SchemaObject(
-			ref: 'TestEnum',
-			nullable: true,
-		);
+		$schema = new SchemaObject(ref: 'TestEnum', nullable: true);
 
 		$json = json_encode($schema);
 		assert($json !== false);
@@ -110,6 +108,7 @@ enum TestCategory: string
 {
 
 	case Active = 'active';
+
 	case Inactive = 'inactive';
 
 }
@@ -117,7 +116,7 @@ enum TestCategory: string
 class DtoWithNullableEnum
 {
 
-	public ?TestCategory $category = null;
+	public TestCategory|null $category = null;
 
 }
 
@@ -138,6 +137,6 @@ class NestedDto
 class DtoWithNullableClass
 {
 
-	public ?NestedDto $nested = null;
+	public NestedDto|null $nested = null;
 
 }

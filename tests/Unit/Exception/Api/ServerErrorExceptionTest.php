@@ -4,6 +4,7 @@ namespace Tests\Unit\Exception\Api;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 
@@ -77,7 +78,7 @@ final class ServerErrorExceptionTest extends TestCase
 	#[Test]
 	public function previousExceptionIsSet(): void
 	{
-		$previous = new \RuntimeException('Database connection failed');
+		$previous = new RuntimeException('Database connection failed');
 		$exception = new ServerErrorException('Database error', 500, $previous);
 
 		self::assertSame($previous, $exception->getPrevious());

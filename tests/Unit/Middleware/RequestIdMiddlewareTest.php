@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RequestIdMiddleware;
+use function array_unique;
 
 final class RequestIdMiddlewareTest extends TestCase
 {
