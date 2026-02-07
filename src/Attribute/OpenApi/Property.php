@@ -5,7 +5,7 @@ namespace Sabservis\Api\Attribute\OpenApi;
 use Attribute;
 use UnitEnum;
 
-#[Attribute(Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
+#[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE)]
 final class Property implements OpenApiAttributeInterface
 {
 

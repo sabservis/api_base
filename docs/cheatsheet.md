@@ -194,6 +194,14 @@ class UserDto
 #[Property(property: 'json_name')]                          // alias
 ```
 
+`#[Property]` funguje i na promoted constructor parametrech (immutable DTO):
+```php
+public function __construct(
+    #[Property(description: 'Username')]
+    public readonly string $username,
+) {}
+```
+
 ### Pole a mapy
 ```php
 #[Property(type: 'array', items: new Items(type: 'string'))]          // pole stringu

@@ -203,6 +203,19 @@ final class SchemaBuilderTest extends TestCase
 	}
 
 	#[Test]
+	public function buildsSchemaWithPropertyAttributesOnPromotedConstructorParameter(): void
+	{
+		$builder = new SchemaBuilder();
+
+		$builder->registerClass(PromotedAttributedDto::class);
+		$schemas = $builder->getSchemas();
+		$schema = $schemas['PromotedAttributedDto'];
+
+		self::assertArrayHasKey('login', $schema->properties);
+		self::assertSame('Login name', $schema->properties['login']->description);
+	}
+
+	#[Test]
 	public function buildsSchemaWithDateTimeProperty(): void
 	{
 		$builder = new SchemaBuilder();
@@ -572,6 +585,18 @@ class AttributedDto
 
 	#[Property(description: 'The user email address', format: 'email')]
 	public string $email;
+
+}
+
+class PromotedAttributedDto
+{
+
+	public function __construct(
+		#[Property(property: 'login', description: 'Login name')]
+		public string $username,
+	)
+	{
+	}
 
 }
 

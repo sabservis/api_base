@@ -4,6 +4,7 @@ namespace Tests\Unit\Mapping\Serializer;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Sabservis\Api\Attribute\OpenApi\Property as OpenApiProperty;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
@@ -117,6 +118,17 @@ final class DataMapperSerializerTest extends TestCase
 		self::assertInstanceOf(TestUserDto::class, $result);
 		self::assertSame('John', $result->name);
 		self::assertSame('john@example.com', $result->email);
+	}
+
+	#[Test]
+	public function deserializeToDtoWithOpenApiPropertyOnPromotedParameter(): void
+	{
+		$json = '{"username":"John"}';
+
+		$result = $this->serializer->deserialize($json, TestPromotedDtoWithOpenApiProperty::class);
+
+		self::assertInstanceOf(TestPromotedDtoWithOpenApiProperty::class, $result);
+		self::assertSame('John', $result->username);
 	}
 
 	#[Test]
@@ -265,5 +277,17 @@ class TestTypedDto
 	public string $name = '';
 
 	public int $age = 0;
+
+}
+
+class TestPromotedDtoWithOpenApiProperty
+{
+
+	public function __construct(
+		#[OpenApiProperty(description: 'Username')]
+		public readonly string $username,
+	)
+	{
+	}
 
 }

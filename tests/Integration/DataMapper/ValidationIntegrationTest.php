@@ -11,6 +11,7 @@ use Pocta\DataMapper\Validation\Length;
 use Pocta\DataMapper\Validation\NotNull;
 use Pocta\DataMapper\Validation\Positive;
 use Pocta\DataMapper\Validation\Range;
+use Sabservis\Api\Attribute\OpenApi\Property as OpenApiProperty;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 
@@ -253,6 +254,43 @@ final class ValidationIntegrationTest extends TestCase
 		self::assertArrayHasKey('company.departments[0].employees[1].email', $context['validation']);
 	}
 
+	#[Test]
+	public function mixedConstructorAndRegularPropertiesValidDataPassesValidation(): void
+	{
+		$json = '{"username":"johnny","age":28,"taxId":"1234567890","score":15}';
+
+		$result = $this->serializer->deserialize($json, MixedPropertyValidationDto::class);
+
+		self::assertInstanceOf(MixedPropertyValidationDto::class, $result);
+		self::assertSame('johnny', $result->username);
+		self::assertSame(28, $result->age);
+		self::assertSame('1234567890', $result->taxId);
+		self::assertSame(15, $result->score);
+	}
+
+	#[Test]
+	public function mixedConstructorAndRegularPropertiesInvalidDataReturnsErrorsForBoth(): void
+	{
+		$json = '{"username":"ab","age":17,"taxId":"123","score":0}';
+
+		$exception = null;
+
+		try {
+			$this->serializer->deserialize($json, MixedPropertyValidationDto::class);
+		} catch (ValidationException $e) {
+			$exception = $e;
+		}
+
+		self::assertNotNull($exception);
+
+		$context = $exception->getContext();
+		self::assertArrayHasKey('validation', $context);
+		self::assertArrayHasKey('username', $context['validation']);
+		self::assertArrayHasKey('age', $context['validation']);
+		self::assertArrayHasKey('taxId', $context['validation']);
+		self::assertArrayHasKey('score', $context['validation']);
+	}
+
 }
 
 // Test DTOs
@@ -464,6 +502,30 @@ class OrganizationDto
 {
 
 	public function __construct(public CompanyDto $company)
+	{
+	}
+
+}
+
+class MixedPropertyValidationDto
+{
+
+	#[OpenApiProperty(description: 'Tax ID')]
+	#[Length(exact: 10)]
+	public string $taxId = '';
+
+	#[OpenApiProperty(description: 'Score')]
+	#[Positive]
+	public int $score = 1;
+
+	public function __construct(
+		#[OpenApiProperty(description: 'Username')]
+		#[Length(min: 3, max: 20)]
+		public string $username,
+		#[OpenApiProperty(description: 'Age')]
+		#[Range(min: 18, max: 120)]
+		public int $age,
+	)
 	{
 	}
 

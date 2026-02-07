@@ -109,7 +109,31 @@ class UserDto
 
 ### Property - kompletni reference
 
-`#[Property]` atribut nastavuje OpenAPI metadata pro properties DTO:
+`#[Property]` atribut nastavuje OpenAPI metadata pro DTO property.
+Lze ho použít jak na klasické public property, tak na promoted constructor parametry:
+
+```php
+use Pocta\DataMapper\Validation\Length;
+use Pocta\DataMapper\Validation\NotBlank;
+use Sabservis\Api\Attribute\OpenApi\Property;
+
+final class LoginRequestDto
+{
+    public function __construct(
+        #[Property(description: 'Username', maxLength: 100)]
+        #[NotBlank]
+        #[Length(max: 100)]
+        public readonly string $username,
+        #[Property(description: 'Password', maxLength: 255, writeOnly: true)]
+        #[NotBlank]
+        #[Length(max: 255)]
+        public readonly string $password,
+    ) {
+    }
+}
+```
+
+Pro promoted parametry se používají stejné argumenty atributu jako pro běžné property.
 
 ```php
 use Sabservis\Api\Attribute\OpenApi\Property;
