@@ -6,6 +6,7 @@ use Nette;
 use Nette\DI\Definitions\Statement;
 use Nette\Schema\Expect;
 use Pocta\DataMapper\Validation\Validator as DataMapperValidator;
+use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use Sabservis\Api\Application;
@@ -19,6 +20,7 @@ use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Mapping\Validator\ContainerValidatorResolver;
 use Sabservis\Api\Mapping\Validator\DataMapperEntityValidator;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Middleware\ApiMiddleware;
@@ -71,6 +73,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			'validator' => Expect::type('string|array|' . Statement::class)
 				->nullable()
 				->default(DataMapperEntityValidator::class),
+			'validatorResolver' => Expect::type('string|array|' . Statement::class)
+				->nullable()
+				->default(ContainerValidatorResolver::class),
 			'router' => Nette\Schema\Expect::structure([
 				'basePath' => Nette\Schema\Expect::string()->nullable()->default(null),
 				'cache' => Nette\Schema\Expect::anyOf(
@@ -335,9 +340,19 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		$builder->addDefinition($this->prefix('request.parameters.mapping'))
 			->setFactory(RequestParameterMapping::class);
 
+		if ($config->validatorResolver !== null) {
+			$builder->addDefinition($this->prefix('mapping.validatorResolver'))
+				->setType(ValidatorResolverInterface::class)
+				->setFactory($config->validatorResolver);
+		}
+
 		if ($config->validator !== null) {
+			$validatorArgs = $config->validatorResolver !== null
+				? ['validatorResolver' => '@' . $this->prefix('mapping.validatorResolver')]
+				: [];
+
 			$builder->addDefinition($this->prefix('mapping.datamapper.validator'))
-				->setFactory(DataMapperValidator::class);
+				->setFactory(DataMapperValidator::class, $validatorArgs);
 
 			$builder->addDefinition($this->prefix('request.entity.validator'))
 				->setType(EntityValidator::class)

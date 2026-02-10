@@ -6,6 +6,8 @@ use JsonException;
 use Pocta\DataMapper\Exceptions\ValidationException as DataMapperValidationException;
 use Pocta\DataMapper\Mapper;
 use Pocta\DataMapper\MapperOptions;
+use Pocta\DataMapper\Validation\Validator;
+use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Utils\JsonLimits;
@@ -30,9 +32,16 @@ class DataMapperSerializer implements EntitySerializer
 	/**
 	 * @param int<1, max> $jsonDepth
 	 */
-	public function __construct(MapperOptions|null $options = null, private int $jsonDepth = self::DEFAULT_JSON_DEPTH)
+	public function __construct(
+		MapperOptions|null $options = null,
+		ValidatorResolverInterface|null $validatorResolver = null,
+		private int $jsonDepth = self::DEFAULT_JSON_DEPTH,
+	)
 	{
-		$this->mapper = new Mapper($options ?? MapperOptions::production());
+		$this->mapper = new Mapper(
+			options: $options ?? MapperOptions::production(),
+			validator: $validatorResolver !== null ? new Validator($validatorResolver) : null,
+		);
 	}
 
 	public function serialize(mixed $data): string

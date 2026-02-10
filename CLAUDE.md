@@ -12,7 +12,7 @@ src/
 ├── Exception/       ApiException hierarchie + ErrorMessages konstanty
 ├── Handler/         ServiceHandler - volání controller metod
 ├── Http/            ApiRequest/ApiResponse (immutable), FileResponse, UploadedFile
-├── Mapping/         EntitySerializer, RequestParameterMapping
+├── Mapping/         EntitySerializer, RequestParameterMapping, ContainerValidatorResolver
 ├── Middleware/      CORS, RateLimit, BasicAuth, Logging, ApiMiddleware (core)
 ├── OpenApi/         OpenApiGenerator, SchemaBuilder
 ├── Router/          Router - O(1) statické, regex dynamické

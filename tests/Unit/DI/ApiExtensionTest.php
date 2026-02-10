@@ -7,6 +7,7 @@ use Nette\DI\Container;
 use Nette\DI\ContainerLoader;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use Sabservis\Api\Application\ApiApplication;
 use Sabservis\Api\DI\ApiExtension;
 use Sabservis\Api\Dispatcher\ApiDispatcher;
@@ -15,6 +16,9 @@ use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
+use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
+use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Mapping\Validator\ContainerValidatorResolver;
 use Sabservis\Api\Mapping\Validator\DataMapperEntityValidator;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
@@ -150,6 +154,48 @@ final class ApiExtensionTest extends TestCase
 		]);
 
 		self::assertFalse($container->hasService('api.request.entity.validator'));
+	}
+
+	#[Test]
+	public function registersValidatorResolverByDefault(): void
+	{
+		$container = $this->createContainer([]);
+
+		self::assertTrue($container->hasService('api.mapping.validatorResolver'));
+
+		$resolver = $container->getService('api.mapping.validatorResolver');
+		self::assertInstanceOf(ContainerValidatorResolver::class, $resolver);
+		self::assertInstanceOf(ValidatorResolverInterface::class, $resolver);
+	}
+
+	#[Test]
+	public function validatorResolverCanBeDisabledWithNull(): void
+	{
+		$container = $this->createContainer([
+			'validatorResolver' => null,
+		]);
+
+		self::assertFalse($container->hasService('api.mapping.validatorResolver'));
+	}
+
+	#[Test]
+	public function validatorResolverIsInjectedIntoSerializer(): void
+	{
+		$container = $this->createContainer([]);
+
+		$serializer = $container->getByType(EntitySerializer::class);
+		self::assertInstanceOf(DataMapperSerializer::class, $serializer);
+	}
+
+	#[Test]
+	public function serializerWorksWhenValidatorResolverDisabled(): void
+	{
+		$container = $this->createContainer([
+			'validatorResolver' => null,
+		]);
+
+		$serializer = $container->getByType(EntitySerializer::class);
+		self::assertInstanceOf(DataMapperSerializer::class, $serializer);
 	}
 
 	#[Test]

@@ -31,6 +31,8 @@ api:
     # Vypnutí: validator: null
     # Vlastní implementace:
     validator: App\Api\SymfonyValidator()
+    # Resolver pro custom constraint validátory (default: ContainerValidatorResolver)
+    # Vypnutí: validatorResolver: null
 ```
 
 ## Entrypoint
