@@ -274,4 +274,6 @@ api:
     serializer: Sabservis\Api\Mapping\Serializer\DataMapperSerializer(
         Pocta\DataMapper\MapperOptions::strict()
     )
+    # Validace je zapnutá automaticky. Vypnutí:
+    # validator: null
 ```

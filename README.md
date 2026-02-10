@@ -111,6 +111,71 @@ $file->moveToDirectory($dir);                  // Auto: vytvoří dir, sanitizuj
 $file->moveToDirectory($dir, 'custom.pdf');    // Vlastní název (sanitizovaný)
 ```
 
+## Validace request DTO
+
+Framework automaticky validuje request DTO po deserializaci pomocí `DataMapperEntityValidator`. Na DTO properties používej validační atributy z knihovny `pocta/data-mapper`:
+
+```php
+use Pocta\DataMapper\Validation\NotBlank;
+use Pocta\DataMapper\Validation\Email;
+use Pocta\DataMapper\Validation\Valid;
+
+class CreateUserDto
+{
+    #[NotBlank]
+    public string $name;
+
+    #[Email]
+    public string $email;
+
+    #[Valid]
+    public AddressDto $address;  // rekurzivní validace
+}
+```
+
+Při odeslání nevalidních dat vrátí framework `422` s detailními chybami:
+
+```json
+{
+  "code": 422,
+  "message": "Request body contains an error. See context for details.",
+  "context": {
+    "validation": {
+      "name": ["This field is required."],
+      "email": ["This value is not a valid email address."],
+      "address.street": ["This field is required."]
+    }
+  }
+}
+```
+
+### Vypnutí validace
+
+```neon
+api:
+    validator: null
+```
+
+### Vlastní validátor
+
+Implementuj `EntityValidator` interface a zaregistruj v konfiguraci:
+
+```php
+class SymfonyEntityValidator implements EntityValidator
+{
+    public function validate(object $entity, array|string|null $validationGroups = null): void
+    {
+        // vlastní validační logika
+        // při chybě throw new ValidationException()->withFields([...])
+    }
+}
+```
+
+```neon
+api:
+    validator: App\Api\Validator\SymfonyEntityValidator
+```
+
 ## Documentation
 
 | Téma | Popis |

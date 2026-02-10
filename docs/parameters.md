@@ -118,12 +118,13 @@ public function create(ApiRequest $request): ApiResponse
 
 ### DTO validace
 
-S `igorpocta/data-mapper`:
+Validace request DTO je zapnutá automaticky (`DataMapperEntityValidator`). Stačí přidat validační atributy z `pocta/data-mapper`:
 
 ```php
 use Pocta\DataMapper\Validation\NotBlank;
 use Pocta\DataMapper\Validation\Email;
 use Pocta\DataMapper\Validation\Length;
+use Pocta\DataMapper\Validation\Valid;
 
 class CreateUserDto
 {
@@ -134,16 +135,26 @@ class CreateUserDto
     #[NotBlank]
     #[Email]
     public string $email;
+
+    #[Valid]
+    public AddressDto $address;  // rekurzivní validace nested objektu
 }
 ```
 
-Konfigurace serializeru s validací:
+Neinicializované properties s validačními atributy automaticky vrací chybu `"This field is required."`.
+
+Vypnutí validace:
 
 ```neon
 api:
-    serializer: Sabservis\Api\Mapping\Serializer\DataMapperSerializer(
-        Pocta\DataMapper\MapperOptions::strict()
-    )
+    validator: null
+```
+
+Vlastní validátor (implementuje `Sabservis\Api\Mapping\Validator\EntityValidator`):
+
+```neon
+api:
+    validator: App\Api\Validator\MyValidator()
 ```
 
 ## Validační chyby

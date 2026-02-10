@@ -15,6 +15,8 @@ use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
+use Sabservis\Api\Mapping\Validator\DataMapperEntityValidator;
+use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Security\AuthorizationChecker;
@@ -126,6 +128,28 @@ final class ApiExtensionTest extends TestCase
 
 		$application = $container->getService('api.application');
 		self::assertInstanceOf(ApiApplication::class, $application);
+	}
+
+	#[Test]
+	public function registersValidatorByDefault(): void
+	{
+		$container = $this->createContainer([]);
+
+		self::assertTrue($container->hasService('api.request.entity.validator'));
+
+		$validator = $container->getService('api.request.entity.validator');
+		self::assertInstanceOf(EntityValidator::class, $validator);
+		self::assertInstanceOf(DataMapperEntityValidator::class, $validator);
+	}
+
+	#[Test]
+	public function validatorCanBeDisabledWithNull(): void
+	{
+		$container = $this->createContainer([
+			'validator' => null,
+		]);
+
+		self::assertFalse($container->hasService('api.request.entity.validator'));
 	}
 
 	#[Test]

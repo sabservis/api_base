@@ -25,8 +25,11 @@ api:
     middlewares:
         - App\Api\Middleware\AuthMiddleware
 
-    # Volitelné - vlastní serializer/validator
+    # Volitelné - vlastní serializer (default: DataMapperSerializer)
     serializer: Sabservis\Api\Mapping\Serializer\DataMapperSerializer()
+    # Validace request DTO je zapnutá automaticky (DataMapperEntityValidator)
+    # Vypnutí: validator: null
+    # Vlastní implementace:
     validator: App\Api\SymfonyValidator()
 ```
 

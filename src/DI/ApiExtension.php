@@ -5,6 +5,7 @@ namespace Sabservis\Api\DI;
 use Nette;
 use Nette\DI\Definitions\Statement;
 use Nette\Schema\Expect;
+use Pocta\DataMapper\Validation\Validator as DataMapperValidator;
 use Psr\Log\LoggerInterface;
 use ReflectionClass;
 use Sabservis\Api\Application;
@@ -18,6 +19,7 @@ use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Mapping\Validator\DataMapperEntityValidator;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Middleware\ApiMiddleware;
 use Sabservis\Api\Middleware\CORSMiddleware;
@@ -66,7 +68,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 				'paths' => Nette\Schema\Expect::arrayOf('string'),
 			]),
 			'serializer' => Expect::type('string|array|' . Statement::class)->default(DataMapperSerializer::class),
-			'validator' => Expect::type('string|array|' . Statement::class)->nullable()->default(null),
+			'validator' => Expect::type('string|array|' . Statement::class)
+				->nullable()
+				->default(DataMapperEntityValidator::class),
 			'router' => Nette\Schema\Expect::structure([
 				'basePath' => Nette\Schema\Expect::string()->nullable()->default(null),
 				'cache' => Nette\Schema\Expect::anyOf(
@@ -332,6 +336,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			->setFactory(RequestParameterMapping::class);
 
 		if ($config->validator !== null) {
+			$builder->addDefinition($this->prefix('mapping.datamapper.validator'))
+				->setFactory(DataMapperValidator::class);
+
 			$builder->addDefinition($this->prefix('request.entity.validator'))
 				->setType(EntityValidator::class)
 				->setFactory($config->validator);
