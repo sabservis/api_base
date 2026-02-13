@@ -9,6 +9,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use Sabservis\Api\Attribute\Core\Authorize;
 use Sabservis\Api\Attribute\OpenApi\Alias;
+use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\OpenApiMerge;
 use Sabservis\Api\Attribute\OpenApi\Operation;
@@ -345,7 +346,30 @@ final class OpenApiAttributeLoader
 		// Parse additional attributes on method
 		$this->parseParameterAttributes($method, $parsed->parameters);
 		$this->requestBodyBuilder->parseRequestBodyAttribute($method, $parsed->requestBody);
-		$this->requestBodyBuilder->parseFileUploadAttributes($method, $parsed->requestBody);
+
+		// Detect multipart DTO BEFORE parseFileUploadAttributes (which would overwrite requestBody).
+		// We need the entity reference intact to check for FileUpload properties in the DTO.
+		$hasMethodFileUploads = $method->getAttributes(FileUpload::class) !== [];
+		$requestBodyEntity = $parsed->requestBody['entity'] ?? null;
+		$hasDtoFileUploads = $requestBodyEntity !== null
+			&& is_string($requestBodyEntity)
+			&& class_exists($requestBodyEntity)
+			&& $this->requestBodyBuilder->hasFileUploadProperties($requestBodyEntity);
+
+		// Conflict check: method must not have both method-level #[FileUpload] and DTO with FileUpload properties
+		if ($hasMethodFileUploads && $hasDtoFileUploads) {
+			throw new InvalidStateException(sprintf(
+				'Method %s::%s() has both method-level #[FileUpload] and a DTO with FileUpload properties. Use one or the other.',
+				$method->getDeclaringClass()->getName(),
+				$method->getName(),
+			));
+		}
+
+		// Parse method-level FileUpload attributes (only if no DTO multipart)
+		if (!$hasDtoFileUploads) {
+			$this->requestBodyBuilder->parseFileUploadAttributes($method, $parsed->requestBody);
+		}
+
 		$this->responseBuilder->parseResponseAttributes($method, $parsed->responses);
 		$this->parseTagAttributes($method, $parsed->tags);
 		$this->parseSecurityAttribute($method, $parsed);
@@ -357,6 +381,20 @@ final class OpenApiAttributeLoader
 			$parsed->parameters,
 			$parsed->httpMethods,
 		);
+
+		// Detect multipart DTO: if requestBody entity is a class with FileUpload properties,
+		// replace with multipart/form-data spec
+		if (
+			$parsed->requestBody !== null
+			&& isset($parsed->requestBody['entity'])
+			&& is_string($parsed->requestBody['entity'])
+			&& class_exists($parsed->requestBody['entity'])
+			&& $this->requestBodyBuilder->hasFileUploadProperties($parsed->requestBody['entity'])
+		) {
+			$parsed->requestBody = $this->requestBodyBuilder->buildMultipartRequestBody(
+				$parsed->requestBody['entity'],
+			);
+		}
 
 		$requestBodyEntity = null;
 
