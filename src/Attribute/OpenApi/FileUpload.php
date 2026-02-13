@@ -18,7 +18,7 @@ use Attribute;
  *     #[FileUpload(name: 'avatar')]
  *     #[FileUpload(name: 'cover')]
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE)]
 final class FileUpload implements OpenApiAttributeInterface
 {
 
@@ -30,7 +30,7 @@ final class FileUpload implements OpenApiAttributeInterface
 	 * @param array<string>|null $allowedTypes Allowed MIME types (e.g., ['image/jpeg', 'image/png'])
 	 */
 	public function __construct(
-		public string $name,
+		public string $name = '',
 		public bool $multiple = false,
 		public bool $required = true,
 		public string|null $description = null,
