@@ -18,7 +18,9 @@ use Attribute;
  *     #[FileUpload(name: 'avatar')]
  *     #[FileUpload(name: 'cover')]
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE)]
+#[Attribute(
+	Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE,
+)]
 final class FileUpload implements OpenApiAttributeInterface
 {
 

@@ -1,17 +1,18 @@
-<?php declare(strict_types=1);
+<?php declare(strict_types = 1);
 
 namespace Tests\Unit\OpenApi\Loader;
 
 use Nette\DI\ContainerBuilder;
 use PHPUnit\Framework\TestCase;
-use Sabservis\Api\Attribute\OpenApi\Post;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Attribute\OpenApi\Post;
 use Sabservis\Api\Attribute\OpenApi\RequestBody;
 use Sabservis\Api\Attribute\OpenApi\Schema;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
+use Sabservis\Api\OpenApi\Loader\RequestBodyBuilder;
 use Sabservis\Api\UI\Controller\Controller;
 
 /**
@@ -19,9 +20,10 @@ use Sabservis\Api\UI\Controller\Controller;
  */
 final class MultipartDtoConflictTest extends TestCase
 {
+
 	public function testDtoIsDetectedAsHavingFileUploadProperties(): void
 	{
-		$builder = new \Sabservis\Api\OpenApi\Loader\RequestBodyBuilder();
+		$builder = new RequestBodyBuilder();
 		$this->assertTrue($builder->hasFileUploadProperties(DtoWithFileUpload::class));
 	}
 
@@ -55,27 +57,33 @@ final class MultipartDtoConflictTest extends TestCase
 		$this->assertArrayHasKey('contentSpec', $requestBody);
 		$this->assertArrayHasKey('multipart/form-data', $requestBody['contentSpec']);
 	}
+
 }
 
 #[Schema]
 final class DtoWithFileUpload
 {
+
 	#[FileUpload(name: 'document')]
 	public UploadedFile $document;
+
 }
 
 final class DtoOnlyController implements Controller
 {
+
 	#[Post(path: '/upload-dto')]
 	#[RequestBody(ref: DtoWithFileUpload::class)]
 	public function upload(DtoWithFileUpload $input): ApiResponse
 	{
 		return ApiResponse::json(['status' => 'ok']);
 	}
+
 }
 
 final class ConflictController implements Controller
 {
+
 	#[Post(path: '/conflict')]
 	#[FileUpload(name: 'extra')]
 	#[RequestBody(ref: DtoWithFileUpload::class)]
@@ -83,4 +91,5 @@ final class ConflictController implements Controller
 	{
 		return ApiResponse::json(['status' => 'ok']);
 	}
+
 }
