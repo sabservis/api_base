@@ -17,6 +17,7 @@ use Sabservis\Api\ErrorHandler\PsrLogErrorHandler;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
+use Sabservis\Api\Mapping\MultipartEntityHydrator;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
@@ -339,6 +340,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		$builder->addDefinition($this->prefix('request.parameters.mapping'))
 			->setFactory(RequestParameterMapping::class);
+
+		$builder->addDefinition($this->prefix('mapping.multipartHydrator'))
+			->setFactory(MultipartEntityHydrator::class);
 
 		if ($config->validatorResolver !== null) {
 			$builder->addDefinition($this->prefix('mapping.validatorResolver'))

@@ -12,6 +12,7 @@ use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\FileResponse;
 use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Http\UploadedFile;
+use Sabservis\Api\Mapping\MultipartEntityHydrator;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
@@ -41,6 +42,7 @@ final class ApiDispatcher
 		private readonly RequestParameterMapping $parameterMapping,
 		private readonly EntityValidator|null $validator = null,
 		private readonly AuthorizationChecker|null $authorizationChecker = null,
+		private readonly MultipartEntityHydrator|null $multipartHydrator = null,
 	)
 	{
 	}
@@ -134,6 +136,21 @@ final class ApiDispatcher
 
 		if ($requestBody?->getEntity() === null) {
 			return $request;
+		}
+
+		// Multipart DTO: hydrate from form data + uploaded files
+		if ($requestBody->hasFileUploads() && $this->multipartHydrator !== null) {
+			/** @var class-string $entityClass */
+			$entityClass = $requestBody->getEntity();
+			$dto = $this->multipartHydrator->hydrate($request, $entityClass);
+
+			if ($this->validator !== null) {
+				$this->validator->validate($dto);
+			}
+
+			return $request
+				->withParsedBody($dto)
+				->withAttribute(RequestAttributes::RequestEntity->value, $dto);
 		}
 
 		$body = $request->getContents();
