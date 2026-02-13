@@ -343,6 +343,37 @@ final class OpenApiGenerator
 		}
 
 		$entity = $requestBody->getEntity();
+		$contentSpec = $requestBody->getContentSpec();
+
+		// Multipart DTO: entity is set AND has fileUploads AND contentSpec (from multipart detection)
+		if ($entity !== null && $requestBody->hasFileUploads() && $contentSpec !== null) {
+			$content = [];
+
+			foreach ($contentSpec as $mediaType => $spec) {
+				$schema = null;
+
+				if (isset($spec['schema'])) {
+					// Resolve _classRef markers in properties to $ref via SchemaBuilder
+					$resolvedSchema = $this->resolveClassRefsInSpec($spec['schema']);
+					$schema = $this->buildSchemaFromSpec($resolvedSchema);
+				}
+
+				$encoding = $spec['encoding'] ?? null;
+
+				$content[$mediaType] = new MediaTypeObject(
+					schema: $schema,
+					example: $spec['example'] ?? null,
+					examples: $spec['examples'] ?? null,
+					encoding: $encoding,
+				);
+			}
+
+			return new RequestBodyObject(
+				content: $content,
+				description: $requestBody->getDescription() ?: null,
+				required: $requestBody->isRequired() ?: null,
+			);
+		}
 
 		// If we have an entity class reference, use it
 		if ($entity !== null && class_exists($entity)) {
@@ -361,8 +392,6 @@ final class OpenApiGenerator
 		}
 
 		// If we have an inline content spec, use it
-		$contentSpec = $requestBody->getContentSpec();
-
 		if ($contentSpec !== null) {
 			$content = [];
 
@@ -391,6 +420,33 @@ final class OpenApiGenerator
 		}
 
 		return null;
+	}
+
+	/**
+	 * Resolve _classRef markers in a spec array by registering classes with SchemaBuilder
+	 * and replacing with $ref.
+	 *
+	 * @param array<string, mixed> $spec
+	 * @return array<string, mixed>
+	 */
+	private function resolveClassRefsInSpec(array $spec): array
+	{
+		if (isset($spec['properties']) && is_array($spec['properties'])) {
+			foreach ($spec['properties'] as $name => $propertySpec) {
+				if (is_array($propertySpec) && isset($propertySpec['_classRef'])) {
+					$className = $propertySpec['_classRef'];
+
+					if (class_exists($className)) {
+						$schemaName = $this->schemaBuilder->registerClass($className);
+						$spec['properties'][$name] = [
+							'$ref' => '#/components/schemas/' . $schemaName,
+						];
+					}
+				}
+			}
+		}
+
+		return $spec;
 	}
 
 	/**
