@@ -40,6 +40,7 @@ PHP knihovna pro REST API v Nette.
 |---------|-------|
 | `#[Hidden]` | Skryje endpoint z OpenAPI |
 | `#[FileUpload(name: 'file')]` | File upload (s `multiple`, `allowedTypes`) |
+| `#[FileUpload]` na DTO property | Multipart form data s beznymi poli + soubory |
 | `#[FileResponse]` | File download (s `response`, `description`) |
 | `#[Alias('/alt-path')]` | Alternativní URL |
 | `#[Security]` | Auth requirement na endpoint/controller |

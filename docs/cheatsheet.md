@@ -216,6 +216,8 @@ public function __construct(
 #[FileUpload(name: 'docs', multiple: true)]                        // vice souboru
 #[FileUpload(name: 'photo', allowedTypes: ['image/jpeg'])]         // s MIME validaci
 #[FileResponse(contentType: 'application/pdf', filename: 'r.pdf')] // download
+# Multipart DTO (form fields + soubory)
+#[RequestBody(ref: MyMultipartDto::class)]                         // DTO s #[FileUpload] properties -> multipart/form-data
 ```
 
 ### Pokrocile

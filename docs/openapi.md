@@ -294,6 +294,53 @@ public function uploadAvatar(int $id, ApiRequest $request): ApiResponse
 #[FileUpload(name: 'cover', required: false)]
 ```
 
+## Multipart DTO (File Upload + Form Fields)
+
+Pro endpointy, kde potrebujes kombinaci beznych poli a souboru v jednom pozadavku:
+
+```php
+use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Attribute\OpenApi\Property;
+use Sabservis\Api\Attribute\OpenApi\Schema;
+use Sabservis\Api\Http\UploadedFile;
+
+#[Schema]
+class AddFormalityRequest
+{
+    #[Property(description: 'Typ nalezitosti')]
+    public FormalityType $type;
+
+    #[FileUpload(allowedTypes: ['application/pdf'])]
+    public UploadedFile $file;
+
+    #[FileUpload]
+    public ?UploadedFile $thumbnail = null;  // volitelny
+
+    #[FileUpload(multiple: true)]
+    public array $attachments;               // vice souboru
+}
+```
+
+Controller:
+```php
+#[Post(path: '/formality')]
+#[RequestBody(ref: AddFormalityRequest::class)]
+public function add(AddFormalityRequest $dto): array
+{
+    $dto->type;          // FormalityType enum
+    $dto->file;          // UploadedFile
+    $dto->thumbnail;     // UploadedFile|null
+    $dto->attachments;   // array<UploadedFile>
+}
+```
+
+**Klicova pravidla:**
+- Required/optional se odvozuje z PHP typu (`UploadedFile` = required, `?UploadedFile` = optional)
+- `allowedTypes` a dalsi validace z `#[FileUpload]` atributu
+- `name` parametr je volitelny - bez nej se pouzije nazev property
+- Nelze kombinovat `#[FileUpload]` na metode a DTO s FileUpload properties na stejnem endpointu
+- Framework automaticky generuje `multipart/form-data` misto `application/json`
+
 ## File Download
 
 ```php
