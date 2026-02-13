@@ -276,7 +276,7 @@ public function uploadAvatar(int $id, ApiRequest $request): ApiResponse
 
 | Parametr | Typ | Default | Popis |
 |----------|-----|---------|-------|
-| `name` | `string` | (povinny) | Nazev form field |
+| `name` | `string` | `''` | Nazev form field (na metode povinny, na property default = nazev property) |
 | `multiple` | `bool` | `false` | Vice souboru pro jedno pole |
 | `required` | `bool` | `true` | Zda je soubor povinny |
 | `description` | `string` | `null` | Popis pro dokumentaci |

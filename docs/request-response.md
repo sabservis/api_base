@@ -79,6 +79,35 @@ foreach ($files as $file) {
 }
 ```
 
+### Multipart DTO (soubory + formulářová pole)
+
+Pro kombinaci souborů a běžných polí v jednom requestu použij DTO s `#[FileUpload]` na properties:
+
+```php
+#[Schema]
+final class CreateProfileDto
+{
+    public string $name;
+
+    #[FileUpload]
+    public UploadedFile $avatar;
+}
+```
+
+V controlleru pak dostaneš plně hydratované DTO:
+
+```php
+#[Post(path: '/profiles')]
+#[RequestBody(ref: CreateProfileDto::class)]
+public function create(CreateProfileDto $input): ApiResponse
+{
+    $input->name;       // string z formuláře
+    $input->avatar;     // UploadedFile instance
+}
+```
+
+Viz [OpenAPI dokumentace - Multipart DTO](openapi.md#multipart-dto-file-upload--form-fields).
+
 ## ApiResponse
 
 Immutable objekt reprezentující HTTP response.
