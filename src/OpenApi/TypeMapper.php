@@ -3,6 +3,7 @@
 namespace Sabservis\Api\OpenApi;
 
 use function in_array;
+use function is_string;
 use function ltrim;
 
 final class TypeMapper
@@ -43,6 +44,25 @@ final class TypeMapper
 		$type = ltrim($type, '\\');
 
 		return in_array($type, ['DateTimeInterface', 'DateTime', 'DateTimeImmutable', 'Date'], true);
+	}
+
+	/**
+	 * Resolve OpenAPI type shorthands like 'date' and 'date-time' to proper type + format.
+	 *
+	 * @param string|array<string> $type
+	 * @return array{type: string, format: string}|null Null if not a shorthand
+	 */
+	public static function resolveOpenApiTypeShorthand(string|array $type): array|null
+	{
+		if (!is_string($type)) {
+			return null;
+		}
+
+		return match ($type) {
+			'date' => ['type' => 'string', 'format' => 'date'],
+			'date-time', 'datetime' => ['type' => 'string', 'format' => 'date-time'],
+			default => null,
+		};
 	}
 
 }

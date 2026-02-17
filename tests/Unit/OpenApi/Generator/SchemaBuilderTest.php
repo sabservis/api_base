@@ -224,9 +224,47 @@ final class SchemaBuilderTest extends TestCase
 		$schemas = $builder->getSchemas();
 		$schema = $schemas['DateTimeDto'];
 
-		// DateTimeImmutable is a class, so it gets registered as a reference
-		// The schema builder registers it and creates a reference
-		self::assertSame('DateTimeImmutable', $schema->properties['createdAt']->ref);
+		// DateTimeImmutable should be mapped to string with date-time format, not as $ref
+		self::assertNull($schema->properties['createdAt']->ref);
+		self::assertSame('string', $schema->properties['createdAt']->type);
+		self::assertSame('date-time', $schema->properties['createdAt']->format);
+
+		// Should NOT register DateTimeImmutable as a separate schema
+		self::assertArrayNotHasKey('DateTimeImmutable', $schemas);
+	}
+
+	#[Test]
+	public function buildsSchemaWithNullableDateTimeProperty(): void
+	{
+		$builder = new SchemaBuilder();
+
+		$builder->registerClass(NullableDateTimeDto::class);
+		$schemas = $builder->getSchemas();
+		$schema = $schemas['NullableDateTimeDto'];
+
+		// Nullable DateTimeImmutable should be string with date-time format and nullable
+		self::assertNull($schema->properties['updatedAt']->ref);
+		self::assertSame('string', $schema->properties['updatedAt']->type);
+		self::assertSame('date-time', $schema->properties['updatedAt']->format);
+		self::assertTrue($schema->properties['updatedAt']->nullable);
+	}
+
+	#[Test]
+	public function buildsSchemaWithDateTimePropertyOverriddenToDate(): void
+	{
+		$builder = new SchemaBuilder();
+
+		$builder->registerClass(DatePropertyDto::class);
+		$schemas = $builder->getSchemas();
+		$schema = $schemas['DatePropertyDto'];
+
+		// Property with format: 'date' override should produce string with date format
+		self::assertSame('string', $schema->properties['birthDate']->type);
+		self::assertSame('date', $schema->properties['birthDate']->format);
+
+		// Property with type: 'date' shorthand should also produce string with date format
+		self::assertSame('string', $schema->properties['signedDate']->type);
+		self::assertSame('date', $schema->properties['signedDate']->format);
 	}
 
 	#[Test]
@@ -604,6 +642,24 @@ class DateTimeDto
 {
 
 	public DateTimeImmutable $createdAt;
+
+}
+
+class NullableDateTimeDto
+{
+
+	public DateTimeImmutable|null $updatedAt = null;
+
+}
+
+class DatePropertyDto
+{
+
+	#[Property(format: 'date')]
+	public DateTimeImmutable $birthDate;
+
+	#[Property(type: 'date')]
+	public DateTimeImmutable $signedDate;
 
 }
 

@@ -238,8 +238,17 @@ final class SchemaBuilder
 		} elseif ($type instanceof ReflectionNamedType) {
 			$typeName = $type->getName();
 
-			// Check for class type that needs reference
-			if (!TypeMapper::isScalarType($typeName) && class_exists($typeName)) {
+			// DateTime types should be mapped to string with format, not as $ref
+			if (TypeMapper::isDateType($typeName)) {
+				$openApiType = TypeMapper::phpToOpenApi($typeName);
+
+				$schema = new SchemaObject(
+					type: $openApiType['type'],
+					format: $openApiType['format'] ?? null,
+					nullable: $type->allowsNull() ? true : null,
+				);
+			} elseif (!TypeMapper::isScalarType($typeName) && class_exists($typeName)) {
+				// Check for class type that needs reference
 				$schemaName = $this->registerClass($typeName);
 
 				$schema = new SchemaObject(
@@ -260,10 +269,23 @@ final class SchemaBuilder
 
 		// Override with attribute values
 		if ($propertyAttr !== null) {
+			// Resolve type shorthands (e.g., 'date' → type: 'string', format: 'date')
+			$resolvedType = $propertyAttr->type;
+			$resolvedFormat = $propertyAttr->format;
+
+			if ($resolvedType !== null && $resolvedFormat === null) {
+				$resolved = TypeMapper::resolveOpenApiTypeShorthand($resolvedType);
+
+				if ($resolved !== null) {
+					$resolvedType = $resolved['type'];
+					$resolvedFormat = $resolved['format'];
+				}
+			}
+
 			$schema = new SchemaObject(
 				ref: $propertyAttr->ref !== null ? $this->handleRefAttribute($propertyAttr->ref) : $schema->ref,
-				type: $propertyAttr->type ?? $schema->type,
-				format: $propertyAttr->format ?? $schema->format,
+				type: $resolvedType ?? $schema->type,
+				format: $resolvedFormat ?? $schema->format,
 				title: $propertyAttr->title,
 				description: $propertyAttr->description,
 				enum: $propertyAttr->enum !== null ? $propertyAttr->resolveEnum() : null,
@@ -313,6 +335,17 @@ final class SchemaBuilder
 		if (count($nonNullTypes) === 1) {
 			$typeName = $nonNullTypes[0]->getName();
 
+			// DateTime types should be mapped to string with format, not as $ref
+			if (TypeMapper::isDateType($typeName)) {
+				$openApiType = TypeMapper::phpToOpenApi($typeName);
+
+				return new SchemaObject(
+					type: $openApiType['type'],
+					format: $openApiType['format'] ?? null,
+					nullable: $allowsNull ? true : null,
+				);
+			}
+
 			// Check for class type that needs reference
 			if (!TypeMapper::isScalarType($typeName) && class_exists($typeName)) {
 				$schemaName = $this->registerClass($typeName);
@@ -338,7 +371,13 @@ final class SchemaBuilder
 		foreach ($nonNullTypes as $unionType) {
 			$typeName = $unionType->getName();
 
-			if (!TypeMapper::isScalarType($typeName) && class_exists($typeName)) {
+			if (TypeMapper::isDateType($typeName)) {
+				$openApiType = TypeMapper::phpToOpenApi($typeName);
+				$oneOfSchemas[] = new SchemaObject(
+					type: $openApiType['type'],
+					format: $openApiType['format'] ?? null,
+				);
+			} elseif (!TypeMapper::isScalarType($typeName) && class_exists($typeName)) {
 				$schemaName = $this->registerClass($typeName);
 				$oneOfSchemas[] = new SchemaObject(ref: $schemaName);
 			} else {

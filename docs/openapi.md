@@ -107,6 +107,42 @@ class UserDto
 }
 ```
 
+### DateTime property
+
+`DateTime`, `DateTimeImmutable` a `DateTimeInterface` se automaticky mapuji na `type: string, format: date-time`:
+
+```php
+class EventDto
+{
+    // Automaticky: type: string, format: date-time
+    public DateTimeImmutable $createdAt;
+
+    // Nullable: type: string, format: date-time, nullable: true
+    public ?DateTimeImmutable $updatedAt;
+
+    // Override na date (jen datum bez casu)
+    #[Property(format: 'date')]
+    public DateTimeImmutable $birthDate;
+
+    // Alternativne shorthand - type: 'date' se rozlozi na type: string, format: date
+    #[Property(type: 'date', description: 'Datum podpisu')]
+    public DateTimeImmutable $signedDate;
+}
+```
+
+| PHP typ | OpenAPI type | OpenAPI format |
+|---------|-------------|----------------|
+| `DateTime` | `string` | `date-time` |
+| `DateTimeImmutable` | `string` | `date-time` |
+| `DateTimeInterface` | `string` | `date-time` |
+
+**Type shorthands v Property atributu:**
+
+| Shorthand `type` | Rozlozeni |
+|-------------------|-----------|
+| `'date'` | `type: 'string', format: 'date'` |
+| `'date-time'` / `'datetime'` | `type: 'string', format: 'date-time'` |
+
 ### Property - kompletni reference
 
 `#[Property]` atribut nastavuje OpenAPI metadata pro DTO property.
@@ -203,8 +239,8 @@ class ProductDto
 | `property` | `string` | Alias - jiny nazev v JSON (default: nazev PHP property) |
 | `title` | `string` | Nazev pro dokumentaci |
 | `description` | `string` | Popis property |
-| `type` | `string` | OpenAPI typ (`string`, `integer`, `number`, `boolean`, `array`, `object`) |
-| `format` | `string` | Format (`email`, `uri`, `uuid`, `date-time`, `int64`, ...) |
+| `type` | `string` | OpenAPI typ (`string`, `integer`, `number`, `boolean`, `array`, `object`) nebo shorthand (`date`, `date-time`) |
+| `format` | `string` | Format (`email`, `uri`, `uuid`, `date-time`, `date`, `int64`, ...) |
 | `enum` | `class-string\|array` | Povolene hodnoty - BackedEnum class nebo pole |
 | `minimum` / `maximum` | `int\|float` | Ciselne rozsahy |
 | `minLength` / `maxLength` | `int` | Delka retezce |
