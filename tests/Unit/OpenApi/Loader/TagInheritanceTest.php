@@ -77,6 +77,50 @@ final class TagInheritanceTest extends TestCase
 		self::assertEmpty($dataOp['tags'] ?? []);
 	}
 
+	#[Test]
+	public function childControllerInheritsTagFromParent(): void
+	{
+		$spec = $this->generateSpecForController(ChildControllerInheritingTag::class);
+
+		// Child without its own tag should inherit parent's tag
+		$ordersOp = $spec['paths']['/orders']['get'];
+		self::assertContains('trades', $ordersOp['tags']);
+	}
+
+	#[Test]
+	public function childControllerOverridesParentTag(): void
+	{
+		$spec = $this->generateSpecForController(ChildControllerOverridingTag::class);
+
+		// Child with own tag should use its own tag, not parent's
+		$ordersOp = $spec['paths']['/orders']['get'];
+		self::assertContains('custom', $ordersOp['tags']);
+		self::assertNotContains('trades', $ordersOp['tags']);
+	}
+
+	#[Test]
+	public function childControllerInheritsTagFromGrandparent(): void
+	{
+		$spec = $this->generateSpecForController(GrandchildControllerInheritingTag::class);
+
+		// Grandchild should inherit tag through the chain
+		$itemsOp = $spec['paths']['/items']['get'];
+		self::assertContains('trades', $itemsOp['tags']);
+	}
+
+	#[Test]
+	public function parentTagDescriptionIsRegistered(): void
+	{
+		$spec = $this->generateSpecForController(ChildControllerInheritingTag::class);
+
+		// Parent's tag description should be registered in global tags
+		$tagNames = array_column($spec['tags'], 'name');
+		self::assertContains('trades', $tagNames);
+
+		$tradesTag = array_values(array_filter($spec['tags'], static fn ($t) => $t['name'] === 'trades'))[0];
+		self::assertSame('Trade operations', $tradesTag['description']);
+	}
+
 	/**
 	 * @param class-string $controllerClass
 	 * @return array<string, mixed>
@@ -178,6 +222,54 @@ class ControllerWithoutAnyTag implements Controller
 	/** @return array<mixed> */
 	#[Get(path: '/data')]
 	public function data(): array
+	{
+		return [];
+	}
+
+}
+
+#[Tag(name: 'trades', description: 'Trade operations')]
+abstract class AbstractParentControllerWithTag implements Controller
+{
+
+}
+
+class ChildControllerInheritingTag extends AbstractParentControllerWithTag
+{
+
+	/** @return array<mixed> */
+	#[Get(path: '/orders')]
+	public function orders(): array
+	{
+		return [];
+	}
+
+}
+
+#[Tag(name: 'custom')]
+class ChildControllerOverridingTag extends AbstractParentControllerWithTag
+{
+
+	/** @return array<mixed> */
+	#[Get(path: '/orders')]
+	public function orders(): array
+	{
+		return [];
+	}
+
+}
+
+abstract class MiddleControllerWithoutTag extends AbstractParentControllerWithTag
+{
+
+}
+
+class GrandchildControllerInheritingTag extends MiddleControllerWithoutTag
+{
+
+	/** @return array<mixed> */
+	#[Get(path: '/items')]
+	public function items(): array
 	{
 		return [];
 	}

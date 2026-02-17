@@ -382,6 +382,32 @@ class UserController implements Controller
 
 **Pravidlo:** Pokud metoda má vlastní `#[Tag]`, přepíše tagy z controlleru. Jinak dědí.
 
+### Dědičnost tagů z rodičovské třídy
+
+`#[Tag]` se dědí z rodičovských tříd. Pokud child controller nemá vlastní `#[Tag]`, zdědí tagy z nejbližšího rodiče, který je definuje.
+
+```php
+#[Tag(name: 'trades', description: 'Trade operations')]
+abstract class BaseTradeController implements Controller {}
+
+// Zdědí tag 'trades' automaticky:
+final class TradeSubmitController extends BaseTradeController
+{
+    #[Post(path: '/trades')]
+    public function submit(TradeDto $input): TradeDto { }
+}
+
+// Přepíše - má vlastní tag, rodičovský se ignoruje:
+#[Tag(name: 'special-trades')]
+final class SpecialTradeController extends BaseTradeController
+{
+    #[Post(path: '/special-trades')]
+    public function submit(TradeDto $input): TradeDto { }
+}
+```
+
+**Pravidlo:** Pokud child má vlastní `#[Tag]`, kompletně přepíše tagy z rodiče (stejný princip jako metoda vs. controller). Dědičnost funguje i přes více úrovní (grandparent → parent → child).
+
 ## Security
 
 Viz [Security dokumentace](security.md#openapi-security).

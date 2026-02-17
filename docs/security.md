@@ -253,6 +253,22 @@ services:
 - Pokud už máš existující autorizaci (middleware / vlastní kontrola) a zároveň `#[Authorize]`, musí projít **obě**.
 - Při zamítnutí vrací knihovna `403 Forbidden`.
 
+### Dědičnost z rodičovské třídy
+
+`#[Authorize]` se dědí z rodičovských tříd. Pokud definuješ autorizaci na abstraktním controlleru, všechny child controllery ji automaticky zdědí.
+
+```php
+#[Authorize(activity: 'trades', authorizer: TradeAuthorizer::class)]
+abstract class BaseTradeController implements Controller {}
+
+// Zdědí autorizaci 'trades' automaticky:
+final class TradeSubmitController extends BaseTradeController
+{
+    #[Post(path: '/trades')]
+    public function submit(TradeDto $input): TradeDto { }
+}
+```
+
 ## OpenAPI Security
 
 Definování security requirements pro OpenAPI dokumentaci:

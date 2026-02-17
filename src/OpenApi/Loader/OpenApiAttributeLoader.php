@@ -192,14 +192,29 @@ final class OpenApiAttributeLoader
 		$controllerSecurity = null;
 		$controllerAuthorizations = $this->parseAuthorizeAttributesFromClass($reflectionClass);
 
-		// Parse class-level tags
+		// Parse class-level tags (including inherited from parent classes)
+		// If the controller has its own tags, use only those (same as method-level override).
+		// Otherwise, inherit from the nearest parent that has tags.
 		foreach ($reflectionClass->getAttributes(Tag::class) as $attribute) {
 			$tag = $attribute->newInstance();
 			assert($tag instanceof Tag);
 			$controllerTags[$tag->getName()] = 1;
-
-			// Register tag with description
 			$this->addTag($tag->getName(), $tag->description);
+		}
+
+		if ($controllerTags === []) {
+			foreach ($this->meta[$controllerClass]['parents'] as $parentReflection) {
+				foreach ($parentReflection->getAttributes(Tag::class) as $attribute) {
+					$tag = $attribute->newInstance();
+					assert($tag instanceof Tag);
+					$controllerTags[$tag->getName()] = 1;
+					$this->addTag($tag->getName(), $tag->description);
+				}
+
+				if ($controllerTags !== []) {
+					break;
+				}
+			}
 		}
 
 		// Parse class-level security
