@@ -7,6 +7,7 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Http\ListResponse;
+use Sabservis\Api\Http\PaginatedListResponse;
 use stdClass;
 use function fopen;
 use function fwrite;
@@ -226,7 +227,6 @@ final class ApiResponseTest extends TestCase
 		self::assertSame(200, $response->getStatusCode());
 		$listResponse = $response->getObject();
 		self::assertInstanceOf(ListResponse::class, $listResponse);
-		self::assertFalse($listResponse->hasMeta());
 		self::assertSame($data, $listResponse->getData());
 	}
 
@@ -239,8 +239,7 @@ final class ApiResponseTest extends TestCase
 
 		self::assertSame(200, $response->getStatusCode());
 		$listResponse = $response->getObject();
-		self::assertInstanceOf(ListResponse::class, $listResponse);
-		self::assertTrue($listResponse->hasMeta());
+		self::assertInstanceOf(PaginatedListResponse::class, $listResponse);
 		self::assertSame($data, $listResponse->getData());
 		self::assertSame(100, $listResponse->getMeta()->total);
 		self::assertSame(20, $listResponse->getMeta()->limit);

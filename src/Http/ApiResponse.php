@@ -78,8 +78,8 @@ class ApiResponse
 	): self
 	{
 		$listResponse = $total !== null
-			? ListResponse::create($data, $total, $limit ?? 0, $offset ?? 0)
-			: ListResponse::withoutMeta($data);
+			? PaginatedListResponse::create($data, $total, $limit ?? 0, $offset ?? 0)
+			: new ListResponse($data);
 
 		return (new self(200))->withObject($listResponse);
 	}

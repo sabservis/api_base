@@ -10,7 +10,10 @@ use Pocta\DataMapper\Validation\Validator;
 use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
+use Sabservis\Api\Http\ListResponse;
+use Sabservis\Api\Http\PaginatedListResponse;
 use Sabservis\Api\Utils\JsonLimits;
+use function array_map;
 use function is_object;
 use function is_string;
 use function json_decode;
@@ -46,6 +49,29 @@ class DataMapperSerializer implements EntitySerializer
 
 	public function serialize(mixed $data): string
 	{
+		if ($data instanceof ListResponse) {
+			return json_encode(
+				array_map(
+					fn (mixed $item) => is_object($item) ? $this->mapper->toArray($item) : $item,
+					$data->getData(),
+				),
+				JSON_THROW_ON_ERROR,
+			);
+		}
+
+		if ($data instanceof PaginatedListResponse) {
+			return json_encode(
+				[
+					'data' => array_map(
+						fn (mixed $item) => is_object($item) ? $this->mapper->toArray($item) : $item,
+						$data->getData(),
+					),
+					'meta' => $data->getMeta()->toArray(),
+				],
+				JSON_THROW_ON_ERROR,
+			);
+		}
+
 		if (is_object($data)) {
 			return $this->mapper->toJson($data);
 		}
