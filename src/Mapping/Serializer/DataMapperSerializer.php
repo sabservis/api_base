@@ -60,16 +60,18 @@ class DataMapperSerializer implements EntitySerializer
 		}
 
 		if ($data instanceof PaginatedListResponse) {
-			return json_encode(
-				[
-					'data' => array_map(
-						fn (mixed $item) => is_object($item) ? $this->mapper->toArray($item) : $item,
-						$data->getData(),
-					),
-					'meta' => $data->getMeta()->toArray(),
-				],
-				JSON_THROW_ON_ERROR,
-			);
+			$result = [
+				'data' => array_map(
+					fn (mixed $item) => is_object($item) ? $this->mapper->toArray($item) : $item,
+					$data->getData(),
+				),
+			];
+
+			if ($data->getMeta() !== null) {
+				$result['meta'] = $data->getMeta()->toArray();
+			}
+
+			return json_encode($result, JSON_THROW_ON_ERROR);
 		}
 
 		if (is_object($data)) {

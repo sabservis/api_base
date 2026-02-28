@@ -76,12 +76,17 @@ final class ResponseBuilder
 				'entity' => $response->ref,
 			];
 
-			// Handle listRef responses (array of items, optionally with meta)
+			// Handle listRef responses (array of items, optionally with meta or data wrapper)
 			if ($response->listRef !== null) {
 				$responseData['entity'] = $response->listRef;
-				$responseData['wrapperType'] = $response->withMeta
-					? EndpointResponse::WrapperListWithMeta
-					: EndpointResponse::WrapperListNoMeta;
+
+				if ($response->withMeta) {
+					$responseData['wrapperType'] = EndpointResponse::WrapperListWithMeta;
+				} elseif ($response->wrapped) {
+					$responseData['wrapperType'] = EndpointResponse::WrapperListDataOnly;
+				} else {
+					$responseData['wrapperType'] = EndpointResponse::WrapperListNoMeta;
+				}
 			}
 
 			// Extract content spec from contentArray (for oneOf, anyOf, custom schemas)

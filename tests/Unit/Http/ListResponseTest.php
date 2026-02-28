@@ -33,4 +33,14 @@ final class ListResponseTest extends TestCase
 		self::assertSame(0, $response->getMeta()->offset);
 	}
 
+	#[Test]
+	public function paginatedListResponseWithoutMeta(): void
+	{
+		$data = [['id' => 1], ['id' => 2]];
+		$response = new PaginatedListResponse($data);
+
+		self::assertSame($data, $response->getData());
+		self::assertNull($response->getMeta());
+	}
+
 }

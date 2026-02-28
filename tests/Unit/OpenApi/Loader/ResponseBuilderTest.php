@@ -72,6 +72,19 @@ final class ResponseBuilderTest extends TestCase
 	}
 
 	#[Test]
+	public function parseResponseAttributesParsesListRefWrapped(): void
+	{
+		$method = new ReflectionMethod(ResponseTestController::class, 'listUsersWrapped');
+		$responses = [];
+
+		$this->builder->parseResponseAttributes($method, $responses);
+
+		self::assertArrayHasKey('200', $responses);
+		self::assertSame(ResponseUserDto::class, $responses['200']['entity']);
+		self::assertSame(EndpointResponse::WrapperListDataOnly, $responses['200']['wrapperType']);
+	}
+
+	#[Test]
 	public function parseResponseAttributesParsesFileResponse(): void
 	{
 		$method = new ReflectionMethod(ResponseTestController::class, 'downloadFile');
@@ -173,6 +186,12 @@ class ResponseTestController
 
 	#[Response(response: 200, description: 'List with meta', listRef: ResponseUserDto::class, withMeta: true)]
 	public function listUsersWithMeta(): void
+	{
+		// Test fixture - attributes are what matters
+	}
+
+	#[Response(response: 200, description: 'Wrapped list', listRef: ResponseUserDto::class, wrapped: true)]
+	public function listUsersWrapped(): void
 	{
 		// Test fixture - attributes are what matters
 	}

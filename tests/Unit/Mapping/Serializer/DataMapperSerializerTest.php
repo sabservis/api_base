@@ -7,6 +7,8 @@ use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\Property as OpenApiProperty;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
+use Sabservis\Api\Http\ListResponse;
+use Sabservis\Api\Http\PaginatedListResponse;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use function json_decode;
 use function str_repeat;
@@ -79,6 +81,55 @@ final class DataMapperSerializerTest extends TestCase
 
 		self::assertSame('John', $decoded['name']);
 		self::assertSame('john@example.com', $decoded['email']);
+	}
+
+	// =====================
+	// serialize() list response tests
+	// =====================
+
+	#[Test]
+	public function serializeListResponse(): void
+	{
+		$obj = new TestUserDto();
+		$obj->name = 'John';
+		$obj->email = 'john@example.com';
+
+		$response = new ListResponse([$obj]);
+		$result = $this->serializer->serialize($response);
+
+		self::assertSame('[{"name":"John","email":"john@example.com"}]', $result);
+	}
+
+	#[Test]
+	public function serializePaginatedListResponse(): void
+	{
+		$obj = new TestUserDto();
+		$obj->name = 'John';
+		$obj->email = 'john@example.com';
+
+		$response = PaginatedListResponse::create([$obj], total: 1, limit: 20, offset: 0);
+		$result = $this->serializer->serialize($response);
+		$decoded = json_decode($result, true);
+
+		self::assertArrayHasKey('data', $decoded);
+		self::assertArrayHasKey('meta', $decoded);
+		self::assertSame('John', $decoded['data'][0]['name']);
+		self::assertSame(1, $decoded['meta']['total']);
+	}
+
+	#[Test]
+	public function serializePaginatedListResponseWithoutMetaProducesDataOnly(): void
+	{
+		$obj = new TestUserDto();
+		$obj->name = 'John';
+		$obj->email = 'john@example.com';
+
+		$response = new PaginatedListResponse([$obj]);
+		$result = $this->serializer->serialize($response);
+		$decoded = json_decode($result, true);
+
+		self::assertSame(['data' => [['name' => 'John', 'email' => 'john@example.com']]], $decoded);
+		self::assertArrayNotHasKey('meta', $decoded);
 	}
 
 	// =====================

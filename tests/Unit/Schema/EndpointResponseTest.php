@@ -134,6 +134,18 @@ final class EndpointResponseTest extends TestCase
 	{
 		self::assertSame('list_with_meta', EndpointResponse::WrapperListWithMeta);
 		self::assertSame('list_no_meta', EndpointResponse::WrapperListNoMeta);
+		self::assertSame('list_data_only', EndpointResponse::WrapperListDataOnly);
+	}
+
+	#[Test]
+	public function isListDataOnlyReturnsTrueWhenSet(): void
+	{
+		$response = new EndpointResponse('200', 'Wrapped list');
+		$response->setWrapperType(EndpointResponse::WrapperListDataOnly);
+
+		self::assertTrue($response->isListDataOnly());
+		self::assertFalse($response->isListWithMeta());
+		self::assertFalse($response->isListNoMeta());
 	}
 
 	#[Test]

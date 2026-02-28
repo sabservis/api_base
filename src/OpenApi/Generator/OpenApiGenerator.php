@@ -564,6 +564,8 @@ final class OpenApiGenerator
 
 				if ($response->isListWithMeta()) {
 					$schema = $this->buildListWithMetaSchemaOneOf($schemaNames);
+				} elseif ($response->isListDataOnly()) {
+					$schema = $this->buildListDataOnlySchemaOneOf($schemaNames);
 				} elseif ($response->isListNoMeta()) {
 					$schema = $this->buildListNoMetaSchemaOneOf($schemaNames);
 				} else {
@@ -579,6 +581,8 @@ final class OpenApiGenerator
 
 				if ($response->isListWithMeta()) {
 					$schema = $this->buildListWithMetaSchema($schemaName);
+				} elseif ($response->isListDataOnly()) {
+					$schema = $this->buildListDataOnlySchema($schemaName);
 				} elseif ($response->isListNoMeta()) {
 					$schema = $this->buildListNoMetaSchema($schemaName);
 				} else {
@@ -678,6 +682,44 @@ final class OpenApiGenerator
 		return new SchemaObject(
 			type: 'array',
 			items: new SchemaObject(ref: $schemaName),
+		);
+	}
+
+	/**
+	 * Build inline schema for data-only list wrapper.
+	 * Structure: { data: [] }
+	 */
+	private function buildListDataOnlySchema(string $schemaName): SchemaObject
+	{
+		return new SchemaObject(
+			type: 'object',
+			properties: [
+				'data' => new SchemaObject(
+					type: 'array',
+					items: new SchemaObject(ref: $schemaName),
+				),
+			],
+			required: ['data'],
+		);
+	}
+
+	/**
+	 * Build inline schema for data-only list wrapper using oneOf.
+	 * Structure: { data: [oneOf: [...]] }
+	 *
+	 * @param array<string> $schemaNames
+	 */
+	private function buildListDataOnlySchemaOneOf(array $schemaNames): SchemaObject
+	{
+		return new SchemaObject(
+			type: 'object',
+			properties: [
+				'data' => new SchemaObject(
+					type: 'array',
+					items: $this->buildOneOfSchema($schemaNames),
+				),
+			],
+			required: ['data'],
 		);
 	}
 

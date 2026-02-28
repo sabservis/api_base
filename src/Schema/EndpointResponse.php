@@ -11,6 +11,8 @@ class EndpointResponse
 
 	public const WrapperListNoMeta = 'list_no_meta';
 
+	public const WrapperListDataOnly = 'list_data_only';
+
 	/** @var string|array<string>|null */
 	private string|array|null $entity = null;
 
@@ -83,6 +85,11 @@ class EndpointResponse
 	public function isListNoMeta(): bool
 	{
 		return $this->wrapperType === self::WrapperListNoMeta;
+	}
+
+	public function isListDataOnly(): bool
+	{
+		return $this->wrapperType === self::WrapperListDataOnly;
 	}
 
 	public function setFileContentType(string|null $contentType): void

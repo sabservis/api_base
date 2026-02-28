@@ -29,6 +29,7 @@ final class Response implements OpenApiAttributeInterface
 		public string|null $description = null,
 		public string|null $ref = null,
 		public string|array|null $listRef = null,
+		public bool $wrapped = false,
 		public bool $withMeta = false,
 		JsonContent|MediaType|array|null $content = null,
 	)
@@ -59,7 +60,6 @@ final class Response implements OpenApiAttributeInterface
 		if ($this->listRef !== null) {
 			$itemsSchema = $this->buildListItemsSchema();
 
-			// phpcs:ignore SlevomatCodingStandard.ControlStructures.RequireTernaryOperator.TernaryOperatorNotUsed
 			if ($this->withMeta) {
 				// { data: [...], meta: { total, limit, offset } }
 				$spec['content'] = [
@@ -81,6 +81,22 @@ final class Response implements OpenApiAttributeInterface
 								],
 							],
 							'required' => ['data', 'meta'],
+						],
+					],
+				];
+			} elseif ($this->wrapped) {
+				// { data: [...] }
+				$spec['content'] = [
+					'application/json' => [
+						'schema' => [
+							'type' => 'object',
+							'properties' => [
+								'data' => [
+									'type' => 'array',
+									'items' => $itemsSchema,
+								],
+							],
+							'required' => ['data'],
 						],
 					],
 				];

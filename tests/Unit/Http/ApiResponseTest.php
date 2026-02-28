@@ -231,6 +231,20 @@ final class ApiResponseTest extends TestCase
 	}
 
 	#[Test]
+	public function listFactoryWrapped(): void
+	{
+		$data = [['id' => 1], ['id' => 2]];
+
+		$response = ApiResponse::list($data, wrapped: true);
+
+		self::assertSame(200, $response->getStatusCode());
+		$listResponse = $response->getObject();
+		self::assertInstanceOf(PaginatedListResponse::class, $listResponse);
+		self::assertSame($data, $listResponse->getData());
+		self::assertNull($listResponse->getMeta());
+	}
+
+	#[Test]
 	public function listFactoryWithMeta(): void
 	{
 		$data = [['id' => 1], ['id' => 2]];

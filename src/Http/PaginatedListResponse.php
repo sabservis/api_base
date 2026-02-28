@@ -17,7 +17,7 @@ final class PaginatedListResponse
 	 */
 	public function __construct(
 		private array $data,
-		private ListMeta $meta,
+		private ListMeta|null $meta = null,
 	)
 	{
 	}
@@ -40,7 +40,7 @@ final class PaginatedListResponse
 		return $this->data;
 	}
 
-	public function getMeta(): ListMeta
+	public function getMeta(): ListMeta|null
 	{
 		return $this->meta;
 	}

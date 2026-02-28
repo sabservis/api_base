@@ -75,11 +75,16 @@ class ApiResponse
 		int|null $total = null,
 		int|null $limit = null,
 		int|null $offset = null,
+		bool $wrapped = false,
 	): self
 	{
-		$listResponse = $total !== null
-			? PaginatedListResponse::create($data, $total, $limit ?? 0, $offset ?? 0)
-			: new ListResponse($data);
+		if ($total !== null) {
+			$listResponse = PaginatedListResponse::create($data, $total, $limit ?? 0, $offset ?? 0);
+		} elseif ($wrapped) {
+			$listResponse = new PaginatedListResponse($data);
+		} else {
+			$listResponse = new ListResponse($data);
+		}
 
 		return (new self(200))->withObject($listResponse);
 	}

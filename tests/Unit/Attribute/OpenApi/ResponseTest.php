@@ -170,6 +170,80 @@ final class ResponseTest extends TestCase
 	}
 
 	#[Test]
+	public function listRefWrappedWithoutMeta(): void
+	{
+		$response = new Response(response: 200, listRef: TestUserDto::class, wrapped: true);
+
+		$spec = $response->toOpenApiSpec();
+
+		self::assertSame('OK', $spec['description']);
+		self::assertArrayHasKey('content', $spec);
+
+		$schema = $spec['content']['application/json']['schema'];
+		self::assertSame('object', $schema['type']);
+		self::assertArrayHasKey('properties', $schema);
+
+		// Check data property
+		self::assertArrayHasKey('data', $schema['properties']);
+		self::assertSame('array', $schema['properties']['data']['type']);
+		self::assertSame(
+			['$ref' => '#/components/schemas/TestUserDto'],
+			$schema['properties']['data']['items'],
+		);
+
+		// No meta property
+		self::assertArrayNotHasKey('meta', $schema['properties']);
+
+		// Check required
+		self::assertSame(['data'], $schema['required']);
+	}
+
+	#[Test]
+	public function listRefArrayWrappedWithoutMeta(): void
+	{
+		$response = new Response(
+			response: 200,
+			listRef: [TestUserDto::class, TestAdminDto::class],
+			wrapped: true,
+		);
+
+		$spec = $response->toOpenApiSpec();
+
+		$schema = $spec['content']['application/json']['schema'];
+		self::assertSame('object', $schema['type']);
+
+		// Check data property with oneOf items
+		self::assertArrayHasKey('data', $schema['properties']);
+		self::assertSame('array', $schema['properties']['data']['type']);
+		self::assertArrayHasKey('oneOf', $schema['properties']['data']['items']);
+		self::assertCount(2, $schema['properties']['data']['items']['oneOf']);
+
+		// No meta
+		self::assertArrayNotHasKey('meta', $schema['properties']);
+		self::assertSame(['data'], $schema['required']);
+	}
+
+	#[Test]
+	public function wrappedWithMetaProducesPaginatedSchema(): void
+	{
+		// wrapped + withMeta = same as withMeta alone
+		$response = new Response(
+			response: 200,
+			listRef: TestUserDto::class,
+			wrapped: true,
+			withMeta: true,
+		);
+
+		$spec = $response->toOpenApiSpec();
+
+		$schema = $spec['content']['application/json']['schema'];
+		self::assertSame('object', $schema['type']);
+		self::assertArrayHasKey('data', $schema['properties']);
+		self::assertArrayHasKey('meta', $schema['properties']);
+		self::assertSame(['data', 'meta'], $schema['required']);
+	}
+
+	#[Test]
 	public function listRefArrayWithoutMeta(): void
 	{
 		$response = new Response(
