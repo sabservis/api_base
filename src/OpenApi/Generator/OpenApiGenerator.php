@@ -648,7 +648,7 @@ final class OpenApiGenerator
 
 	/**
 	 * Build inline schema for list with meta wrapper.
-	 * Structure: { data: [], meta: { total, limit, offset } }
+	 * Structure: { data: [], meta: { totalCount, limit, offset } }
 	 */
 	private function buildListWithMetaSchema(string $schemaName): SchemaObject
 	{
@@ -662,11 +662,11 @@ final class OpenApiGenerator
 				'meta' => new SchemaObject(
 					type: 'object',
 					properties: [
-						'total' => new SchemaObject(type: 'integer'),
+						'totalCount' => new SchemaObject(type: 'integer'),
 						'limit' => new SchemaObject(type: 'integer'),
 						'offset' => new SchemaObject(type: 'integer'),
 					],
-					required: ['total', 'limit', 'offset'],
+					required: ['totalCount', 'limit', 'offset'],
 				),
 			],
 			required: ['data', 'meta'],
@@ -725,7 +725,7 @@ final class OpenApiGenerator
 
 	/**
 	 * Build inline schema for list with meta wrapper using oneOf.
-	 * Structure: { data: [oneOf: [...]], meta: { total, limit, offset } }
+	 * Structure: { data: [oneOf: [...]], meta: { totalCount, limit, offset } }
 	 *
 	 * @param array<string> $schemaNames
 	 */
@@ -741,11 +741,11 @@ final class OpenApiGenerator
 				'meta' => new SchemaObject(
 					type: 'object',
 					properties: [
-						'total' => new SchemaObject(type: 'integer'),
+						'totalCount' => new SchemaObject(type: 'integer'),
 						'limit' => new SchemaObject(type: 'integer'),
 						'offset' => new SchemaObject(type: 'integer'),
 					],
-					required: ['total', 'limit', 'offset'],
+					required: ['totalCount', 'limit', 'offset'],
 				),
 			],
 			required: ['data', 'meta'],

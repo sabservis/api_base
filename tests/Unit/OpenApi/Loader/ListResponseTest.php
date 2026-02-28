@@ -135,7 +135,7 @@ final class ListResponseTest extends TestCase
 
 		// Meta should have pagination fields
 		$metaProps = $paginatedSchema['properties']['meta']['properties'];
-		self::assertArrayHasKey('total', $metaProps);
+		self::assertArrayHasKey('totalCount', $metaProps);
 		self::assertArrayHasKey('limit', $metaProps);
 		self::assertArrayHasKey('offset', $metaProps);
 	}
@@ -318,7 +318,7 @@ final class ListResponseTest extends TestCase
 
 		// Meta should have pagination fields
 		$metaProps = $feedSchema['properties']['meta']['properties'];
-		self::assertArrayHasKey('total', $metaProps);
+		self::assertArrayHasKey('totalCount', $metaProps);
 		self::assertArrayHasKey('limit', $metaProps);
 		self::assertArrayHasKey('offset', $metaProps);
 	}

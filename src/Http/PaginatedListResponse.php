@@ -2,14 +2,17 @@
 
 namespace Sabservis\Api\Http;
 
+use JsonSerializable;
+
 /**
- * Response wrapper for list/collection endpoints with pagination metadata.
+ * Response wrapper for list/collection endpoints with data wrapper.
  *
- * Serializes as: { "data": [...], "meta": { "total": 100, "limit": 20, "offset": 0 } }
+ * Without meta: { "data": [...] }
+ * With meta: { "data": [...], "meta": { "totalCount": 100, "limit": 20, "offset": 0 } }
  *
  * @template T
  */
-final class PaginatedListResponse
+final class PaginatedListResponse implements JsonSerializable
 {
 
 	/**
@@ -27,9 +30,9 @@ final class PaginatedListResponse
 	 * @param array<TItem> $data
 	 * @return self<TItem>
 	 */
-	public static function create(array $data, int $total, int $limit, int $offset): self
+	public static function create(array $data, int $totalCount, int $limit, int $offset): self
 	{
-		return new self($data, new ListMeta($total, $limit, $offset));
+		return new self($data, new ListMeta($totalCount, $limit, $offset));
 	}
 
 	/**
@@ -43,6 +46,20 @@ final class PaginatedListResponse
 	public function getMeta(): ListMeta|null
 	{
 		return $this->meta;
+	}
+
+	/**
+	 * @return array{data: array<T>}|array{data: array<T>, meta: array{totalCount: int, limit: int, offset: int}}
+	 */
+	public function jsonSerialize(): array
+	{
+		$result = ['data' => $this->data];
+
+		if ($this->meta !== null) {
+			$result['meta'] = $this->meta->toArray();
+		}
+
+		return $result;
 	}
 
 }

@@ -13,9 +13,9 @@ final class ListMetaTest extends TestCase
 	#[Test]
 	public function createWithAllValues(): void
 	{
-		$meta = new ListMeta(total: 100, limit: 20, offset: 40);
+		$meta = new ListMeta(totalCount: 100, limit: 20, offset: 40);
 
-		self::assertSame(100, $meta->total);
+		self::assertSame(100, $meta->totalCount);
 		self::assertSame(20, $meta->limit);
 		self::assertSame(40, $meta->offset);
 	}
@@ -23,10 +23,10 @@ final class ListMetaTest extends TestCase
 	#[Test]
 	public function toArrayReturnsCorrectStructure(): void
 	{
-		$meta = new ListMeta(total: 50, limit: 10, offset: 0);
+		$meta = new ListMeta(totalCount: 50, limit: 10, offset: 0);
 
 		self::assertSame([
-			'total' => 50,
+			'totalCount' => 50,
 			'limit' => 10,
 			'offset' => 0,
 		], $meta->toArray());
@@ -35,10 +35,10 @@ final class ListMetaTest extends TestCase
 	#[Test]
 	public function jsonSerializeReturnsArray(): void
 	{
-		$meta = new ListMeta(total: 100, limit: 20, offset: 0);
+		$meta = new ListMeta(totalCount: 100, limit: 20, offset: 0);
 
 		self::assertSame(
-			'{"total":100,"limit":20,"offset":0}',
+			'{"totalCount":100,"limit":20,"offset":0}',
 			json_encode($meta),
 		);
 	}

@@ -280,7 +280,7 @@ final class OpenApiGeneratorEdgeCasesTest extends TestCase
 
 		// meta should have pagination fields
 		$metaProps = $responseSchema['properties']['meta']['properties'];
-		self::assertArrayHasKey('total', $metaProps);
+		self::assertArrayHasKey('totalCount', $metaProps);
 		self::assertArrayHasKey('limit', $metaProps);
 		self::assertArrayHasKey('offset', $metaProps);
 	}

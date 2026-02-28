@@ -11,7 +11,7 @@ final class ListMeta implements JsonSerializable
 {
 
 	public function __construct(
-		public readonly int $total,
+		public readonly int $totalCount,
 		public readonly int $limit,
 		public readonly int $offset,
 	)
@@ -19,19 +19,19 @@ final class ListMeta implements JsonSerializable
 	}
 
 	/**
-	 * @return array{total: int, limit: int, offset: int}
+	 * @return array{totalCount: int, limit: int, offset: int}
 	 */
 	public function toArray(): array
 	{
 		return [
-			'total' => $this->total,
+			'totalCount' => $this->totalCount,
 			'limit' => $this->limit,
 			'offset' => $this->offset,
 		];
 	}
 
 	/**
-	 * @return array{total: int, limit: int, offset: int}
+	 * @return array{totalCount: int, limit: int, offset: int}
 	 */
 	public function jsonSerialize(): array
 	{

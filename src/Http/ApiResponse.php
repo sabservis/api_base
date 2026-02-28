@@ -74,14 +74,14 @@ class ApiResponse
 	 */
 	public static function list(
 		array $data,
-		int|null $total = null,
+		int|null $totalCount = null,
 		int|null $limit = null,
 		int|null $offset = null,
 		bool $unwrapped = false,
 	): self
 	{
-		if ($total !== null) {
-			$listResponse = PaginatedListResponse::create($data, $total, $limit ?? 0, $offset ?? 0);
+		if ($totalCount !== null) {
+			$listResponse = PaginatedListResponse::create($data, $totalCount, $limit ?? 0, $offset ?? 0);
 		} elseif ($unwrapped) {
 			$listResponse = new ListResponse($data);
 		} else {

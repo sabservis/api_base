@@ -63,7 +63,7 @@ final class Response implements OpenApiAttributeInterface
 			$itemsSchema = $this->buildListItemsSchema();
 
 			if ($this->withMeta) {
-				// { data: [...], meta: { total, limit, offset } }
+				// { data: [...], meta: { totalCount, limit, offset } }
 				$spec['content'] = [
 					'application/json' => [
 						'schema' => [
@@ -76,7 +76,7 @@ final class Response implements OpenApiAttributeInterface
 								'meta' => [
 									'type' => 'object',
 									'properties' => [
-										'total' => ['type' => 'integer'],
+										'totalCount' => ['type' => 'integer'],
 										'limit' => ['type' => 'integer'],
 										'offset' => ['type' => 'integer'],
 									],

@@ -249,13 +249,13 @@ final class ApiResponseTest extends TestCase
 	{
 		$data = [['id' => 1], ['id' => 2]];
 
-		$response = ApiResponse::list($data, total: 100, limit: 20, offset: 0);
+		$response = ApiResponse::list($data, totalCount: 100, limit: 20, offset: 0);
 
 		self::assertSame(200, $response->getStatusCode());
 		$listResponse = $response->getObject();
 		self::assertInstanceOf(PaginatedListResponse::class, $listResponse);
 		self::assertSame($data, $listResponse->getData());
-		self::assertSame(100, $listResponse->getMeta()->total);
+		self::assertSame(100, $listResponse->getMeta()->totalCount);
 		self::assertSame(20, $listResponse->getMeta()->limit);
 		self::assertSame(0, $listResponse->getMeta()->offset);
 	}

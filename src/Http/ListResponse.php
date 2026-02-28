@@ -2,6 +2,8 @@
 
 namespace Sabservis\Api\Http;
 
+use JsonSerializable;
+
 /**
  * Response wrapper for list/collection endpoints without pagination.
  *
@@ -9,7 +11,7 @@ namespace Sabservis\Api\Http;
  *
  * @template T
  */
-final class ListResponse
+final class ListResponse implements JsonSerializable
 {
 
 	/** @param array<T> $data */
@@ -21,6 +23,14 @@ final class ListResponse
 	 * @return array<T>
 	 */
 	public function getData(): array
+	{
+		return $this->data;
+	}
+
+	/**
+	 * @return array<T>
+	 */
+	public function jsonSerialize(): array
 	{
 		return $this->data;
 	}

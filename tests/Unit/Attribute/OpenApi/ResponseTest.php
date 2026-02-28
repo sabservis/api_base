@@ -84,7 +84,7 @@ final class ResponseTest extends TestCase
 		// Check meta property
 		self::assertArrayHasKey('meta', $schema['properties']);
 		self::assertSame('object', $schema['properties']['meta']['type']);
-		self::assertArrayHasKey('total', $schema['properties']['meta']['properties']);
+		self::assertArrayHasKey('totalCount', $schema['properties']['meta']['properties']);
 		self::assertArrayHasKey('limit', $schema['properties']['meta']['properties']);
 		self::assertArrayHasKey('offset', $schema['properties']['meta']['properties']);
 
@@ -271,7 +271,7 @@ final class ResponseTest extends TestCase
 
 		// Check meta property
 		self::assertArrayHasKey('meta', $schema['properties']);
-		self::assertArrayHasKey('total', $schema['properties']['meta']['properties']);
+		self::assertArrayHasKey('totalCount', $schema['properties']['meta']['properties']);
 		self::assertArrayHasKey('limit', $schema['properties']['meta']['properties']);
 		self::assertArrayHasKey('offset', $schema['properties']['meta']['properties']);
 

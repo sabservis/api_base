@@ -107,14 +107,14 @@ final class DataMapperSerializerTest extends TestCase
 		$obj->name = 'John';
 		$obj->email = 'john@example.com';
 
-		$response = PaginatedListResponse::create([$obj], total: 1, limit: 20, offset: 0);
+		$response = PaginatedListResponse::create([$obj], totalCount: 1, limit: 20, offset: 0);
 		$result = $this->serializer->serialize($response);
 		$decoded = json_decode($result, true);
 
 		self::assertArrayHasKey('data', $decoded);
 		self::assertArrayHasKey('meta', $decoded);
 		self::assertSame('John', $decoded['data'][0]['name']);
-		self::assertSame(1, $decoded['meta']['total']);
+		self::assertSame(1, $decoded['meta']['totalCount']);
 	}
 
 	#[Test]
