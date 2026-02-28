@@ -12,12 +12,8 @@ namespace Sabservis\Api\Http;
 final class ListResponse
 {
 
-	/**
-	 * @param array<T> $data
-	 */
-	public function __construct(
-		private array $data,
-	)
+	/** @param array<T> $data */
+	public function __construct(private array $data)
 	{
 	}
 

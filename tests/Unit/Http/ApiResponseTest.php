@@ -218,7 +218,7 @@ final class ApiResponseTest extends TestCase
 	}
 
 	#[Test]
-	public function listFactoryWithoutMeta(): void
+	public function listFactoryDefaultIsDataWrapped(): void
 	{
 		$data = [['id' => 1], ['id' => 2]];
 
@@ -226,22 +226,22 @@ final class ApiResponseTest extends TestCase
 
 		self::assertSame(200, $response->getStatusCode());
 		$listResponse = $response->getObject();
-		self::assertInstanceOf(ListResponse::class, $listResponse);
-		self::assertSame($data, $listResponse->getData());
-	}
-
-	#[Test]
-	public function listFactoryWrapped(): void
-	{
-		$data = [['id' => 1], ['id' => 2]];
-
-		$response = ApiResponse::list($data, wrapped: true);
-
-		self::assertSame(200, $response->getStatusCode());
-		$listResponse = $response->getObject();
 		self::assertInstanceOf(PaginatedListResponse::class, $listResponse);
 		self::assertSame($data, $listResponse->getData());
 		self::assertNull($listResponse->getMeta());
+	}
+
+	#[Test]
+	public function listFactoryUnwrapped(): void
+	{
+		$data = [['id' => 1], ['id' => 2]];
+
+		$response = ApiResponse::list($data, unwrapped: true);
+
+		self::assertSame(200, $response->getStatusCode());
+		$listResponse = $response->getObject();
+		self::assertInstanceOf(ListResponse::class, $listResponse);
+		self::assertSame($data, $listResponse->getData());
 	}
 
 	#[Test]

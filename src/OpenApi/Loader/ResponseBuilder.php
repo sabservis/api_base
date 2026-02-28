@@ -82,10 +82,10 @@ final class ResponseBuilder
 
 				if ($response->withMeta) {
 					$responseData['wrapperType'] = EndpointResponse::WrapperListWithMeta;
-				} elseif ($response->wrapped) {
-					$responseData['wrapperType'] = EndpointResponse::WrapperListDataOnly;
-				} else {
+				} elseif ($response->unwrapped) {
 					$responseData['wrapperType'] = EndpointResponse::WrapperListNoMeta;
+				} else {
+					$responseData['wrapperType'] = EndpointResponse::WrapperListDataOnly;
 				}
 			}
 

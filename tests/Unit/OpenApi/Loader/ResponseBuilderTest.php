@@ -56,7 +56,7 @@ final class ResponseBuilderTest extends TestCase
 
 		self::assertArrayHasKey('200', $responses);
 		self::assertSame(ResponseUserDto::class, $responses['200']['entity']);
-		self::assertSame(EndpointResponse::WrapperListNoMeta, $responses['200']['wrapperType']);
+		self::assertSame(EndpointResponse::WrapperListDataOnly, $responses['200']['wrapperType']);
 	}
 
 	#[Test]
@@ -72,16 +72,16 @@ final class ResponseBuilderTest extends TestCase
 	}
 
 	#[Test]
-	public function parseResponseAttributesParsesListRefWrapped(): void
+	public function parseResponseAttributesParsesListRefUnwrapped(): void
 	{
-		$method = new ReflectionMethod(ResponseTestController::class, 'listUsersWrapped');
+		$method = new ReflectionMethod(ResponseTestController::class, 'listUsersUnwrapped');
 		$responses = [];
 
 		$this->builder->parseResponseAttributes($method, $responses);
 
 		self::assertArrayHasKey('200', $responses);
 		self::assertSame(ResponseUserDto::class, $responses['200']['entity']);
-		self::assertSame(EndpointResponse::WrapperListDataOnly, $responses['200']['wrapperType']);
+		self::assertSame(EndpointResponse::WrapperListNoMeta, $responses['200']['wrapperType']);
 	}
 
 	#[Test]
@@ -190,8 +190,8 @@ class ResponseTestController
 		// Test fixture - attributes are what matters
 	}
 
-	#[Response(response: 200, description: 'Wrapped list', listRef: ResponseUserDto::class, wrapped: true)]
-	public function listUsersWrapped(): void
+	#[Response(response: 200, description: 'Unwrapped list', listRef: ResponseUserDto::class, unwrapped: true)]
+	public function listUsersUnwrapped(): void
 	{
 		// Test fixture - attributes are what matters
 	}

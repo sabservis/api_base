@@ -68,6 +68,8 @@ class ApiResponse
 	/**
 	 * Create list response (with or without pagination meta).
 	 *
+	 * Default wraps in { data: [] }. Use unwrapped: true for plain array.
+	 *
 	 * @param array<mixed> $data
 	 */
 	public static function list(
@@ -75,15 +77,15 @@ class ApiResponse
 		int|null $total = null,
 		int|null $limit = null,
 		int|null $offset = null,
-		bool $wrapped = false,
+		bool $unwrapped = false,
 	): self
 	{
 		if ($total !== null) {
 			$listResponse = PaginatedListResponse::create($data, $total, $limit ?? 0, $offset ?? 0);
-		} elseif ($wrapped) {
-			$listResponse = new PaginatedListResponse($data);
-		} else {
+		} elseif ($unwrapped) {
 			$listResponse = new ListResponse($data);
+		} else {
+			$listResponse = new PaginatedListResponse($data);
 		}
 
 		return (new self(200))->withObject($listResponse);

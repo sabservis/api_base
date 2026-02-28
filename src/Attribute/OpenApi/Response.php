@@ -21,6 +21,8 @@ final class Response implements OpenApiAttributeInterface
 	 * @param class-string|string|null $ref Reference to a single DTO class
 	 * @param class-string|string|array<class-string|string>|null $listRef Reference to DTO class(es) for list response.
 	 *        Single class: array of that type. Array of classes: array with oneOf items.
+	 *        Default wraps in { data: [] }. Use unwrapped: true for plain array.
+	 * @param bool $unwrapped When true with listRef, produces plain array [...] instead of { data: [] }
 	 * @param bool $withMeta When true with listRef, wraps response in { data: [], meta: {} }
 	 * @param JsonContent|MediaType|array<JsonContent|MediaType>|null $content
 	 */
@@ -29,7 +31,7 @@ final class Response implements OpenApiAttributeInterface
 		public string|null $description = null,
 		public string|null $ref = null,
 		public string|array|null $listRef = null,
-		public bool $wrapped = false,
+		public bool $unwrapped = false,
 		public bool $withMeta = false,
 		JsonContent|MediaType|array|null $content = null,
 	)
@@ -84,8 +86,18 @@ final class Response implements OpenApiAttributeInterface
 						],
 					],
 				];
-			} elseif ($this->wrapped) {
-				// { data: [...] }
+			} elseif ($this->unwrapped) {
+				// Plain array: [...]
+				$spec['content'] = [
+					'application/json' => [
+						'schema' => [
+							'type' => 'array',
+							'items' => $itemsSchema,
+						],
+					],
+				];
+			} else {
+				// Default: { data: [...] }
 				$spec['content'] = [
 					'application/json' => [
 						'schema' => [
@@ -97,16 +109,6 @@ final class Response implements OpenApiAttributeInterface
 								],
 							],
 							'required' => ['data'],
-						],
-					],
-				];
-			} else {
-				// Plain array: [...]
-				$spec['content'] = [
-					'application/json' => [
-						'schema' => [
-							'type' => 'array',
-							'items' => $itemsSchema,
 						],
 					],
 				];

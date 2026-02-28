@@ -20,7 +20,7 @@ final class ListResponseTest extends TestCase
 {
 
 	#[Test]
-	public function listRefWithoutMetaGeneratesCorrectResponseData(): void
+	public function listRefDefaultGeneratesDataWrappedResponseData(): void
 	{
 		$containerBuilder = new ContainerBuilder();
 		$containerBuilder->addDefinition('testController')
@@ -49,7 +49,7 @@ final class ListResponseTest extends TestCase
 
 		$response = $listEndpoint['responses']['200'];
 		self::assertSame(ItemDto::class, $response['entity']);
-		self::assertSame(EndpointResponse::WrapperListNoMeta, $response['wrapperType']);
+		self::assertSame(EndpointResponse::WrapperListDataOnly, $response['wrapperType']);
 	}
 
 	#[Test]
@@ -108,13 +108,17 @@ final class ListResponseTest extends TestCase
 
 		$specArray = json_decode(json_encode($spec), true);
 
-		// Check /items endpoint (list without meta)
+		// Check /items endpoint (default: data-wrapped)
 		$itemsResponse = $specArray['paths']['/items']['get']['responses']['200'];
 		self::assertArrayHasKey('content', $itemsResponse);
 
 		$itemsSchema = $itemsResponse['content']['application/json']['schema'];
-		self::assertSame('array', $itemsSchema['type']);
-		self::assertSame('#/components/schemas/ItemDto', $itemsSchema['items']['$ref']);
+		self::assertSame('object', $itemsSchema['type']);
+		self::assertArrayHasKey('data', $itemsSchema['properties']);
+		self::assertArrayNotHasKey('meta', $itemsSchema['properties']);
+		self::assertSame('array', $itemsSchema['properties']['data']['type']);
+		self::assertSame('#/components/schemas/ItemDto', $itemsSchema['properties']['data']['items']['$ref']);
+		self::assertSame(['data'], $itemsSchema['required']);
 
 		// Check /items/paginated endpoint (list with meta)
 		$paginatedResponse = $specArray['paths']['/items/paginated']['get']['responses']['200'];
@@ -137,7 +141,7 @@ final class ListResponseTest extends TestCase
 	}
 
 	#[Test]
-	public function listRefWrappedGeneratesCorrectResponseData(): void
+	public function listRefUnwrappedGeneratesCorrectResponseData(): void
 	{
 		$containerBuilder = new ContainerBuilder();
 		$containerBuilder->addDefinition('testController')
@@ -148,28 +152,28 @@ final class ListResponseTest extends TestCase
 
 		$endpoints = $result['endpoints'];
 
-		// Find the wrapped endpoint
-		$wrappedEndpoint = null;
+		// Find the unwrapped endpoint
+		$unwrappedEndpoint = null;
 
 		foreach ($endpoints as $endpoint) {
-			if ($endpoint['methods'] === ['GET'] && $endpoint['mask'] === '/items/wrapped') {
-				$wrappedEndpoint = $endpoint;
+			if ($endpoint['methods'] === ['GET'] && $endpoint['mask'] === '/items/unwrapped') {
+				$unwrappedEndpoint = $endpoint;
 
 				break;
 			}
 		}
 
-		self::assertNotNull($wrappedEndpoint);
-		self::assertArrayHasKey('responses', $wrappedEndpoint);
-		self::assertArrayHasKey('200', $wrappedEndpoint['responses']);
+		self::assertNotNull($unwrappedEndpoint);
+		self::assertArrayHasKey('responses', $unwrappedEndpoint);
+		self::assertArrayHasKey('200', $unwrappedEndpoint['responses']);
 
-		$response = $wrappedEndpoint['responses']['200'];
+		$response = $unwrappedEndpoint['responses']['200'];
 		self::assertSame(ItemDto::class, $response['entity']);
-		self::assertSame(EndpointResponse::WrapperListDataOnly, $response['wrapperType']);
+		self::assertSame(EndpointResponse::WrapperListNoMeta, $response['wrapperType']);
 	}
 
 	#[Test]
-	public function listRefWrappedGeneratesCorrectOpenApiSpec(): void
+	public function listRefUnwrappedGeneratesCorrectOpenApiSpec(): void
 	{
 		$containerBuilder = new ContainerBuilder();
 		$containerBuilder->addDefinition('testController')
@@ -190,25 +194,17 @@ final class ListResponseTest extends TestCase
 
 		$specArray = json_decode(json_encode($spec), true);
 
-		// Check /items/wrapped endpoint (data-only wrapper)
-		$wrappedResponse = $specArray['paths']['/items/wrapped']['get']['responses']['200'];
-		self::assertArrayHasKey('content', $wrappedResponse);
+		// Check /items/unwrapped endpoint (plain array)
+		$unwrappedResponse = $specArray['paths']['/items/unwrapped']['get']['responses']['200'];
+		self::assertArrayHasKey('content', $unwrappedResponse);
 
-		$wrappedSchema = $wrappedResponse['content']['application/json']['schema'];
-		self::assertSame('object', $wrappedSchema['type']);
-		self::assertArrayHasKey('data', $wrappedSchema['properties']);
-		self::assertArrayNotHasKey('meta', $wrappedSchema['properties']);
-
-		// Data should be array of ItemDto
-		self::assertSame('array', $wrappedSchema['properties']['data']['type']);
-		self::assertSame('#/components/schemas/ItemDto', $wrappedSchema['properties']['data']['items']['$ref']);
-
-		// Required should only include data
-		self::assertSame(['data'], $wrappedSchema['required']);
+		$unwrappedSchema = $unwrappedResponse['content']['application/json']['schema'];
+		self::assertSame('array', $unwrappedSchema['type']);
+		self::assertSame('#/components/schemas/ItemDto', $unwrappedSchema['items']['$ref']);
 	}
 
 	#[Test]
-	public function listRefArrayWrappedGeneratesOneOfDataOnly(): void
+	public function listRefArrayDefaultGeneratesOneOfDataWrapped(): void
 	{
 		$containerBuilder = new ContainerBuilder();
 		$containerBuilder->addDefinition('testController')
@@ -229,8 +225,8 @@ final class ListResponseTest extends TestCase
 
 		$specArray = json_decode(json_encode($spec), true);
 
-		// Check /feed/wrapped endpoint (data-only wrapper with oneOf)
-		$feedResponse = $specArray['paths']['/feed/wrapped']['get']['responses']['200'];
+		// Check /feed endpoint (default: data-only wrapper with oneOf)
+		$feedResponse = $specArray['paths']['/feed']['get']['responses']['200'];
 		self::assertArrayHasKey('content', $feedResponse);
 
 		$feedSchema = $feedResponse['content']['application/json']['schema'];
@@ -244,10 +240,14 @@ final class ListResponseTest extends TestCase
 		self::assertCount(2, $feedSchema['properties']['data']['items']['oneOf']);
 
 		self::assertSame(['data'], $feedSchema['required']);
+
+		// Check schemas are registered
+		self::assertArrayHasKey('ArticleItemDto', $specArray['components']['schemas']);
+		self::assertArrayHasKey('VideoItemDto', $specArray['components']['schemas']);
 	}
 
 	#[Test]
-	public function listRefArrayGeneratesOneOfWithoutMeta(): void
+	public function listRefArrayUnwrappedGeneratesOneOfPlainArray(): void
 	{
 		$containerBuilder = new ContainerBuilder();
 		$containerBuilder->addDefinition('testController')
@@ -256,32 +256,26 @@ final class ListResponseTest extends TestCase
 		$loader = new OpenApiAttributeLoader($containerBuilder);
 		$result = $loader->load();
 
-		// Hydrate endpoints
 		$hydrator = new ArrayHydrator();
 		$schema = $hydrator->hydrate([
 			'endpoints' => $result['endpoints'],
 			'tags' => $result['tags'],
 		]);
 
-		// Generate OpenAPI spec
 		$config = new OpenApiConfig(title: 'Test API', version: '1.0.0');
 		$generator = new OpenApiGenerator($config);
 		$spec = $generator->generate($schema);
 
 		$specArray = json_decode(json_encode($spec), true);
 
-		// Check /feed endpoint (list without meta, oneOf)
-		$feedResponse = $specArray['paths']['/feed']['get']['responses']['200'];
+		// Check /feed/unwrapped endpoint (plain array with oneOf)
+		$feedResponse = $specArray['paths']['/feed/unwrapped']['get']['responses']['200'];
 		self::assertArrayHasKey('content', $feedResponse);
 
 		$feedSchema = $feedResponse['content']['application/json']['schema'];
 		self::assertSame('array', $feedSchema['type']);
 		self::assertArrayHasKey('oneOf', $feedSchema['items']);
 		self::assertCount(2, $feedSchema['items']['oneOf']);
-
-		// Check schemas are registered
-		self::assertArrayHasKey('ArticleItemDto', $specArray['components']['schemas']);
-		self::assertArrayHasKey('VideoItemDto', $specArray['components']['schemas']);
 	}
 
 	#[Test]
@@ -350,9 +344,9 @@ class ListResponseController implements Controller
 		return [];
 	}
 
-	#[Get(path: '/items/wrapped')]
-	#[Response(listRef: ItemDto::class, wrapped: true)]
-	public function listWrapped(): array
+	#[Get(path: '/items/unwrapped')]
+	#[Response(listRef: ItemDto::class, unwrapped: true)]
+	public function listUnwrapped(): array
 	{
 		return [];
 	}
@@ -376,9 +370,9 @@ class ListOneOfController implements Controller
 		return [];
 	}
 
-	#[Get(path: '/feed/wrapped')]
-	#[Response(listRef: [ArticleItemDto::class, VideoItemDto::class], wrapped: true)]
-	public function feedWrapped(): array
+	#[Get(path: '/feed/unwrapped')]
+	#[Response(listRef: [ArticleItemDto::class, VideoItemDto::class], unwrapped: true)]
+	public function feedUnwrapped(): array
 	{
 		return [];
 	}
