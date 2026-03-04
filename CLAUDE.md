@@ -8,7 +8,7 @@ src/
 ├── Attribute/       PHP 8 atributy pro routing a OpenAPI
 ├── DI/              ApiExtension pro Nette DI
 ├── Dispatcher/      ApiDispatcher - orchestrace happy path
-├── ErrorHandler/    ErrorHandler interface
+├── ErrorHandler/    ErrorHandler interface, ErrorResponseBuilder, TraceIdProvider/ErrorContextFilter/ErrorResponseTransformer interfaces
 ├── Exception/       ApiException hierarchie + ErrorMessages konstanty
 ├── Handler/         ServiceHandler - volání controller metod
 ├── Http/            ApiRequest/ApiResponse (immutable), FileResponse, UploadedFile
@@ -45,6 +45,12 @@ ApiException (ExceptionExtra trait)
 ├── ClientErrorException (400-499) → ValidationException (422)
 └── ServerErrorException (500-599)
 ```
+
+**ErrorResponseBuilder customizace (autowiring):**
+- `TraceIdProvider` → přidá `traceId` do error response
+- `ErrorContextFilter` → filtruje context data
+- `ErrorResponseTransformer` → modifikuje celý response před JSON serializací
+- Zaregistruj implementaci jako service → framework autowirne do builderu
 
 ## Middleware priority (nižší = dříve)
 

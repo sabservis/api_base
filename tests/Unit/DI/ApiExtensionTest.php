@@ -8,11 +8,14 @@ use Nette\DI\ContainerLoader;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Pocta\DataMapper\Validation\ValidatorResolverInterface;
+use ReflectionProperty;
 use Sabservis\Api\Application\ApiApplication;
 use Sabservis\Api\DI\ApiExtension;
 use Sabservis\Api\Dispatcher\ApiDispatcher;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
+use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
+use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\RequestParameterMapping;
@@ -24,6 +27,7 @@ use Sabservis\Api\Mapping\Validator\EntityValidator;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Security\AuthorizationChecker;
+use function json_decode;
 use function sys_get_temp_dir;
 use function uniqid;
 
@@ -38,6 +42,7 @@ final class ApiExtensionTest extends TestCase
 		self::assertTrue($container->hasService('api.application'));
 		self::assertTrue($container->hasService('api.dispatcher'));
 		self::assertTrue($container->hasService('api.errorHandler'));
+		self::assertTrue($container->hasService('api.errorResponseBuilder'));
 		self::assertTrue($container->hasService('api.router'));
 		self::assertTrue($container->hasService('api.handler'));
 		self::assertTrue($container->hasService('api.schema'));
@@ -53,6 +58,7 @@ final class ApiExtensionTest extends TestCase
 		self::assertInstanceOf(ApiApplication::class, $container->getService('api.application'));
 		self::assertInstanceOf(ApiDispatcher::class, $container->getService('api.dispatcher'));
 		self::assertInstanceOf(ErrorHandler::class, $container->getService('api.errorHandler'));
+		self::assertInstanceOf(ErrorResponseBuilder::class, $container->getService('api.errorResponseBuilder'));
 		self::assertInstanceOf(Router::class, $container->getService('api.router'));
 		self::assertInstanceOf(ServiceHandler::class, $container->getService('api.handler'));
 		self::assertInstanceOf(Schema::class, $container->getService('api.schema'));
@@ -210,6 +216,123 @@ final class ApiExtensionTest extends TestCase
 		self::assertTrue($container->hasService('api.router'));
 	}
 
+	// === ErrorResponseBuilder DI Tests ===
+
+	#[Test]
+	public function registersErrorResponseBuilder(): void
+	{
+		$container = $this->createContainer([]);
+
+		self::assertTrue($container->hasService('api.errorResponseBuilder'));
+		self::assertInstanceOf(
+			ErrorResponseBuilder::class,
+			$container->getService('api.errorResponseBuilder'),
+		);
+	}
+
+	#[Test]
+	public function errorResponseBuilderIsInjectedIntoErrorHandler(): void
+	{
+		$container = $this->createContainer([]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		$errorHandler = $container->getService('api.errorHandler');
+
+		$ref = new ReflectionProperty(SimpleErrorHandler::class, 'responseBuilder');
+		self::assertSame($builder, $ref->getValue($errorHandler));
+	}
+
+	#[Test]
+	public function autowiresTraceIdProviderIntoBuilder(): void
+	{
+		$container = $this->createContainerWithServices([
+			TestTraceIdProvider::class,
+		]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		self::assertInstanceOf(ErrorResponseBuilder::class, $builder);
+
+		$response = $builder->build(new ClientErrorException('Test', 400));
+		$body = json_decode($response->getBody(), true);
+
+		self::assertArrayHasKey('traceId', $body);
+		self::assertSame('test-trace-id', $body['traceId']);
+	}
+
+	#[Test]
+	public function autowiresErrorContextFilterIntoBuilder(): void
+	{
+		$container = $this->createContainerWithServices([
+			TestErrorContextFilter::class,
+		]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		self::assertInstanceOf(ErrorResponseBuilder::class, $builder);
+
+		$response = $builder->build(
+			(new ClientErrorException('Test', 400))->withContext(['keep' => 'yes', 'strip_me' => 'gone']),
+		);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertArrayHasKey('keep', $body['context']);
+		self::assertArrayNotHasKey('strip_me', $body['context']);
+	}
+
+	#[Test]
+	public function autowiresErrorResponseTransformerIntoBuilder(): void
+	{
+		$container = $this->createContainerWithServices([
+			TestErrorResponseTransformer::class,
+		]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		self::assertInstanceOf(ErrorResponseBuilder::class, $builder);
+
+		$response = $builder->build(new ClientErrorException('Test', 400));
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame('https://support.example.com', $body['support']);
+	}
+
+	#[Test]
+	public function disableContextViaConfig(): void
+	{
+		$container = $this->createContainer([
+			'errorResponse' => [
+				'includeContext' => false,
+			],
+		]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		self::assertInstanceOf(ErrorResponseBuilder::class, $builder);
+
+		$response = $builder->build(
+			(new ClientErrorException('Test', 400))->withContext(['field' => 'email']),
+		);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertArrayNotHasKey('context', $body);
+	}
+
+	#[Test]
+	public function defaultConfigPreservesExistingBehavior(): void
+	{
+		$container = $this->createContainer([]);
+
+		$builder = $container->getService('api.errorResponseBuilder');
+		self::assertInstanceOf(ErrorResponseBuilder::class, $builder);
+
+		$response = $builder->build(
+			(new ClientErrorException('Test error', 400))->withContext(['field' => 'email']),
+		);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame(400, $body['code']);
+		self::assertSame('Test error', $body['message']);
+		self::assertArrayHasKey('context', $body);
+		self::assertArrayNotHasKey('traceId', $body);
+	}
+
 	/**
 	 * @param array<string, mixed> $config
 	 */
@@ -233,6 +356,73 @@ final class ApiExtensionTest extends TestCase
 		$class = $loader->load($callback, uniqid('container_', true));
 
 		return new $class();
+	}
+
+	/**
+	 * @param array<string, mixed> $config
+	 * @param list<class-string> $services
+	 */
+	private function createContainerWithServices(array $services, array $config = []): Container
+	{
+		$tempDir = sys_get_temp_dir() . '/nette-test-' . uniqid('', true);
+		@mkdir($tempDir, 0o777, true); // @phpcs:ignore
+
+		$loader = new ContainerLoader($tempDir, true);
+		// phpcs:ignore SlevomatCodingStandard.Functions.StaticClosure.ClosureNotStatic
+		$callback = function (Compiler $compiler) use ($config, $services): void {
+			$compiler->addExtension('api', new ApiExtension());
+			$serviceDefinitions = [];
+			foreach ($services as $service) {
+				$serviceDefinitions[] = $service;
+			}
+			$compiler->addConfig([
+				'parameters' => [
+					'productionMode' => false,
+				],
+				'api' => $config,
+				'services' => $serviceDefinitions,
+			]);
+		};
+		/** @var class-string<Container> $class */
+		$class = $loader->load($callback, uniqid('container_', true));
+
+		return new $class();
+	}
+
+}
+
+// Test fixtures
+
+final class TestTraceIdProvider implements \Sabservis\Api\ErrorHandler\TraceIdProvider
+{
+
+	public function get(): string|null
+	{
+		return 'test-trace-id';
+	}
+
+}
+
+final class TestErrorContextFilter implements \Sabservis\Api\ErrorHandler\ErrorContextFilter
+{
+
+	public function filter(array $context): array
+	{
+		unset($context['strip_me']);
+
+		return $context;
+	}
+
+}
+
+final class TestErrorResponseTransformer implements \Sabservis\Api\ErrorHandler\ErrorResponseTransformer
+{
+
+	public function transform(array $data, \Throwable $error): array
+	{
+		$data['support'] = 'https://support.example.com';
+
+		return $data;
 	}
 
 }

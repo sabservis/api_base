@@ -13,8 +13,12 @@ use Sabservis\Api\Application;
 use Sabservis\Api\Attribute;
 use Sabservis\Api\Dispatcher\ApiDispatcher;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
+use Sabservis\Api\ErrorHandler\ErrorContextFilter;
+use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
+use Sabservis\Api\ErrorHandler\ErrorResponseTransformer;
 use Sabservis\Api\ErrorHandler\PsrLogErrorHandler;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
+use Sabservis\Api\ErrorHandler\TraceIdProvider;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
@@ -97,6 +101,9 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 				'maxAge' => Nette\Schema\Expect::int(3_600),
 				'exposedHeaders' => Nette\Schema\Expect::arrayOf('string')->default([]),
 			]),
+			'errorResponse' => Nette\Schema\Expect::structure([
+				'includeContext' => Nette\Schema\Expect::bool(true),
+			]),
 		]);
 	}
 
@@ -141,6 +148,31 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			} catch (Nette\DI\MissingServiceException) {
 				// No need to handle
 			}
+		}
+
+		// Autowire ErrorResponseBuilder hooks
+		$builderDef = $builder->getDefinition($this->prefix('errorResponseBuilder'));
+		assert($builderDef instanceof Nette\DI\Definitions\ServiceDefinition);
+
+		try {
+			$traceIdProvider = $builder->getDefinitionByType(TraceIdProvider::class);
+			$builderDef->addSetup('setTraceIdProvider', [$traceIdProvider]);
+		} catch (Nette\DI\MissingServiceException) {
+			// No TraceIdProvider registered
+		}
+
+		try {
+			$contextFilter = $builder->getDefinitionByType(ErrorContextFilter::class);
+			$builderDef->addSetup('setContextFilter', [$contextFilter]);
+		} catch (Nette\DI\MissingServiceException) {
+			// No ErrorContextFilter registered
+		}
+
+		try {
+			$responseTransformer = $builder->getDefinitionByType(ErrorResponseTransformer::class);
+			$builderDef->addSetup('setResponseTransformer', [$responseTransformer]);
+		} catch (Nette\DI\MissingServiceException) {
+			// No ErrorResponseTransformer registered
 		}
 
 		// Add CORS middleware to chain first (needs to run before other middlewares for preflight)
@@ -292,6 +324,16 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		$builder->addDefinition($this->prefix('authorization.checker'))
 			->setFactory(AuthorizationChecker::class);
+
+		// ErrorResponseBuilder
+		$builder->addDefinition($this->prefix('errorResponseBuilder'))
+			->setFactory(ErrorResponseBuilder::class);
+
+		if ($config->errorResponse->includeContext === false) {
+			$builderDef = $builder->getDefinition($this->prefix('errorResponseBuilder'));
+			assert($builderDef instanceof Nette\DI\Definitions\ServiceDefinition);
+			$builderDef->addSetup('disableContext');
+		}
 
 		$builder->addDefinition($this->prefix('errorHandler'))
 			->setFactory($config->errorHandler)

@@ -6,6 +6,7 @@ use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\ApiException;
 use Sabservis\Api\Http\ApiResponse;
 use Throwable;
+use Closure;
 use function array_map;
 use function get_debug_type;
 use function is_array;
@@ -63,22 +64,11 @@ final class ErrorResponseBuilder
 		'/ssn/i',
 	];
 
-	/**
-	 * Custom context filter callback.
-	 * Signature: fn(array $context): array
-	 *
-	 * @var callable|null
-	 */
-	private $contextFilter = null;
+	private ErrorContextFilter|null $contextFilter = null;
 
-	/**
-	 * Provider for trace ID (e.g. Sentry trace ID).
-	 * Signature: fn(): ?string
-	 *
-	 * @var (callable(): ?string)|null
-	 */
-	private $traceIdProvider = null;
+	private TraceIdProvider|null $traceIdProvider = null;
 
+	private ErrorResponseTransformer|null $responseTransformer = null;
 	/**
 	 * Whether to include context in responses at all.
 	 */
@@ -89,11 +79,24 @@ final class ErrorResponseBuilder
 	 *
 	 * The filter receives the context array and should return a filtered array.
 	 * This is called AFTER the default sensitive key filtering.
-	 *
-	 * @param callable(array<string, mixed>): array<string, mixed> $filter
 	 */
-	public function setContextFilter(callable $filter): self
+	public function setContextFilter(ErrorContextFilter|Closure $filter): self
 	{
+		if ($filter instanceof Closure) {
+			$filter = new class ($filter) implements ErrorContextFilter {
+
+				public function __construct(private readonly Closure $fn)
+				{
+				}
+
+				public function filter(array $context): array
+				{
+					return ($this->fn)($context);
+				}
+
+			};
+		}
+
 		$this->contextFilter = $filter;
 
 		return $this;
@@ -103,13 +106,54 @@ final class ErrorResponseBuilder
 	 * Set trace ID provider.
 	 *
 	 * The provider is called on each error response. If it returns a non-null string,
-	 * the trace ID is included in the response (e.g. for Sentry correlation).
-	 *
-	 * @param callable(): ?string $provider
+	 * the trace ID is included in the response (e.g. for request correlation).
 	 */
-	public function setTraceIdProvider(callable $provider): self
+	public function setTraceIdProvider(TraceIdProvider|Closure $provider): self
 	{
+		if ($provider instanceof Closure) {
+			$provider = new class ($provider) implements TraceIdProvider {
+
+				public function __construct(private readonly Closure $fn)
+				{
+				}
+
+				public function get(): string|null
+				{
+					return ($this->fn)();
+				}
+
+			};
+		}
+
 		$this->traceIdProvider = $provider;
+
+		return $this;
+	}
+
+	/**
+	 * Set response transformer.
+	 *
+	 * The transformer receives the complete response data array and the original exception.
+	 * Called as the last step before JSON serialization — after traceId, context, and sanitization.
+	 */
+	public function setResponseTransformer(ErrorResponseTransformer|Closure $transformer): self
+	{
+		if ($transformer instanceof Closure) {
+			$transformer = new class ($transformer) implements ErrorResponseTransformer {
+
+				public function __construct(private readonly Closure $fn)
+				{
+				}
+
+				public function transform(array $data, Throwable $error): array
+				{
+					return ($this->fn)($data, $error);
+				}
+
+			};
+		}
+
+		$this->responseTransformer = $transformer;
 
 		return $this;
 	}
@@ -171,11 +215,14 @@ final class ErrorResponseBuilder
 
 		// Add trace ID if provider is configured
 		if ($this->traceIdProvider !== null) {
-			$traceId = ($this->traceIdProvider)();
-
+			$traceId = $this->traceIdProvider->get();
 			if ($traceId !== null) {
 				$data['traceId'] = $traceId;
 			}
+		}
+		// Apply transformer if configured
+		if ($this->responseTransformer !== null) {
+			$data = $this->responseTransformer->transform($data, $error);
 		}
 
 		return (new ApiResponse())
@@ -184,7 +231,7 @@ final class ErrorResponseBuilder
 	}
 
 	/**
-	 * @return array{code: int, message: string, context?: mixed}
+	 * @return array<string, mixed>
 	 */
 	private function buildData(Throwable $error, bool $includeTrace): array
 	{
@@ -202,8 +249,7 @@ final class ErrorResponseBuilder
 
 		// Add trace ID if provider is configured
 		if ($this->traceIdProvider !== null) {
-			$traceId = ($this->traceIdProvider)();
-
+			$traceId = $this->traceIdProvider->get();
 			if ($traceId !== null) {
 				$data['traceId'] = $traceId;
 			}
@@ -222,6 +268,11 @@ final class ErrorResponseBuilder
 			// Debug mode without ApiException context - show sanitized stack trace
 			// SECURITY: Never include function arguments - they may contain passwords, tokens, etc.
 			$data['context'] = $this->sanitizeTrace($error->getTrace());
+		}
+
+		// Apply transformer if configured
+		if ($this->responseTransformer !== null) {
+			$data = $this->responseTransformer->transform($data, $error);
 		}
 
 		return $data;
@@ -272,7 +323,7 @@ final class ErrorResponseBuilder
 
 		// Apply custom filter if configured
 		if ($this->contextFilter !== null) {
-			$filtered = ($this->contextFilter)($filtered);
+			$filtered = $this->contextFilter->filter($filtered);
 		}
 
 		return $filtered;

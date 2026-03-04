@@ -5,6 +5,9 @@ namespace Tests\Unit\ErrorHandler;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
+use Sabservis\Api\ErrorHandler\ErrorContextFilter;
+use Sabservis\Api\ErrorHandler\ErrorResponseTransformer;
+use Sabservis\Api\ErrorHandler\TraceIdProvider;
 use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
@@ -575,6 +578,149 @@ final class ErrorResponseBuilderTest extends TestCase
 		self::assertArrayNotHasKey('Token', $body['context']);
 		self::assertArrayNotHasKey('API_KEY', $body['context']);
 		self::assertArrayNotHasKey('Secret', $body['context']);
+	}
+
+	// === Interface Acceptance Tests ===
+
+	#[Test]
+	public function acceptsTraceIdProviderInterface(): void
+	{
+		$provider = new class implements TraceIdProvider {
+			public function get(): string|null { return 'interface-trace-id'; }
+		};
+
+		$this->builder->setTraceIdProvider($provider);
+
+		$response = $this->builder->build(new ClientErrorException('Error', 400));
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame('interface-trace-id', $body['traceId']);
+	}
+
+	#[Test]
+	public function acceptsErrorContextFilterInterface(): void
+	{
+		$filter = new class implements ErrorContextFilter {
+			public function filter(array $context): array
+			{
+				unset($context['remove_me']);
+				return $context;
+			}
+		};
+
+		$this->builder->setContextFilter($filter);
+
+		$exception = (new ClientErrorException('Error', 400))
+			->withContext(['keep' => 'yes', 'remove_me' => 'gone']);
+
+		$response = $this->builder->build($exception);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertArrayHasKey('keep', $body['context']);
+		self::assertArrayNotHasKey('remove_me', $body['context']);
+	}
+
+	// === Response Transformer Tests ===
+
+	#[Test]
+	public function responseTransformerModifiesBuildOutput(): void
+	{
+		$transformer = new class implements ErrorResponseTransformer {
+			public function transform(array $data, \Throwable $error): array
+			{
+				$data['support'] = 'https://support.example.com';
+				return $data;
+			}
+		};
+
+		$this->builder->setResponseTransformer($transformer);
+
+		$response = $this->builder->build(new ClientErrorException('Error', 400));
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame(400, $body['code']);
+		self::assertSame('https://support.example.com', $body['support']);
+	}
+
+	#[Test]
+	public function responseTransformerModifiesBuildFatalOutput(): void
+	{
+		$transformer = new class implements ErrorResponseTransformer {
+			public function transform(array $data, \Throwable $error): array
+			{
+				$data['support'] = 'https://support.example.com';
+				return $data;
+			}
+		};
+
+		$this->builder->setResponseTransformer($transformer);
+
+		$response = $this->builder->buildFatal(new RuntimeException('Fatal'), debugMode: false);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame(500, $body['code']);
+		self::assertSame('https://support.example.com', $body['support']);
+	}
+
+	#[Test]
+	public function responseTransformerReceivesOriginalException(): void
+	{
+		$receivedException = null;
+
+		$transformer = new class($receivedException) implements ErrorResponseTransformer {
+			public function __construct(private mixed &$ref) {}
+			public function transform(array $data, \Throwable $error): array
+			{
+				$this->ref = $error;
+				return $data;
+			}
+		};
+
+		$original = new ClientErrorException('Original', 422);
+		$this->builder->setResponseTransformer($transformer);
+		$this->builder->build($original);
+
+		self::assertSame($original, $receivedException);
+	}
+
+	#[Test]
+	public function responseTransformerAcceptsClosure(): void
+	{
+		$this->builder->setResponseTransformer(
+			static function (array $data, \Throwable $error): array {
+				$data['custom'] = 'closure-value';
+				return $data;
+			},
+		);
+
+		$response = $this->builder->build(new ClientErrorException('Error', 400));
+		$body = json_decode($response->getBody(), true);
+
+		self::assertSame('closure-value', $body['custom']);
+	}
+
+	#[Test]
+	public function responseTransformerRunsAfterTraceIdAndContext(): void
+	{
+		$this->builder->setTraceIdProvider(static fn () => 'trace-123');
+
+		$this->builder->setResponseTransformer(
+			static function (array $data, \Throwable $error): array {
+				// Transformer sees both traceId and context
+				$data['hasTraceId'] = isset($data['traceId']);
+				$data['hasContext'] = isset($data['context']);
+				return $data;
+			},
+		);
+
+		$exception = (new ClientErrorException('Error', 400))
+			->withContext(['field' => 'email']);
+
+		$response = $this->builder->build($exception);
+		$body = json_decode($response->getBody(), true);
+
+		self::assertTrue($body['hasTraceId']);
+		self::assertTrue($body['hasContext']);
 	}
 
 }
