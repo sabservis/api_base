@@ -9,15 +9,23 @@ use ReflectionProperty;
 use ReflectionType;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use function class_exists;
 use function array_key_exists;
 use function filter_var;
 use function is_array;
+use function is_string;
 use function is_subclass_of;
 use const FILTER_VALIDATE_BOOLEAN;
 
 class MultipartEntityHydrator
 {
 
+	public function __construct(
+		private readonly EntitySerializer|null $entitySerializer = null,
+	)
+	{
+	}
 	/**
 	 * Hydrate a DTO instance from a multipart/form-data request.
 	 *
@@ -113,6 +121,14 @@ class MultipartEntityHydrator
 				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
 				/** @var class-string<BackedEnum> $typeName */
 				$property->setValue($instance, $typeName::from($value));
+
+				return;
+			}
+
+			// Nested object from JSON string (multipart form-data)
+			if (is_string($value) && class_exists($typeName) && $this->entitySerializer !== null) {
+				$nested = $this->entitySerializer->deserialize($value, $typeName);
+				$property->setValue($instance, $nested);
 
 				return;
 			}

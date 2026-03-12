@@ -8,6 +8,7 @@ use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
+use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 
 enum TestCategory: string
 {
@@ -90,6 +91,33 @@ class FloatPropertyDto
 
 }
 
+class NestedAddressDto
+{
+
+	public string $street;
+
+	public string $city;
+
+}
+
+class ParentWithNestedObjectDto
+{
+
+	public string $name;
+
+	public NestedAddressDto $address;
+
+}
+
+class ParentWithNullableNestedObjectDto
+{
+
+	public string $name;
+
+	public ?NestedAddressDto $address = null;
+
+}
+
 final class MultipartEntityHydratorTest extends TestCase
 {
 
@@ -97,7 +125,7 @@ final class MultipartEntityHydratorTest extends TestCase
 
 	protected function setUp(): void
 	{
-		$this->hydrator = new MultipartEntityHydrator();
+		$this->hydrator = new MultipartEntityHydrator(new DataMapperSerializer());
 	}
 
 	#[Test]
@@ -216,6 +244,37 @@ final class MultipartEntityHydratorTest extends TestCase
 
 		self::assertInstanceOf(DefaultValueDto::class, $dto);
 		self::assertSame('draft', $dto->status);
+	}
+
+	#[Test]
+	public function hydratesNestedObjectFromJsonString(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody([
+				'name' => 'John',
+				'address' => '{"street":"Main St","city":"Prague"}',
+			]);
+
+		$dto = $this->hydrator->hydrate($request, ParentWithNestedObjectDto::class);
+
+		self::assertInstanceOf(ParentWithNestedObjectDto::class, $dto);
+		self::assertSame('John', $dto->name);
+		self::assertInstanceOf(NestedAddressDto::class, $dto->address);
+		self::assertSame('Main St', $dto->address->street);
+		self::assertSame('Prague', $dto->address->city);
+	}
+
+	#[Test]
+	public function hydratesNullableNestedObjectAsNullWhenMissing(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['name' => 'John']);
+
+		$dto = $this->hydrator->hydrate($request, ParentWithNullableNestedObjectDto::class);
+
+		self::assertInstanceOf(ParentWithNullableNestedObjectDto::class, $dto);
+		self::assertSame('John', $dto->name);
+		self::assertNull($dto->address);
 	}
 
 }
