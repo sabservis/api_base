@@ -13,7 +13,7 @@
 		"ext-fileinfo": "*",
 		"ext-mbstring": "*",
 		"nette/di": "^3.2",
-		"symfony/cache": "^6.4",
+		"symfony/cache": "^6.4 || ^7.0",
 		"igorpocta/data-mapper": "^1.8",
 		"psr/simple-cache": "^3.0",
 		"tracy/tracy": "^2.10"

@@ -128,3 +128,41 @@ jobs:
                     git add .github/badges/tests.json .github/badges/assertions.json
                     git commit -m "chore: update test badges [skip ci]"
                     git push
+
+    tests-symfony7:
+        if: ${{ github.event_name != 'push' || !contains(github.event.head_commit.message, '[skip ci]') }}
+        name: PHPUnit (Symfony Cache 7, PHP ${{ matrix.php-version }})
+        runs-on: ubuntu-latest
+        strategy:
+            fail-fast: false
+            matrix:
+                php-version:
+                    - '8.2'
+                    - '8.3'
+
+        steps:
+            -   name: Checkout repository
+                uses: actions/checkout@v4
+
+            -   name: Set up PHP
+                uses: shivammathur/setup-php@v2
+                with:
+                    php-version: ${{ matrix.php-version }}
+                    extensions: mbstring, intl, pdo_mysql, gd, zip, pcntl, bcmath, soap, tokenizer
+                    coverage: none
+
+            -   name: Force Symfony Cache 7
+                run: |
+                    composer require --no-update "symfony/cache:^7.0"
+
+            -   name: Install dependencies
+                run: |
+                    composer update --prefer-dist --no-progress --with-all-dependencies
+
+            -   name: Verify Symfony Cache 7 is installed
+                run: |
+                    composer show symfony/cache | grep -E "versions\s*:\s*\*?\s*v?7\." || { echo "Expected Symfony Cache 7.x"; exit 1; }
+
+            -   name: Run PHPUnit
+                run: |
+                    ./vendor/bin/phpunit
