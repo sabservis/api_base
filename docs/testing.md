@@ -77,6 +77,19 @@ $response = $this->client
     ->get('/api/users', ['accept' => 'application/json']);
 ```
 
+## Query string a server params
+
+```php
+// Query string se rozparsuje do query parametrů (jako $_GET)
+$client->get('/api/users?limit=5&tags[]=a&tags[]=b');
+
+// $_SERVER hodnoty - klientská IP, HTTPS (rate limit, trustedProxies, EnforceHttps)
+$client->withServerParams(['REMOTE_ADDR' => '10.0.0.1', 'HTTPS' => 'on']);
+
+// Jen pro jeden request (přepíše výchozí)
+$client->request('GET', '/api/users', serverParams: ['REMOTE_ADDR' => '10.0.0.2']);
+```
+
 ## TestResponse assertions
 
 ### Status kódy

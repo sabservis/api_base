@@ -455,4 +455,69 @@ final class ApiTestClientTest extends TestCase
 		self::assertNull($response->json());
 	}
 
+	#[Test]
+	public function queryStringIsParsedIntoQueryParams(): void
+	{
+		$request = $this->capture(
+			static fn (ApiTestClient $client) => $client->get('/users?limit=5&tags[]=a&tags[]=b'),
+		);
+
+		self::assertSame(['limit' => '5', 'tags' => ['a', 'b']], $request->getQueryParams());
+		self::assertSame('/users', $request->getPath());
+	}
+
+	#[Test]
+	public function uriWithoutQueryHasEmptyQueryParams(): void
+	{
+		$request = $this->capture(static fn (ApiTestClient $client) => $client->get('/users'));
+
+		self::assertSame([], $request->getQueryParams());
+	}
+
+	#[Test]
+	public function requestAcceptsServerParams(): void
+	{
+		$request = $this->capture(
+			static fn (ApiTestClient $client) => $client->request(
+				'GET',
+				'/users',
+				serverParams: ['REMOTE_ADDR' => '10.0.0.1'],
+			),
+		);
+
+		self::assertSame('10.0.0.1', $request->getClientIp());
+	}
+
+	#[Test]
+	public function withServerParamsSetsDefaultsAndRequestOverrides(): void
+	{
+		$request = $this->capture(
+			static fn (ApiTestClient $client) => $client
+				->withServerParams(['HTTPS' => 'on', 'REMOTE_ADDR' => '10.0.0.1'])
+				->request('GET', '/users', serverParams: ['REMOTE_ADDR' => '10.0.0.2']),
+		);
+
+		self::assertTrue($request->isSecured());
+		self::assertSame('10.0.0.2', $request->getClientIp());
+	}
+
+	/**
+	 * @param callable(ApiTestClient): mixed $send
+	 */
+	private function capture(callable $send): ApiRequest
+	{
+		$received = null;
+
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use (&$received): ApiResponse {
+			$received = $request;
+
+			return $response->withStatus(200);
+		};
+
+		$send(new ApiTestClient(new ApiApplication($chain)));
+		self::assertInstanceOf(ApiRequest::class, $received);
+
+		return $received;
+	}
+
 }
