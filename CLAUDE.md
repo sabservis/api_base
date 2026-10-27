@@ -59,10 +59,10 @@ ApiException (ExceptionExtra trait)
 | 5 | RequestIdMiddleware |
 | 10 | MethodOverrideMiddleware |
 | 15 | RequestSizeLimitMiddleware |
+| 20 | EnforceHttpsMiddleware (před auth - žádná WWW-Authenticate výzva přes HTTP) |
 | 200 | CORSMiddleware |
 | 450 | RateLimitMiddleware |
 | 460 | BasicAuthMiddleware (za RateLimit - brute force) |
-| 499 | EnforceHttpsMiddleware |
 | 500 | AuditLogMiddleware |
 | - | ApiMiddleware (vždy poslední) |
 

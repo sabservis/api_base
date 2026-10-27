@@ -10,10 +10,10 @@ Middleware umožňuje zpracovat request/response v pipeline.
 | `MethodOverrideMiddleware` | 10 | X-HTTP-Method-Override header |
 | `LoggingMiddleware` | 10 | Request/response logging |
 | `RequestSizeLimitMiddleware` | 15 | Omezení velikosti body |
+| `EnforceHttpsMiddleware` | 20 | Odmítne HTTP (400) před autentizací a rate limitem |
 | `CORSMiddleware` | 200 | CORS headers + preflight |
 | `RateLimitMiddleware` | 450 | Rate limiting per IP |
 | `BasicAuthMiddleware` | 460 | HTTP Basic Auth (za RateLimit, aby se počítaly i neúspěšné pokusy) |
-| `EnforceHttpsMiddleware` | 499 | Force HTTPS redirect |
 | `AuditLogMiddleware` | 500 | Audit trail logging |
 
 Nižší priorita = spustí se dříve.

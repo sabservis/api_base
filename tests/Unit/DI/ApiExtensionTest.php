@@ -480,6 +480,34 @@ final class ApiExtensionTest extends TestCase
 		$chain($request, new ApiResponse());
 	}
 
+	#[Test]
+	public function httpsIsEnforcedBeforeAuthentication(): void
+	{
+		$container = $this->createContainerFromNeon(<<<'NEON'
+			api:
+			    middlewares:
+			        - Sabservis\Api\Middleware\BasicAuthMiddleware
+			        - Sabservis\Api\Middleware\EnforceHttpsMiddleware
+			NEON);
+
+		$chainBuilder = $container->getService('api.middleware.chain');
+		assert($chainBuilder instanceof ChainBuilder);
+		$chain = $chainBuilder->create();
+
+		// Plain HTTP without credentials: must not trigger WWW-Authenticate challenge
+		$response = $chain(new ApiRequest(method: 'GET', uri: '/admin'), new ApiResponse());
+		self::assertSame(400, $response->getStatusCode());
+		self::assertFalse($response->hasHeader('WWW-Authenticate'));
+
+		// Plain HTTP with wrong credentials: same response, no password oracle
+		$request = new ApiRequest(
+			method: 'GET',
+			uri: '/admin',
+			headers: ['Authorization' => 'Basic ' . base64_encode('admin:wrong')],
+		);
+		self::assertSame(400, $chain($request, new ApiResponse())->getStatusCode());
+	}
+
 	/**
 	 * Compiles container from NEON config and returns middleware classes in chain order
 	 * (excluding the always-last ApiMiddleware).

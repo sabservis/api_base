@@ -7,7 +7,7 @@ use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 
-#[MiddlewarePriority(499)]
+#[MiddlewarePriority(20)]
 class EnforceHttpsMiddleware implements Middleware
 {
 
