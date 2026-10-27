@@ -34,7 +34,7 @@ ApiRequest::fromGlobals() → ApiApplication::runWith() → Middleware chain →
 
 **Endpoint = Facade** deleguje na: RouteDefinition, HandlerDefinition, OpenApiDefinition
 
-**ServiceHandler injection:** `int $id` z path, `?int $limit` z query s default, `CreateDto $input` z body, `ApiRequest $request` pro plnou kontrolu
+**ServiceHandler injection:** `int $id` z path, `?int $limit` z query (chybí → default, jinak null), `CreateDto $input` z body, `ApiRequest $request` pro plnou kontrolu
 
 **Exception handling:**
 - `ApiMiddleware` chytá exceptions, deleguje na `ErrorHandler`

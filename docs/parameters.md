@@ -8,6 +8,7 @@ Parametry se automaticky inferují z method signature:
 #[Get(path: '/users/{id}')]
 public function get(int $id, int $limit = 20, int $offset = 0): array
 // id z path, limit a offset z query (mají default → optional)
+// Nullable bez defaultu (?int $limit) je také optional - chybějící hodnota → null
 ```
 
 ## Explicitní definice

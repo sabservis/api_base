@@ -136,6 +136,13 @@ class ServiceHandler
 				continue;
 			}
 
+			// Nullable without default (?int $limit) - not required (same as OpenAPI inference)
+			if ($paramType !== null && $paramType->allowsNull()) {
+				$arguments[] = null;
+
+				continue;
+			}
+
 			// Required parameter not found - throw clear exception
 			throw new InvalidArgumentException(
 				sprintf(
