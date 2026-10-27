@@ -39,7 +39,6 @@ use Sabservis\Api\Utils\ChainBuilder;
 use stdClass;
 use function assert;
 use function class_exists;
-use function is_object;
 use function is_string;
 use function sprintf;
 use function uasort;
@@ -65,7 +64,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 							Nette\Schema\Expect::string(),
 							Nette\Schema\Expect::type(Nette\DI\Definitions\Statement::class),
 						),
-						'priority' => Nette\Schema\Expect::int(10),
+						'priority' => Nette\Schema\Expect::int()->nullable(),
 					]),
 				),
 			),
@@ -243,11 +242,11 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 
 		$definitions = [];
 
-		/** @var object{class: string|Nette\DI\Definitions\Statement|null, priority: int|null}|string $service */
 		foreach ($config->middlewares as $service) {
 			$priority = null;
 
-			if (is_object($service) && $service->class !== null) {
+			// Structure {class, priority}; Statement is an object too, so test the exact type
+			if ($service instanceof stdClass) {
 				$priority = $service->priority;
 				$service = $service->class;
 			}
@@ -260,9 +259,12 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 				->addDefinition($this->prefix(sprintf('middleware.%s', $counter)))
 				->setFactory($service);
 
-			if ($priority === null && is_string($service) && class_exists($service)) {
+			// Service references (@name) have no resolvable class here - priority must be explicit
+			$class = $service instanceof Nette\DI\Definitions\Statement ? $service->getEntity() : $service;
+
+			if ($priority === null && is_string($class) && class_exists($class)) {
 				/** @var ReflectionClass<object> $reflectionClass */
-				$reflectionClass = new ReflectionClass($service);
+				$reflectionClass = new ReflectionClass($class);
 
 				foreach ($reflectionClass->getAttributes() as $attribute) {
 					$attributeInstance = $attribute->newInstance();

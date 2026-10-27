@@ -57,12 +57,20 @@ api:
 ```neon
 api:
     middlewares:
-        # Jednoduše - použije default prioritu
+        # Jednoduše - priorita z #[MiddlewarePriority], jinak 10
         - App\Middleware\AuthMiddleware
 
-        # S explicitní prioritou
-        - { class: App\Middleware\CacheMiddleware, priority: 100 }
+        # S argumenty - priorita z #[MiddlewarePriority]
+        - App\Middleware\CacheMiddleware(ttl: 60)
+
+        # S explicitní prioritou (přebije atribut)
+        - { class: App\Middleware\CacheMiddleware(ttl: 60), priority: 100 }
+
+        # Odkaz na službu - priorita MUSÍ být explicitní
+        - { class: @myMiddleware, priority: 100 }
 ```
+
+U odkazu na službu (`@myMiddleware`) nelze při kompilaci zjistit třídu, takže `#[MiddlewarePriority]` se nepřečte. Bez `priority` dostane middleware výchozí prioritu 10.
 
 ## CORS
 

@@ -10,6 +10,7 @@ use PHPUnit\Framework\TestCase;
 use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use ReflectionProperty;
 use Sabservis\Api\Application\ApiApplication;
+use Sabservis\Api\Attribute\Core\MiddlewarePriority;
 use Sabservis\Api\DI\ApiExtension;
 use Sabservis\Api\Dispatcher\ApiDispatcher;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
@@ -18,15 +19,26 @@ use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
+use Sabservis\Api\Http\ApiRequest;
+use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Mapping\RequestParameterMapping;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use Sabservis\Api\Mapping\Validator\ContainerValidatorResolver;
 use Sabservis\Api\Mapping\Validator\DataMapperEntityValidator;
 use Sabservis\Api\Mapping\Validator\EntityValidator;
+use Sabservis\Api\Middleware\ApiMiddleware;
+use Sabservis\Api\Middleware\Middleware;
 use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Security\AuthorizationChecker;
+use Sabservis\Api\Utils\ChainBuilder;
+use function array_filter;
+use function array_map;
+use function array_values;
+use function assert;
+use function file_put_contents;
+use function is_array;
 use function json_decode;
 use function sys_get_temp_dir;
 use function uniqid;
@@ -333,6 +345,74 @@ final class ApiExtensionTest extends TestCase
 		self::assertArrayNotHasKey('traceId', $body);
 	}
 
+	#[Test]
+	public function middlewareAsClassNameUsesPriorityFromAttribute(): void
+	{
+		$order = $this->compileMiddlewareOrder(<<<'NEON'
+			api:
+			    middlewares:
+			        - Tests\Unit\DI\LatePriorityMiddleware
+			        - Tests\Unit\DI\ReferencePriorityMiddleware
+			NEON);
+
+		self::assertSame([ReferencePriorityMiddleware::class, LatePriorityMiddleware::class], $order);
+	}
+
+	#[Test]
+	public function middlewareAsStatementWithArgumentsUsesPriorityFromAttribute(): void
+	{
+		$order = $this->compileMiddlewareOrder(<<<'NEON'
+			api:
+			    middlewares:
+			        - Tests\Unit\DI\LatePriorityMiddleware(limit: 100)
+			        - Tests\Unit\DI\ReferencePriorityMiddleware
+			NEON);
+
+		self::assertSame([ReferencePriorityMiddleware::class, LatePriorityMiddleware::class], $order);
+	}
+
+	#[Test]
+	public function middlewareAsStructureWithoutPriorityUsesPriorityFromAttribute(): void
+	{
+		$order = $this->compileMiddlewareOrder(<<<'NEON'
+			api:
+			    middlewares:
+			        - { class: Tests\Unit\DI\LatePriorityMiddleware }
+			        - Tests\Unit\DI\ReferencePriorityMiddleware
+			NEON);
+
+		self::assertSame([ReferencePriorityMiddleware::class, LatePriorityMiddleware::class], $order);
+	}
+
+	#[Test]
+	public function middlewareAsStructureWithStatementUsesExplicitPriority(): void
+	{
+		$order = $this->compileMiddlewareOrder(<<<'NEON'
+			api:
+			    middlewares:
+			        - Tests\Unit\DI\ReferencePriorityMiddleware
+			        - { class: Tests\Unit\DI\LatePriorityMiddleware(limit: 100), priority: 100 }
+			NEON);
+
+		self::assertSame([LatePriorityMiddleware::class, ReferencePriorityMiddleware::class], $order);
+	}
+
+	#[Test]
+	public function middlewareAsServiceReferenceUsesExplicitPriority(): void
+	{
+		$order = $this->compileMiddlewareOrder(<<<'NEON'
+			services:
+			    lateMiddleware: Tests\Unit\DI\LatePriorityMiddleware(limit: 100)
+
+			api:
+			    middlewares:
+			        - Tests\Unit\DI\ReferencePriorityMiddleware
+			        - { class: @lateMiddleware, priority: 100 }
+			NEON);
+
+		self::assertSame([LatePriorityMiddleware::class, ReferencePriorityMiddleware::class], $order);
+	}
+
 	/**
 	 * @param array<string, mixed> $config
 	 */
@@ -356,6 +436,39 @@ final class ApiExtensionTest extends TestCase
 		$class = $loader->load($callback, uniqid('container_', true));
 
 		return new $class();
+	}
+
+	/**
+	 * Compiles container from NEON config and returns middleware classes in chain order
+	 * (excluding the always-last ApiMiddleware).
+	 *
+	 * @return list<class-string>
+	 */
+	private function compileMiddlewareOrder(string $neon): array
+	{
+		$tempDir = sys_get_temp_dir() . '/nette-test-' . uniqid('', true);
+		@mkdir($tempDir, 0o777, true); // @phpcs:ignore
+		$configFile = $tempDir . '/config.neon';
+		file_put_contents($configFile, $neon);
+
+		$loader = new ContainerLoader($tempDir, true);
+		// phpcs:ignore SlevomatCodingStandard.Functions.StaticClosure.ClosureNotStatic
+		$callback = function (Compiler $compiler) use ($configFile): void {
+			$compiler->addExtension('api', new ApiExtension());
+			$compiler->addConfig(['parameters' => ['productionMode' => false]]);
+			$compiler->loadConfig($configFile);
+		};
+		/** @var class-string<Container> $class */
+		$class = $loader->load($callback, uniqid('container_', true));
+		$container = new $class();
+
+		$chain = $container->getService('api.middleware.chain');
+		$middlewares = (new ReflectionProperty(ChainBuilder::class, 'middlewares'))->getValue($chain);
+		assert(is_array($middlewares));
+
+		$classes = array_map(static fn (object $middleware): string => $middleware::class, $middlewares);
+
+		return array_values(array_filter($classes, static fn (string $class): bool => $class !== ApiMiddleware::class));
 	}
 
 	/**
@@ -392,6 +505,32 @@ final class ApiExtensionTest extends TestCase
 }
 
 // Test fixtures
+
+#[MiddlewarePriority(300)]
+final class ReferencePriorityMiddleware implements Middleware
+{
+
+	public function __invoke(ApiRequest $request, ApiResponse $response, callable $next): ApiResponse
+	{
+		return $next($request, $response);
+	}
+
+}
+
+#[MiddlewarePriority(450)]
+final class LatePriorityMiddleware implements Middleware
+{
+
+	public function __construct(public int $limit = 0)
+	{
+	}
+
+	public function __invoke(ApiRequest $request, ApiResponse $response, callable $next): ApiResponse
+	{
+		return $next($request, $response);
+	}
+
+}
 
 final class TestTraceIdProvider implements \Sabservis\Api\ErrorHandler\TraceIdProvider
 {
