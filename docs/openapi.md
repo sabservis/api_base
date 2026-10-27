@@ -294,6 +294,23 @@ class NotificationDto { }
 #[Schema(allOf: [BaseDto::class, ExtendedDto::class])]
 class FullDto { }
 ```
+
+**Název schématu (`components/schemas`):**
+
+Výchozí název je krátké jméno třídy (`App\Dto\UserDto` → `UserDto`). Pokud mají dvě třídy stejné krátké jméno, obě dostanou prefix z namespace, aby se nepřepsaly:
+
+| Třída | Název |
+|-------|-------|
+| `App\Order\ItemDto` | `OrderItemDto` |
+| `App\Invoice\ItemDto` | `InvoiceItemDto` |
+| `App\Dto\UserDto` (bez kolize) | `UserDto` |
+
+Když přibude kolidující třída, změní se název i té stávající (generovaní klienti dostanou nový typ). Pro stabilní název ho nastav explicitně:
+
+```php
+#[Schema(name: 'ItemDto')]          // zůstane ItemDto, kolidující třída dostane prefix
+final class ItemDto { }
+```
 ```
 
 ## File Upload

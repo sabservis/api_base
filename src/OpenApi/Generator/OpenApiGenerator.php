@@ -60,6 +60,13 @@ final class OpenApiGenerator
 
 	private SchemaBuilder $schemaBuilder;
 
+	/**
+	 * Classes referenced by the response being built (disambiguates short-name refs).
+	 *
+	 * @var array<class-string>
+	 */
+	private array $refContext = [];
+
 	/** @var array<string, TagObject> */
 	private array $tags = [];
 
@@ -81,12 +88,19 @@ final class OpenApiGenerator
 
 	public function generate(Schema $schema): OpenApiSpec
 	{
-		// Reset state for fresh generation
-		$this->tags = [];
-		$this->usedTags = [];
-		$this->schemaBuilder = new SchemaBuilder($this->schemaFilter);
+		$paths = $this->buildPathsWithSchemaNames($schema, []);
 
-		$paths = $this->buildPaths($schema);
+		// Second pass only when some class needs a non-default name (collision or #[Schema(name)])
+		$schemaNames = SchemaNameResolver::assign($this->schemaBuilder->getRegisteredClasses());
+
+		foreach ($schemaNames as $class => $name) {
+			if ($name !== SchemaNameResolver::shortName($class)) {
+				$paths = $this->buildPathsWithSchemaNames($schema, $schemaNames);
+
+				break;
+			}
+		}
+
 		$components = $this->buildComponents($paths);
 
 		// Filter tags to only include used ones
@@ -175,6 +189,21 @@ final class OpenApiGenerator
 		}
 
 		return $servers;
+	}
+
+	/**
+	 * @param array<class-string, string> $schemaNames
+	 * @return array<string, PathItemObject>
+	 */
+	private function buildPathsWithSchemaNames(Schema $schema, array $schemaNames): array
+	{
+		// Reset state for fresh generation
+		$this->tags = [];
+		$this->usedTags = [];
+		$this->refContext = [];
+		$this->schemaBuilder = new SchemaBuilder($this->schemaFilter, $schemaNames);
+
+		return $this->buildPaths($schema);
 	}
 
 	/**
@@ -480,6 +509,11 @@ final class OpenApiGenerator
 			$ref = substr($ref, strlen('#/components/schemas/'));
 		}
 
+		// Attributes reference classes by short name - map to the (possibly prefixed) component name
+		if ($ref !== null) {
+			$ref = $this->schemaBuilder->resolveRefName($ref, $this->refContext);
+		}
+
 		// Handle oneOf/anyOf/allOf composition
 		$oneOf = null;
 		$anyOf = null;
@@ -604,6 +638,8 @@ final class OpenApiGenerator
 					}
 				}
 
+				$this->refContext = $response->getReferencedSchemas();
+
 				foreach ($contentSpec as $mediaType => $spec) {
 					$schema = null;
 
@@ -617,6 +653,8 @@ final class OpenApiGenerator
 						examples: $spec['examples'] ?? null,
 					);
 				}
+
+				$this->refContext = [];
 			}
 
 			$responses[(string) $code] = new ResponseObject(

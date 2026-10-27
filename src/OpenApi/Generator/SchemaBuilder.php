@@ -19,10 +19,10 @@ use Sabservis\Api\OpenApi\Spec\DiscriminatorObject;
 use Sabservis\Api\OpenApi\Spec\SchemaObject;
 use Sabservis\Api\OpenApi\TypeMapper;
 use UnitEnum;
+use function array_keys;
 use function class_exists;
 use function count;
-use function end;
-use function explode;
+use function in_array;
 use function is_string;
 
 final class SchemaBuilder
@@ -31,17 +31,28 @@ final class SchemaBuilder
 	/** @var array<string, SchemaObject> */
 	private array $schemas = [];
 
-	/** @var array<string, bool> */
-	private array $processing = [];
+	/**
+	 * Registered (built, in progress or filtered) classes.
+	 *
+	 * @var array<class-string, bool>
+	 */
+	private array $classes = [];
 
-	/** @var array<string, bool> */
-	private array $filtered = [];
+	/** @var array<string, list<class-string>> */
+	private array $classesByShortName = [];
 
 	/**
 	 * @param Closure(string): bool|null $schemaFilter Filter schemas by class name - return true to include
+	 * @param array<class-string, string> $schemaNames Class → component name (see SchemaNameResolver)
 	 */
-	public function __construct(private Closure|null $schemaFilter = null)
+	public function __construct(
+		private Closure|null $schemaFilter = null,
+		private array $schemaNames = [],
+	)
 	{
+		foreach ($schemaNames as $class => $name) {
+			$this->classesByShortName[SchemaNameResolver::shortName($class)][] = $class;
+		}
 	}
 
 	/**
@@ -53,37 +64,52 @@ final class SchemaBuilder
 	{
 		$schemaName = $this->getSchemaName($className);
 
-		// Already registered
-		if (isset($this->schemas[$schemaName])) {
+		// Already registered, filtered out or in progress (circular reference)
+		if (isset($this->classes[$className])) {
 			return $schemaName;
 		}
 
-		// Already filtered out
-		if (isset($this->filtered[$schemaName])) {
-			return $schemaName;
-		}
+		$this->classes[$className] = true;
 
 		// Apply schema filter
 		if ($this->schemaFilter !== null && ($this->schemaFilter)($className) === false) {
-			$this->filtered[$schemaName] = true;
-
 			return $schemaName;
 		}
 
-		// Circular reference protection
-		if (isset($this->processing[$schemaName])) {
-			return $schemaName;
-		}
-
-		$this->processing[$schemaName] = true;
-
-		try {
-			$this->schemas[$schemaName] = $this->buildSchemaFromClass($className);
-		} finally {
-			unset($this->processing[$schemaName]);
-		}
+		$this->schemas[$schemaName] = $this->buildSchemaFromClass($className);
 
 		return $schemaName;
+	}
+
+	/**
+	 * @return list<class-string>
+	 */
+	public function getRegisteredClasses(): array
+	{
+		return array_keys($this->classes);
+	}
+
+	/**
+	 * Resolve a ref produced by attributes (short class name, e.g. "ItemDto") to the component name.
+	 * When several classes share the short name, $context (classes referenced at that place) decides.
+	 *
+	 * @param array<class-string> $context
+	 */
+	public function resolveRefName(string $ref, array $context = []): string
+	{
+		$candidates = $this->classesByShortName[$ref] ?? [];
+
+		if ($candidates === []) {
+			return $ref;
+		}
+
+		foreach ($context as $class) {
+			if (in_array($class, $candidates, true)) {
+				return $this->schemaNames[$class];
+			}
+		}
+
+		return $this->schemaNames[$candidates[0]];
 	}
 
 	/**
@@ -560,11 +586,12 @@ final class SchemaBuilder
 		return $attributes[0]->newInstance();
 	}
 
+	/**
+	 * @param class-string $className
+	 */
 	private function getSchemaName(string $className): string
 	{
-		$parts = explode('\\', $className);
-
-		return end($parts);
+		return $this->schemaNames[$className] ?? SchemaNameResolver::shortName($className);
 	}
 
 }

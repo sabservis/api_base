@@ -48,6 +48,8 @@ final class Schema implements OpenApiAttributeInterface
 		public array|null $allOf = null,
 		public array|null $x = null,
 		public bool $hidden = false,
+		// Component name in #/components/schemas (default: short class name, prefixed on collision)
+		public string|null $name = null,
 	)
 	{
 	}
