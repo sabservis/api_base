@@ -6,11 +6,15 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Sabservis\Api\Application\ApiApplication;
+use Sabservis\Api\ErrorHandler\ErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use Throwable;
 use function file_put_contents;
 use function fopen;
+use function json_decode;
 use function ob_end_clean;
 use function ob_get_clean;
 use function ob_start;
@@ -366,6 +370,56 @@ final class ApiApplicationTest extends TestCase
 		ob_end_clean();
 
 		self::assertSame(100_000, strlen($receivedRequest->getContents()));
+	}
+
+	#[Test]
+	public function caughtExceptionWithoutErrorHandlerIsNotReportedAsSuccess(): void
+	{
+		$response = $this->runCaught(new RuntimeException('SQLSTATE[42S02]: table users missing'));
+
+		self::assertSame(500, $response->getStatusCode());
+		self::assertSame(
+			['code' => 500, 'message' => ServerErrorException::$defaultMessage],
+			json_decode((string) $response->getBody(), true),
+		);
+	}
+
+	#[Test]
+	public function caughtClientErrorWithoutErrorHandlerKeepsStatusAndMessage(): void
+	{
+		$response = $this->runCaught(new ClientErrorException('Not found', 404));
+
+		self::assertSame(404, $response->getStatusCode());
+		self::assertSame(['code' => 404, 'message' => 'Not found'], json_decode((string) $response->getBody(), true));
+	}
+
+	#[Test]
+	public function caughtExceptionWithErrorHandlerUsesHandler(): void
+	{
+		$handler = $this->createMock(ErrorHandler::class);
+		$handler->method('handle')->willReturn((new ApiResponse())->withStatus(418));
+
+		$response = $this->runCaught(new RuntimeException('x'), $handler);
+
+		self::assertSame(418, $response->getStatusCode());
+	}
+
+	private function runCaught(Throwable $exception, ErrorHandler|null $handler = null): ApiResponse
+	{
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next) use ($exception): ApiResponse {
+			throw $exception;
+		};
+
+		$app = new ApiApplication($chain, $handler);
+		$app->setCatchExceptions(true);
+
+		ob_start();
+
+		try {
+			return $app->runWith(new ApiRequest(method: 'POST', uri: '/orders'));
+		} finally {
+			ob_end_clean();
+		}
 	}
 
 }

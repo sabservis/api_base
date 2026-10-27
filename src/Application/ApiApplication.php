@@ -5,6 +5,8 @@ namespace Sabservis\Api\Application;
 use RuntimeException;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\Api\ServerErrorException;
+use Sabservis\Api\Exception\ApiException;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
@@ -151,6 +153,9 @@ final class ApiApplication
 					// Error handler itself failed, use fatal fallback
 					$response = $this->errorHandler->handleFatal($fatal, $request);
 				}
+			} else {
+				// Never report a swallowed exception as 200 OK
+				$response = $this->createFallbackErrorResponse($e);
 			}
 		}
 
@@ -179,16 +184,25 @@ final class ApiApplication
 				$response = $this->errorHandler->handleFatal($fatal, $request);
 			}
 		} else {
-			// No error handler - create minimal JSON response
-			$response = (new ApiResponse())
-				->withStatus($e->getCode() >= 400 && $e->getCode() < 600 ? $e->getCode() : 500)
-				->writeJsonBody([
-					'code' => $e->getCode(),
-					'message' => $e->getMessage(),
-				]);
+			$response = $this->createFallbackErrorResponse($e);
 		}
 
 		return $this->finalize($response);
+	}
+
+	/**
+	 * Minimal JSON error response when no ErrorHandler is configured.
+	 * Only ApiException status/message is exposed - other messages may contain internals (SQL, paths).
+	 */
+	private function createFallbackErrorResponse(Throwable $e): ApiResponse
+	{
+		$isApiError = $e instanceof ApiException && $e->getCode() >= 400 && $e->getCode() < 600;
+		$code = $isApiError ? $e->getCode() : 500;
+		$message = $isApiError && $code < 500 ? $e->getMessage() : ServerErrorException::$defaultMessage;
+
+		return (new ApiResponse())
+			->withStatus($code)
+			->writeJsonBody(['code' => $code, 'message' => $message]);
 	}
 
 	private function finalize(ApiResponse $response): ApiResponse
