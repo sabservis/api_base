@@ -13,13 +13,14 @@ use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Utils\Regex;
 use function is_array;
 use function is_string;
-use function mb_strlen;
-use function mb_substr;
 use function rawurldecode;
 use function sprintf;
 use function str_contains;
+use function str_ends_with;
 use function str_starts_with;
+use function strlen;
 use function strtoupper;
+use function substr;
 use function trim;
 
 /**
@@ -317,7 +318,12 @@ final class Router
 	private function normalizePath(string $path): string
 	{
 		if ($this->basePath !== null && str_starts_with($path, $this->basePath)) {
-			$path = mb_substr($path, mb_strlen($this->basePath));
+			$rest = substr($path, strlen($this->basePath));
+
+			// Only at segment boundary - /api must not turn /apiv2/users into /v2/users
+			if ($rest === '' || $rest[0] === '/' || str_ends_with($this->basePath, '/')) {
+				$path = $rest;
+			}
 		}
 
 		// Url has always slash at the beginning and no trailing slash at the end

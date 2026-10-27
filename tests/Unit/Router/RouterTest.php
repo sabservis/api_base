@@ -87,6 +87,41 @@ final class RouterTest extends TestCase
 	}
 
 	#[Test]
+	public function basePathIsStrippedFromPath(): void
+	{
+		self::assertSame('/users', $this->matchWithBasePath('/api', '/api/users'));
+		self::assertSame('/', $this->matchWithBasePath('/api', '/api'));
+		self::assertSame('/', $this->matchWithBasePath('/api', '/api/'));
+	}
+
+	#[Test]
+	public function basePathIsStrippedOnlyOnceSoDynamicApiRoutesNeedDoublePrefix(): void
+	{
+		// Production setup: dynamic route /api/users/{id} is reached via /api/api/users/{id}
+		self::assertSame('/api/users/{id}', $this->matchWithBasePath('/api', '/api/api/users/5'));
+		self::assertSame('/api/users/{id}', $this->matchWithBasePath('/api/', '/api/api/users/5'));
+	}
+
+	#[Test]
+	public function pathWithoutBasePathIsStillRouted(): void
+	{
+		self::assertSame('/users', $this->matchWithBasePath('/api', '/users'));
+	}
+
+	#[Test]
+	public function basePathIsStrippedOnlyAtSegmentBoundary(): void
+	{
+		self::assertNull($this->matchWithBasePath('/api', '/apiv2/users'));
+		self::assertNull($this->matchWithBasePath('/api', '/apifoo'));
+	}
+
+	#[Test]
+	public function basePathWithTrailingSlashIsStripped(): void
+	{
+		self::assertSame('/users', $this->matchWithBasePath('/api/', '/api/users'));
+	}
+
+	#[Test]
 	public function matchParametersFooBar(): void
 	{
 		$endpoint = new Endpoint('TestController', 'testMethod');
@@ -355,6 +390,30 @@ final class RouterTest extends TestCase
 		$matched = $router->match($request);
 
 		self::assertInstanceOf(ApiRequest::class, $matched);
+	}
+
+	/**
+	 * Returns mask of the matched endpoint, null when nothing matched.
+	 */
+	private function matchWithBasePath(string $basePath, string $path): string|null
+	{
+		$schema = new Schema();
+
+		foreach (['/', '/users', '/v2/users', '/foo'] as $i => $mask) {
+			$schema->addEndpoint($this->createEndpoint('TestController', 'method' . $i, 'GET', $mask));
+		}
+
+		$dynamic = $this->createEndpoint('TestController', 'show', 'GET', '/api/users/{id}');
+		$dynamic->setPattern('#^/api/users/(?P<id>[^/]+)$#');
+		$schema->addEndpoint($dynamic);
+
+		$router = new Router($schema);
+		$router->setBasePath($basePath);
+
+		$matched = $router->match(new ApiRequest(method: 'GET', uri: 'http://example.com' . $path));
+		$endpoint = $matched?->getAttribute(RequestAttributes::Endpoint->value);
+
+		return $endpoint instanceof Endpoint ? $endpoint->getMask() : null;
 	}
 
 	/**
