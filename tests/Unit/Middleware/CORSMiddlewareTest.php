@@ -276,4 +276,87 @@ final class CORSMiddlewareTest extends TestCase
 		self::assertSame('X-Request-Id, X-Total-Count', $result->getHeader('access-control-expose-headers'));
 	}
 
+	// Fetch Standard §3.2.5: response that depends on Origin must carry "Vary: Origin" - also when ACAO is absent
+
+	#[Test]
+	public function allowedOriginResponseVariesOnOrigin(): void
+	{
+		self::assertSame('Origin', $this->vary($this->whitelist(), 'GET', 'https://app.example.com'));
+	}
+
+	#[Test]
+	public function disallowedOriginResponseVariesOnOrigin(): void
+	{
+		self::assertSame('Origin', $this->vary($this->whitelist(), 'GET', 'https://evil.example.com'));
+	}
+
+	#[Test]
+	public function requestWithoutOriginVariesOnOriginWithWhitelist(): void
+	{
+		self::assertSame('Origin', $this->vary($this->whitelist(), 'GET', null));
+	}
+
+	#[Test]
+	public function preflightVariesOnOriginForAllowedAndDisallowedOrigin(): void
+	{
+		self::assertSame('Origin', $this->vary($this->whitelist(), 'OPTIONS', 'https://app.example.com'));
+		self::assertSame('Origin', $this->vary($this->whitelist(), 'OPTIONS', 'https://evil.example.com'));
+	}
+
+	#[Test]
+	public function wildcardResponseDoesNotVaryOnOrigin(): void
+	{
+		self::assertNull($this->vary(new CORSMiddleware(), 'GET', 'https://app.example.com'));
+	}
+
+	#[Test]
+	public function varyOriginIsAppendedToExistingVary(): void
+	{
+		// RFC 9110 §12.5.5: Vary is a list - must not overwrite application value
+		self::assertSame(
+			'Accept-Encoding, Origin',
+			$this->vary($this->whitelist(), 'GET', 'https://app.example.com', 'Accept-Encoding'),
+		);
+		self::assertSame(
+			'Accept-Encoding, Origin',
+			$this->vary($this->whitelist(), 'GET', 'https://evil.example.com', 'Accept-Encoding'),
+		);
+	}
+
+	#[Test]
+	public function varyOriginIsNotDuplicated(): void
+	{
+		self::assertSame('origin', $this->vary($this->whitelist(), 'GET', 'https://app.example.com', 'origin'));
+		self::assertSame('*', $this->vary($this->whitelist(), 'GET', 'https://app.example.com', '*'));
+	}
+
+	#[Test]
+	public function wildcardKeepsExistingVary(): void
+	{
+		self::assertSame(
+			'Accept-Encoding',
+			$this->vary(new CORSMiddleware(), 'GET', 'https://app.example.com', 'Accept-Encoding'),
+		);
+	}
+
+	private function whitelist(): CORSMiddleware
+	{
+		return new CORSMiddleware(allowedOrigins: ['https://app.example.com']);
+	}
+
+	private function vary(
+		CORSMiddleware $middleware,
+		string $method,
+		string|null $origin,
+		string|null $appVary = null,
+	): string|null
+	{
+		$request = new ApiRequest(method: $method, uri: '/', headers: $origin !== null ? ['Origin' => $origin] : []);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $appVary !== null
+			? $res->withHeader('Vary', $appVary)
+			: $res;
+
+		return $middleware($request, new ApiResponse(), $next)->getHeader('Vary');
+	}
+
 }

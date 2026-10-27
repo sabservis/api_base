@@ -88,6 +88,8 @@ api:
         exposedHeaders: []
 ```
 
+**Cache (Fetch Standard §3.2.5):** s whitelistem `allowedOrigins` dostane každá odpověď `Vary: Origin` - i odmítnutá bez `Access-Control-Allow-Origin` a preflight - aby CDN/reverse proxy neposlala odpověď pro jeden origin jinému. `Origin` se k `Vary` aplikace přidá (`Vary: Accept-Encoding, Origin`), nepřepíše ho. Wildcard (prázdné `allowedOrigins`) `Vary` nepřidává.
+
 ## Rate Limiting
 
 ```neon

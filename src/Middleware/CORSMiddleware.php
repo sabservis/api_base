@@ -7,8 +7,11 @@ use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use function explode;
 use function implode;
 use function in_array;
+use function strtolower;
+use function trim;
 
 /**
  * CORS (Cross-Origin Resource Sharing) middleware.
@@ -78,6 +81,13 @@ class CORSMiddleware implements Middleware
 	{
 		$origin = $request->getHeaderLine('Origin');
 
+		// Fetch Standard §3.2.5: with an origin whitelist every response depends on Origin
+		// (also rejected ones without ACAO) - shared caches must not serve it to another origin.
+		// Static wildcard (empty allowedOrigins) does not vary.
+		if ($this->allowedOrigins !== []) {
+			$response = $this->withVaryOrigin($response);
+		}
+
 		// Determine allowed origin
 		$allowedOrigin = $this->resolveAllowedOrigin($origin);
 
@@ -102,12 +112,25 @@ class CORSMiddleware implements Middleware
 			$response = $response->withHeader('Access-Control-Expose-Headers', implode(', ', $this->exposedHeaders));
 		}
 
-		// Vary header for proper caching when origin validation is used
-		if ($this->allowedOrigins !== []) {
-			$response = $response->withHeader('Vary', 'Origin');
+		return $response;
+	}
+
+	/**
+	 * Append "Origin" to Vary (RFC 9110 §12.5.5: list value - keep what the application set).
+	 */
+	private function withVaryOrigin(ApiResponse $response): ApiResponse
+	{
+		$vary = $response->getHeaderLine('Vary');
+
+		foreach (explode(',', $vary) as $token) {
+			$token = strtolower(trim($token));
+
+			if ($token === '*' || $token === 'origin') {
+				return $response;
+			}
 		}
 
-		return $response;
+		return $response->withHeader('Vary', $vary === '' ? 'Origin' : $vary . ', Origin');
 	}
 
 	private function resolveAllowedOrigin(string $origin): string|null
