@@ -254,4 +254,35 @@ final class IpMatcherTest extends TestCase
 		self::assertFalse(IpMatcher::matchesAny('2001:db9::1', $patterns));
 	}
 
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function addressesWithTrailingNewline(): array
+	{
+		return [
+			'ipv4' => ["10.0.0.1\n"],
+			'ipv6 loopback' => ["::1\n"],
+			'ipv6 full' => ["2001:0db8:0000:0000:0000:0000:0000:0001\n"],
+			'ipv6 compressed' => ["2001:db8::1\n"],
+			'ipv6 trailing ::' => ["2001:db8::\n"],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('addressesWithTrailingNewline')]
+	public function isValidRejectsTrailingNewline(string $ip): void
+	{
+		// PCRE "$" also matches before a final "\n" - would create a distinct rate-limit key
+		self::assertFalse(IpMatcher::isValid($ip));
+		self::assertFalse(IpMatcher::isValidPattern($ip));
+	}
+
+	#[Test]
+	public function isValidAcceptsAddressesWithoutNewline(): void
+	{
+		foreach (['10.0.0.1', '::1', '2001:0db8:0000:0000:0000:0000:0000:0001', '2001:db8::1', '2001:db8::'] as $ip) {
+			self::assertTrue(IpMatcher::isValid($ip), $ip);
+		}
+	}
+
 }
