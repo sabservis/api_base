@@ -11,8 +11,8 @@ Middleware umožňuje zpracovat request/response v pipeline.
 | `LoggingMiddleware` | 10 | Request/response logging |
 | `RequestSizeLimitMiddleware` | 15 | Omezení velikosti body |
 | `CORSMiddleware` | 200 | CORS headers + preflight |
-| `BasicAuthMiddleware` | 250 | HTTP Basic Auth |
 | `RateLimitMiddleware` | 450 | Rate limiting per IP |
+| `BasicAuthMiddleware` | 460 | HTTP Basic Auth (za RateLimit, aby se počítaly i neúspěšné pokusy) |
 | `EnforceHttpsMiddleware` | 499 | Force HTTPS redirect |
 | `AuditLogMiddleware` | 500 | Audit trail logging |
 

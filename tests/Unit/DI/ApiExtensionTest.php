@@ -37,6 +37,7 @@ use function array_filter;
 use function array_map;
 use function array_values;
 use function assert;
+use function base64_encode;
 use function file_put_contents;
 use function is_array;
 use function json_decode;
@@ -449,6 +450,36 @@ final class ApiExtensionTest extends TestCase
 		return new $class();
 	}
 
+	#[Test]
+	public function failedBasicAuthAttemptsAreRateLimited(): void
+	{
+		$container = $this->createContainerFromNeon(<<<'NEON'
+			api:
+			    middlewares:
+			        - Sabservis\Api\Middleware\BasicAuthMiddleware
+			        - Sabservis\Api\Middleware\RateLimitMiddleware(cache: Symfony\Component\Cache\Adapter\ArrayAdapter(), maxRequests: 2)
+			NEON);
+
+		$chainBuilder = $container->getService('api.middleware.chain');
+		assert($chainBuilder instanceof ChainBuilder);
+		$chain = $chainBuilder->create();
+
+		$request = new ApiRequest(
+			method: 'GET',
+			uri: '/admin',
+			headers: ['Authorization' => 'Basic ' . base64_encode('admin:wrong')],
+			serverParams: ['REMOTE_ADDR' => '1.2.3.4'],
+		);
+
+		self::assertSame(401, $chain($request, new ApiResponse())->getStatusCode());
+		self::assertSame(401, $chain($request, new ApiResponse())->getStatusCode());
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionCode(429);
+
+		$chain($request, new ApiResponse());
+	}
+
 	/**
 	 * Compiles container from NEON config and returns middleware classes in chain order
 	 * (excluding the always-last ApiMiddleware).
@@ -456,6 +487,19 @@ final class ApiExtensionTest extends TestCase
 	 * @return list<class-string>
 	 */
 	private function compileMiddlewareOrder(string $neon): array
+	{
+		$container = $this->createContainerFromNeon($neon);
+
+		$chain = $container->getService('api.middleware.chain');
+		$middlewares = (new ReflectionProperty(ChainBuilder::class, 'middlewares'))->getValue($chain);
+		assert(is_array($middlewares));
+
+		$classes = array_map(static fn (object $middleware): string => $middleware::class, $middlewares);
+
+		return array_values(array_filter($classes, static fn (string $class): bool => $class !== ApiMiddleware::class));
+	}
+
+	private function createContainerFromNeon(string $neon): Container
 	{
 		$tempDir = sys_get_temp_dir() . '/nette-test-' . uniqid('', true);
 		@mkdir($tempDir, 0o777, true); // @phpcs:ignore
@@ -471,15 +515,8 @@ final class ApiExtensionTest extends TestCase
 		};
 		/** @var class-string<Container> $class */
 		$class = $loader->load($callback, uniqid('container_', true));
-		$container = new $class();
 
-		$chain = $container->getService('api.middleware.chain');
-		$middlewares = (new ReflectionProperty(ChainBuilder::class, 'middlewares'))->getValue($chain);
-		assert(is_array($middlewares));
-
-		$classes = array_map(static fn (object $middleware): string => $middleware::class, $middlewares);
-
-		return array_values(array_filter($classes, static fn (string $class): bool => $class !== ApiMiddleware::class));
+		return new $class();
 	}
 
 	/**

@@ -13,7 +13,7 @@ use function password_verify;
 use function str_starts_with;
 use function substr;
 
-#[MiddlewarePriority(250)]
+#[MiddlewarePriority(460)]
 class BasicAuthMiddleware implements Middleware
 {
 
