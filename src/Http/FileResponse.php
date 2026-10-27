@@ -5,9 +5,11 @@ namespace Sabservis\Api\Http;
 use Sabservis\Api\Exception\RuntimeStateException;
 use function basename;
 use function dirname;
+use function explode;
 use function filesize;
 use function fopen;
 use function fstat;
+use function in_array;
 use function is_link;
 use function is_resource;
 use function pathinfo;
@@ -18,6 +20,7 @@ use function str_replace;
 use function str_starts_with;
 use function strlen;
 use function strtolower;
+use function trim;
 use const DIRECTORY_SEPARATOR;
 use const PATHINFO_EXTENSION;
 
@@ -116,6 +119,19 @@ final class FileResponse
 		'ttf' => 'font/ttf',
 		'otf' => 'font/otf',
 		'eot' => 'application/vnd.ms-fontobject',
+	];
+
+	/**
+	 * Content types the browser can execute scripts in (stored XSS when user uploads are served).
+	 */
+	private const ACTIVE_CONTENT_TYPES = [
+		'text/html',
+		'application/xhtml+xml',
+		'image/svg+xml',
+		'application/xml',
+		'text/xml',
+		'application/javascript',
+		'text/javascript',
 	];
 
 	/** @var array<string> Allowed directories for file serving (empty = allow all with warning) */
@@ -425,11 +441,24 @@ final class FileResponse
 			->withHeader('Pragma', 'public')
 			->withBody($this->body);
 
+		// SECURITY: Scripts in served HTML/SVG/XML would run on the API origin (stored XSS).
+		// Not applied to passive types - CSP sandbox breaks Chrome's inline PDF viewer.
+		if ($this->isActiveContent()) {
+			$response = $response->withHeader('Content-Security-Policy', "sandbox; default-src 'none'");
+		}
+
 		if ($this->size !== null) {
 			$response = $response->withHeader('Content-Length', (string) $this->size);
 		}
 
 		return $response;
+	}
+
+	private function isActiveContent(): bool
+	{
+		$mimeType = strtolower(trim(explode(';', $this->contentType, 2)[0]));
+
+		return in_array($mimeType, self::ACTIVE_CONTENT_TYPES, true);
 	}
 
 	/**

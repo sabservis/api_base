@@ -98,8 +98,13 @@ S tímto nastavením `FileResponse::fromPath()` odmítne soubory mimo povolené 
 
 `FileResponse::fromPath()` automaticky:
 - Kanonizuje cestu pomocí `realpath()`
-- Blokuje `../` útoky
 - Ověřuje že soubor existuje
+
+**POZOR:** `realpath()` sám `../` neblokuje, jen ho vyhodnotí. Bez `setAllowedDirectories()` projde i `/uploads/../../etc/passwd`. Ochrana proti path traversal je aktivní až po nastavení povolených adresářů.
+
+### XSS přes servírované soubory
+
+HTML, SVG, XML a JavaScript (podle `Content-Type`) dostanou automaticky `Content-Security-Policy: sandbox; default-src 'none'`, takže skripty v nahraném souboru se nespustí ani při `inline()`. Ostatní typy (PDF, obrázky) CSP nedostanou - sandbox by v Chrome rozbil zobrazení PDF.
 
 ### Doporučení
 

@@ -74,7 +74,8 @@ Používej `ErrorMessages::NOT_FOUND`, `METHOD_NOT_ALLOWED`, `TOO_MANY_REQUESTS`
 
 | Oblast | Jak |
 |--------|-----|
-| Path traversal | `FileResponse::setAllowedDirectories()` + `realpath()` |
+| Path traversal | **Opt-in:** `FileResponse::setAllowedDirectories()` + `realpath()` (bez konfigurace se adresáře nekontrolují) |
+| XSS přes soubory | `FileResponse` přidá `CSP: sandbox` pro HTML/SVG/XML/JS (i při `inline()`) |
 | File upload MIME | `$file->getValidatedContentType()` (finfo, ne klient) |
 | File upload empty | 0-byte automaticky odmítnuty |
 | Header injection | `HeaderSanitizer` automaticky |

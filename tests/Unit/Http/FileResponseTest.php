@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Http;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\RuntimeStateException;
@@ -12,6 +13,7 @@ use function file_put_contents;
 use function mkdir;
 use function realpath;
 use function rmdir;
+use function sprintf;
 use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
@@ -150,6 +152,59 @@ final class FileResponseTest extends TestCase
 			->toApiResponse();
 
 		self::assertStringContainsString('inline', $response->getHeader('content-disposition'));
+	}
+
+	#[Test]
+	#[DataProvider('provideActiveContentTypes')]
+	public function activeContentIsSandboxedEvenWhenInline(string $contentType): void
+	{
+		$response = FileResponse::fromContent('<script>alert(1)</script>', 'upload.bin', $contentType)
+			->inline()
+			->toApiResponse();
+
+		$csp = $response->getHeader('content-security-policy');
+		self::assertNotNull($csp, sprintf('%s must be sandboxed', $contentType));
+		self::assertStringContainsString('sandbox', $csp);
+		self::assertStringContainsString("default-src 'none'", $csp);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function provideActiveContentTypes(): array
+	{
+		return [
+			'html' => ['text/html'],
+			'html with charset' => ['text/html; charset=utf-8'],
+			'uppercase' => ['Text/HTML'],
+			'svg' => ['image/svg+xml'],
+			'xhtml' => ['application/xhtml+xml'],
+			'xml' => ['application/xml'],
+			'text xml' => ['text/xml'],
+			'javascript' => ['application/javascript'],
+			'text javascript' => ['text/javascript'],
+		];
+	}
+
+	#[Test]
+	public function activeContentIsDetectedFromUploadedFilename(): void
+	{
+		foreach (['avatar.svg', 'page.html', 'page.htm'] as $filename) {
+			$response = FileResponse::fromContent('<svg onload="alert(1)"/>', $filename)->inline()->toApiResponse();
+
+			self::assertNotNull($response->getHeader('content-security-policy'), $filename);
+		}
+	}
+
+	#[Test]
+	public function passiveContentIsNotSandboxed(): void
+	{
+		// CSP sandbox breaks Chrome's inline PDF viewer
+		foreach (['report.pdf', 'photo.png', 'data.csv'] as $filename) {
+			$response = FileResponse::fromContent('data', $filename)->inline()->toApiResponse();
+
+			self::assertNull($response->getHeader('content-security-policy'), $filename);
+		}
 	}
 
 	#[Test]
