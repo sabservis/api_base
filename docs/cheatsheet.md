@@ -176,7 +176,7 @@ public function get(#[HeaderParameter(name: 'X-API-Key')] string $apiKey): array
 ### Organizace
 ```php
 #[Tag(name: 'users', description: 'User management')]  // na controller
-#[Hidden]                                               // skryje z OpenAPI
+#[Hidden]                                               // skryje z OpenAPI (endpoint i DTO property, jen docs)
 #[Security([['Bearer' => []]])]                         // auth requirement
 #[Security([])]                                         // verejny endpoint
 #[Authorize(activity: 'users.read', authorizer: UsersAuthorizer::class)] // runtime autorizace

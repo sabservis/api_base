@@ -187,7 +187,7 @@ final class OpenApiGenerator
 		foreach ($schema->getEndpoints() as $endpoint) {
 			$mask = $endpoint->getMask();
 
-			if ($mask === null) {
+			if ($mask === null || $endpoint->isHidden()) {
 				continue;
 			}
 

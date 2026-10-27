@@ -296,6 +296,16 @@ class Endpoint
 		$this->openApi->setDeprecated($deprecated);
 	}
 
+	public function isHidden(): bool
+	{
+		return $this->openApi->isHidden();
+	}
+
+	public function setHidden(bool $hidden): void
+	{
+		$this->openApi->setHidden($hidden);
+	}
+
 	// === Security (delegated to OpenApiDefinition) ===
 
 	/**

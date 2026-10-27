@@ -88,6 +88,10 @@ class ArrayHydrator implements Hydrator
 			$endpoint->setDeprecated(true);
 		}
 
+		if (isset($data['hidden']) && $data['hidden'] === true) {
+			$endpoint->setHidden(true);
+		}
+
 		if (isset($data['security'])) {
 			$endpoint->setSecurity($data['security']);
 		}

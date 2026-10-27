@@ -29,7 +29,7 @@
 
 | Atribut | Popis |
 |---------|-------|
-| `#[Hidden]` | Skryje endpoint z OpenAPI |
+| `#[Hidden]` | Skryje endpoint (zůstává routovatelný) nebo DTO property z OpenAPI - neblokuje vstup |
 | `#[FileUpload(name: 'file')]` | File upload (s `multiple`, `allowedTypes`) |
 | `#[FileUpload]` na DTO property | Multipart form data s beznymi poli + soubory |
 | `#[FileResponse]` | File download (s `response`, `description`) |

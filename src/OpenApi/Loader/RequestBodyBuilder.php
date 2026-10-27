@@ -9,6 +9,7 @@ use ReflectionNamedType;
 use ReflectionProperty;
 use Sabservis\Api\Attribute\OpenApi\Encoding;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\JsonContent;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\RequestBody;
@@ -229,6 +230,10 @@ final class RequestBodyBuilder
 		$fileUploads = [];
 
 		foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
+			if ($refProperty->getAttributes(Hidden::class) !== []) {
+				continue;
+			}
+
 			$fileUploadAttrs = $refProperty->getAttributes(FileUpload::class);
 
 			if ($fileUploadAttrs !== []) {

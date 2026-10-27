@@ -11,6 +11,7 @@ use ReflectionProperty;
 use ReflectionUnionType;
 use Sabservis\Api\Attribute\OpenApi\AdditionalProperties;
 use Sabservis\Api\Attribute\OpenApi\Discriminator;
+use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\Items;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\Schema;
@@ -159,6 +160,10 @@ final class SchemaBuilder
 		$required = [];
 
 		foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+			if ($property->getAttributes(Hidden::class) !== []) {
+				continue;
+			}
+
 			$propertyName = $this->getPropertyName($property);
 			$propertySchema = $this->buildPropertySchema($property);
 

@@ -509,6 +509,24 @@ use Sabservis\Api\Attribute\OpenApi\Hidden;
 public function debug(): array
 ```
 
+Endpoint zůstává **funkční a routovatelný**, jen chybí v OpenAPI. Nepoužívej `#[Hidden]` jako vypínač nebo ochranu přístupu - na to je `#[Authorize]` / middleware.
+
+### Skrytá property v DTO
+
+```php
+final class UserDto
+{
+    public string $name;
+
+    #[Hidden]
+    public string $internalNote = '';
+}
+```
+
+Property zmizí ze schématu (JSON i multipart request body, query DTO).
+
+**POZOR:** `#[Hidden]` je jen dokumentace. Property se z request body **dál hydratuje** - klient, který ji pošle (`{"role": "admin"}`), ji nastaví. Pro pole, která klient nesmí nastavit, použij samostatný vstupní DTO bez nich (např. `CreateUserInput` vs. `UserDto`).
+
 ---
 
 ## Pokročilé

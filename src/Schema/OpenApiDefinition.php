@@ -25,6 +25,8 @@ final class OpenApiDefinition
 
 	private bool $deprecated = false;
 
+	private bool $hidden = false;
+
 	/** @var array<array<string, array<string>>>|null */
 	private array|null $security = null;
 
@@ -131,6 +133,16 @@ final class OpenApiDefinition
 	public function setDeprecated(bool $deprecated): void
 	{
 		$this->deprecated = $deprecated;
+	}
+
+	public function isHidden(): bool
+	{
+		return $this->hidden;
+	}
+
+	public function setHidden(bool $hidden): void
+	{
+		$this->hidden = $hidden;
 	}
 
 	/**

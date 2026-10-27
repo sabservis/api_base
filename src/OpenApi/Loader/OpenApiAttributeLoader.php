@@ -347,11 +347,6 @@ final class OpenApiAttributeLoader
 		array $operationAttributes,
 	): array|null
 	{
-		// Check if endpoint is hidden from OpenAPI documentation
-		if ($this->isHidden($method)) {
-			return null;
-		}
-
 		// Parse operation attributes
 		$parsed = $this->parseOperationAttributes($operationAttributes);
 
@@ -453,6 +448,8 @@ final class OpenApiAttributeLoader
 			'summary' => $parsed->summary,
 			'description' => $parsed->description,
 			'deprecated' => $parsed->deprecated,
+			// Hidden only from OpenAPI documentation, still routable
+			'hidden' => $this->isHidden($method),
 			'mask' => $mask,
 			'methods' => $parsed->httpMethods,
 			'parameters' => [],

@@ -10,6 +10,7 @@ use ReflectionMethod;
 use ReflectionNamedType;
 use ReflectionParameter;
 use ReflectionUnionType;
+use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\RequestParameter;
 use Sabservis\Api\Http\ApiRequest;
@@ -203,7 +204,7 @@ final class ParameterInferenceEngine
 		foreach ($reflectionClass->getProperties() as $property) {
 			$propertyAttributes = $property->getAttributes(Property::class);
 
-			if ($propertyAttributes === []) {
+			if ($propertyAttributes === [] || $property->getAttributes(Hidden::class) !== []) {
 				continue;
 			}
 
