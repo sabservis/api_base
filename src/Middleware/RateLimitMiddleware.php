@@ -4,6 +4,7 @@ namespace Sabservis\Api\Middleware;
 
 use Psr\Cache\CacheItemPoolInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
+use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RateLimit\Psr6RateLimitCache;
@@ -62,6 +63,15 @@ final class RateLimitMiddleware implements Middleware
 		private readonly string $clientIpHeader = 'X-Forwarded-For',
 	)
 	{
+		foreach ($trustedProxies as $proxy) {
+			if (!IpMatcher::isValidPattern($proxy)) {
+				throw new InvalidArgumentException(sprintf(
+					'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
+					$proxy,
+				));
+			}
+		}
+
 		$this->cache = $this->wrapCache($cache);
 	}
 

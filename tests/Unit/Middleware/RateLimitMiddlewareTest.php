@@ -5,6 +5,7 @@ namespace Tests\Unit\Middleware;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RateLimitMiddleware;
@@ -12,6 +13,15 @@ use Symfony\Component\Cache\Adapter\ArrayAdapter;
 
 final class RateLimitMiddlewareTest extends TestCase
 {
+
+	#[Test]
+	public function throwsForMalformedTrustedProxy(): void
+	{
+		$this->expectException(InvalidArgumentException::class);
+		$this->expectExceptionMessage('10.0.0.0/');
+
+		new RateLimitMiddleware(new ArrayAdapter(), trustedProxies: ['127.0.0.1', '10.0.0.0/']);
+	}
 
 	#[Test]
 	public function allowsRequestUnderLimit(): void
