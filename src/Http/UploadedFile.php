@@ -14,6 +14,7 @@ use function in_array;
 use function is_dir;
 use function is_uploaded_file;
 use function mb_strlen;
+use function mb_substr;
 use function mkdir;
 use function move_uploaded_file;
 use function pathinfo;
@@ -25,7 +26,6 @@ use function set_error_handler;
 use function str_replace;
 use function stream_copy_to_stream;
 use function strtolower;
-use function substr;
 use function trim;
 use const FILEINFO_MIME_TYPE;
 use const PATHINFO_EXTENSION;
@@ -129,7 +129,8 @@ final class UploadedFile
 	 * Sanitize a filename for safe filesystem operations.
 	 *
 	 * @param string $filename Raw filename to sanitize
-	 * @param int $maxLength Maximum length (default 255)
+	 * @param int $maxLength Maximum length in characters (default 255); never cuts a UTF-8 character.
+	 *                       Filesystems limit names to 255 BYTES - use a lower value for non-ASCII names on disk.
 	 * @return string Safe filename
 	 */
 	public static function sanitizeFilename(string $filename, int $maxLength = 255): string
@@ -179,10 +180,10 @@ final class UploadedFile
 				$nameLength = $maxLength - $extLength;
 
 				$filename = $nameLength > 0
-					? substr($name, 0, $nameLength) . '.' . $extension
-					: substr($filename, 0, $maxLength);
+					? mb_substr($name, 0, $nameLength) . '.' . $extension
+					: mb_substr($filename, 0, $maxLength);
 			} else {
-				$filename = substr($filename, 0, $maxLength);
+				$filename = mb_substr($filename, 0, $maxLength);
 			}
 		}
 

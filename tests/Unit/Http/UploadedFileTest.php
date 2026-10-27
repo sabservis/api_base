@@ -10,6 +10,8 @@ use function fclose;
 use function file_get_contents;
 use function file_put_contents;
 use function fopen;
+use function mb_check_encoding;
+use function mb_strlen;
 use function mkdir;
 use function rmdir;
 use function str_repeat;
@@ -968,6 +970,42 @@ final class UploadedFileTest extends TestCase
 
 		@unlink($finalPath);
 		@rmdir($targetDir);
+	}
+
+	#[Test]
+	public function sanitizeFilenameTruncatesMultibyteNameToValidUtf8(): void
+	{
+		$result = UploadedFile::sanitizeFilename(str_repeat('ž', 300) . '.pdf');
+
+		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
+		self::assertSame(255, mb_strlen($result));
+		self::assertStringEndsWith('.pdf', $result);
+	}
+
+	#[Test]
+	public function sanitizeFilenameTruncatesEmojiNameToValidUtf8(): void
+	{
+		$result = UploadedFile::sanitizeFilename(str_repeat('📄', 300));
+
+		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
+		self::assertSame(255, mb_strlen($result));
+	}
+
+	#[Test]
+	public function sanitizeFilenameTruncatesMultibyteNameWithLongExtension(): void
+	{
+		$result = UploadedFile::sanitizeFilename('ž.' . str_repeat('č', 300), 10);
+
+		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
+		self::assertSame(10, mb_strlen($result));
+	}
+
+	#[Test]
+	public function sanitizeFilenameAsciiTruncationIsUnchanged(): void
+	{
+		$result = UploadedFile::sanitizeFilename(str_repeat('a', 300) . '.pdf');
+
+		self::assertSame(str_repeat('a', 251) . '.pdf', $result);
 	}
 
 }
