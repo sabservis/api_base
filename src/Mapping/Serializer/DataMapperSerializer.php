@@ -14,6 +14,7 @@ use Sabservis\Api\Http\ListResponse;
 use Sabservis\Api\Http\PaginatedListResponse;
 use Sabservis\Api\Utils\JsonLimits;
 use function array_map;
+use function is_array;
 use function is_object;
 use function is_string;
 use function json_decode;
@@ -87,24 +88,32 @@ class DataMapperSerializer implements EntitySerializer
 			throw new ClientErrorException('Invalid input data - expected JSON string');
 		}
 
-		if ($type === null) {
-			try {
-				return json_decode($data, true, $this->jsonDepth, JSON_THROW_ON_ERROR);
-			} catch (JsonException $e) {
-				throw new ClientErrorException('Invalid input data (JSON)', previous: $e);
-			}
+		try {
+			$decoded = json_decode($data, true, $this->jsonDepth, JSON_THROW_ON_ERROR);
+		} catch (JsonException $e) {
+			throw new ClientErrorException('Invalid input data (JSON)', previous: $e);
 		}
+
+		if ($type === null) {
+			return $decoded;
+		}
+
+		// Decoded here (not via Mapper::fromJson) to apply jsonDepth and reject scalar bodies with 400
+		if (!is_array($decoded)) {
+			throw new ClientErrorException('Invalid input data - expected JSON object');
+		}
+
+		/** @var array<string, mixed> $payload */
+		$payload = $decoded;
 
 		try {
 			/** @var class-string $type */
-			return $this->mapper->fromJson($data, $type);
+			return $this->mapper->fromArray($payload, $type);
 		} catch (DataMapperValidationException $e) {
 			throw (new ValidationException(
 				'Request body contains validation errors',
 				previous: $e,
 			))->withFields($e->getErrors());
-		} catch (JsonException $e) {
-			throw new ClientErrorException('Invalid input data (JSON)', previous: $e);
 		}
 	}
 

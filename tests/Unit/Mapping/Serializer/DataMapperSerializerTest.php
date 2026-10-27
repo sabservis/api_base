@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Mapping\Serializer;
 
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Attribute\OpenApi\Property as OpenApiProperty;
@@ -229,6 +230,55 @@ final class DataMapperSerializerTest extends TestCase
 		$this->expectExceptionMessage('Invalid input data - expected JSON string');
 
 		$this->serializer->deserialize(null);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function nonObjectJsonBodies(): array
+	{
+		return [
+			'string' => ['"str"'],
+			'integer' => ['1'],
+			'float' => ['1.5'],
+			'boolean' => ['true'],
+			'null' => ['null'],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('nonObjectJsonBodies')]
+	public function deserializeNonObjectJsonToDtoThrowsClientError(string $json): void
+	{
+		try {
+			$this->serializer->deserialize($json, TestUserDto::class);
+			self::fail('Expected ClientErrorException');
+		} catch (ClientErrorException $e) {
+			self::assertSame(400, $e->getCode());
+			self::assertNotInstanceOf(ValidationException::class, $e);
+		}
+	}
+
+	#[Test]
+	public function deserializeEmptyJsonArrayToDtoBehavesLikeEmptyObject(): void
+	{
+		// json_decode('[]', true) === json_decode('{}', true)
+		$result = $this->serializer->deserialize('[]', TestUserDto::class);
+
+		self::assertInstanceOf(TestUserDto::class, $result);
+		self::assertSame('', $result->name);
+	}
+
+	#[Test]
+	public function deserializeDeeplyNestedJsonToDtoThrows(): void
+	{
+		$depth = 70;
+		$json = '{"name":' . str_repeat('{"a":', $depth) . '1' . str_repeat('}', $depth) . '}';
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage('Invalid input data (JSON)');
+
+		$this->serializer->deserialize($json, TestUserDto::class);
 	}
 
 	#[Test]
