@@ -19,7 +19,7 @@ final class DateTimeParser
 	public const DEFAULT_FORMATS = [
 		'Y-m-d\TH:i:sP', // ISO 8601 with timezone
 		'Y-m-d\TH:i:s', // ISO 8601 without timezone
-		'Y-m-d', // Date only
+		'!Y-m-d', // Date only - "!" = midnight (without it time is taken from now)
 	];
 
 	/**

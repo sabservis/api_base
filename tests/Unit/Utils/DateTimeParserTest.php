@@ -8,6 +8,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Utils\DateTimeParser;
+use function date_default_timezone_get;
 
 final class DateTimeParserTest extends TestCase
 {
@@ -93,8 +94,37 @@ final class DateTimeParserTest extends TestCase
 		self::assertSame([
 			'Y-m-d\TH:i:sP',
 			'Y-m-d\TH:i:s',
-			'Y-m-d',
+			'!Y-m-d',
 		], DateTimeParser::DEFAULT_FORMATS);
+	}
+
+	#[Test]
+	public function dateOnlyIsMidnight(): void
+	{
+		$result = DateTimeParser::parse('2024-05-01');
+
+		self::assertSame('2024-05-01 00:00:00.000000', $result->format('Y-m-d H:i:s.u'));
+	}
+
+	#[Test]
+	public function dateOnlyIsDeterministic(): void
+	{
+		self::assertEquals(DateTimeParser::parse('2024-05-01'), DateTimeParser::parse('2024-05-01'));
+	}
+
+	#[Test]
+	public function dateOnlyKeepsDefaultTimezone(): void
+	{
+		$result = DateTimeParser::parse('2024-05-01');
+
+		self::assertSame(date_default_timezone_get(), $result->getTimezone()->getName());
+	}
+
+	#[Test]
+	public function isoDateTimeKeepsTime(): void
+	{
+		self::assertSame('10:30:00.000000', DateTimeParser::parse('2024-05-01T10:30:00')->format('H:i:s.u'));
+		self::assertSame('10:30:00 +02:00', DateTimeParser::parse('2024-05-01T10:30:00+02:00')->format('H:i:s P'));
 	}
 
 }
