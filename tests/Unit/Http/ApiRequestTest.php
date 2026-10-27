@@ -1256,4 +1256,18 @@ final class ApiRequestTest extends TestCase
 		self::assertSame('', $request->getContents());
 	}
 
+	#[Test]
+	public function fromGlobalsWithLimitTreatsEmptyContentLengthAsMissing(): void
+	{
+		// nginx default fastcgi_params sends CONTENT_LENGTH="" for requests without body
+		$_SERVER['REQUEST_METHOD'] = 'GET';
+		$_SERVER['REQUEST_URI'] = '/test';
+		$_SERVER['CONTENT_LENGTH'] = '';
+
+		$request = ApiRequest::fromGlobalsWithLimit(10_000);
+
+		self::assertSame('GET', $request->getMethod());
+		self::assertSame('', $request->getContents());
+	}
+
 }

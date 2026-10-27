@@ -112,7 +112,8 @@ class ApiRequest
 		// SECURITY: Check Content-Length BEFORE reading body to prevent memory DoS
 		$contentLength = $_SERVER['CONTENT_LENGTH'] ?? null;
 
-		if ($contentLength !== null) {
+		// nginx default fastcgi_params passes CONTENT_LENGTH="" for requests without body
+		if ($contentLength !== null && $contentLength !== '') {
 			// SECURITY: Validate Content-Length is a non-negative integer
 			// Negative values could bypass size checks, non-numeric could cause issues
 			if (!ctype_digit($contentLength)) {
