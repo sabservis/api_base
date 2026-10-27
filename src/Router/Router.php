@@ -347,8 +347,10 @@ final class Router
 			$name = $param->getName();
 
 			// Decoded after match so %2F cannot split segments; rawurldecode keeps "+" (RFC 3986)
-			if (isset($pathParams[$name])) {
-				$pathParameters[$name] = rawurldecode($pathParams[$name]);
+			$group = PathVariable::groupName($name);
+
+			if (isset($pathParams[$group])) {
+				$pathParameters[$name] = rawurldecode($pathParams[$group]);
 			}
 		}
 

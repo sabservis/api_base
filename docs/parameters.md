@@ -34,6 +34,8 @@ public function get(
 
 Atribut na metodě se do argumentu dosadí podle **stejného jména** (`#[CookieParameter(name: 'session')]` + `string $session`, u hlaviček bez ohledu na velikost písmen). Když se jméno liší (`X-API-Key` → `$apiKey`), dej atribut přímo na argument. Povinnost se pak odvodí ze signatury (`string` → povinný, `?string` / default → volitelný), pokud ji neurčíš přes `required:`.
 
+Názvy path proměnných mohou obsahovat pomlčku (`/users/{user-id}`) - do argumentu je naváže `#[PathParameter(name: 'user-id')] int $userId`.
+
 Hodnoty path parametrů jsou URL-dekódované (`/users/john%20doe` → `'john doe'`, `+` zůstává `+`, `%2F` → `/` uvnitř jednoho segmentu).
 
 Bez `type:` se typ převezme z argumentu metody se stejným jménem (`#[PathParameter(name: 'id', description: 'User ID')]` + `int $id` → `int`). Explicitní `type:` nebo `schema` s typem má přednost. Pokud argument se stejným jménem neexistuje, použije se `string`.

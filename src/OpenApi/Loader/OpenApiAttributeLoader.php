@@ -18,6 +18,7 @@ use Sabservis\Api\Attribute\OpenApi\RequestParameter;
 use Sabservis\Api\Attribute\OpenApi\Security;
 use Sabservis\Api\Attribute\OpenApi\Tag;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
+use Sabservis\Api\Router\PathVariable;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Security\Authorizer;
 use Sabservis\Api\UI\Controller\Controller as ControllerInterface;
@@ -297,7 +298,7 @@ final class OpenApiAttributeLoader
 		$pattern = Regex::replaceCallback(
 			$mask,
 			'#{([a-zA-Z0-9\-_]+)}#U',
-			static fn (array $matches): string => sprintf('(?P<%s>[^/]+)', $matches[1]),
+			static fn (array $matches): string => sprintf('(?P<%s>[^/]+)', PathVariable::groupName($matches[1])),
 		);
 
 		$endpoint['attributes'] = ['pattern' => $pattern];
@@ -586,7 +587,7 @@ final class OpenApiAttributeLoader
 				}
 
 				// Build parameter pattern
-				$pattern = sprintf('(?P<%s>[^/]+)', $variableName);
+				$pattern = sprintf('(?P<%s>[^/]+)', PathVariable::groupName($variableName));
 
 				// Build mask parameters
 				$maskParameters[$variableName] = [
