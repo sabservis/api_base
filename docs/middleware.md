@@ -129,7 +129,7 @@ api:
 
 ## Request ID
 
-Automaticky generuje nebo propaguje `X-Request-ID`:
+Automaticky generuje nebo propaguje `X-Request-ID`. Hodnota od klienta se převezme jen pokud odpovídá `[A-Za-z0-9._:=-]{1,128}` (UUID, ULID, hex, AWS `Root=1-...`) - jinak se vygeneruje nové UUID, aby se do logů nedostaly nové řádky, řídicí znaky nebo obří hodnoty (log injection):
 
 ```php
 public function action(ApiRequest $request): ApiResponse

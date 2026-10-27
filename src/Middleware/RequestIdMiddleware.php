@@ -6,6 +6,7 @@ use Sabservis\Api\Attribute\Core\MiddlewarePriority;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use function bin2hex;
+use function preg_match;
 use function random_bytes;
 use function sprintf;
 
@@ -26,6 +27,13 @@ final class RequestIdMiddleware implements Middleware
 	public const HeaderName = 'X-Request-ID';
 
 	public const AttributeName = 'requestId';
+
+	/**
+	 * Accepted client-provided IDs: UUID, ULID, hex, AWS "Root=1-...", etc.
+	 * Anything else (newlines, control chars, oversized values) would end up in logs - a new ID is generated.
+	 * \z instead of $ - $ would accept a trailing newline.
+	 */
+	private const VALID_REQUEST_ID = '/^[A-Za-z0-9._:=-]{1,128}\z/';
 
 	/**
 	 * Number of random bytes for UUID v4 generation (128-bit = 16 bytes).
@@ -71,8 +79,12 @@ final class RequestIdMiddleware implements Middleware
 		callable $next,
 	): ApiResponse
 	{
-		// Use existing request ID from header or generate new one
-		$requestId = $request->getHeader(self::HeaderName) ?? $this->generateUuid();
+		// Use existing request ID from header (when safe) or generate new one
+		$requestId = $request->getHeader(self::HeaderName);
+
+		if ($requestId === null || preg_match(self::VALID_REQUEST_ID, $requestId) !== 1) {
+			$requestId = $this->generateUuid();
+		}
 
 		// Add to request attributes for use in application
 		$request = $request->withAttribute(self::AttributeName, $requestId);
