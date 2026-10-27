@@ -24,7 +24,7 @@ Nižší priorita = spustí se dříve.
 |------------|----------------|-------------------|
 | `RequestIdMiddleware` | Trasování requestů přes logy, microservices | Jednoduchá aplikace bez distribuovaného logování |
 | `MethodOverrideMiddleware` | Klienti nepodporují PUT/PATCH/DELETE (legacy browsers, firewally) | Moderní SPA/mobile aplikace |
-| `RequestSizeLimitMiddleware` | Omezení velikosti PŘED načtením do RAM (DoS ochrana) | Už používáš `maxRequestBodySize` v DI (dělá totéž) |
+| `RequestSizeLimitMiddleware` | Dodatečný (nižší) limit body - body už je v paměti, **nechrání RAM** | Potřebuješ ochranu paměti - na to je `maxRequestBodySize` v DI |
 | `CORSMiddleware` | Frontend běží na jiné doméně než API | Same-origin aplikace, server-to-server komunikace |
 | `BasicAuthMiddleware` | Rychlá ochrana interních/admin endpointů, dev prostředí | Produkční user-facing API (použij JWT/OAuth) |
 | `RateLimitMiddleware` | Veřejné API, ochrana před abuse, brute-force | Interní microservices za VPN |
@@ -128,6 +128,8 @@ api:
     middlewares:
         - Sabservis\Api\Middleware\RequestSizeLimitMiddleware(maxBodySize: 10485760)
 ```
+
+**POZOR:** middleware běží až po sestavení `ApiRequest`, body je v tu chvíli **už celé v paměti** - u uploadu bez `Content-Length` (chunked) se načte celé a teprve pak přijde 413. Ochranu proti memory DoS dává jen `maxRequestBodySize` v DI, který čte vstup postupně a skončí hned za limitem (viz [Security](security.md#request-size-limit)). Middleware použij jen jako dodatečný, přísnější limit.
 
 ## Request ID
 

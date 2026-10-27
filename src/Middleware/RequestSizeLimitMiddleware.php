@@ -20,6 +20,9 @@ use function strlen;
  * - Validates actual body size as fallback
  * - Returns 413 Payload Too Large on violation
  *
+ * NOTE: Runs after ApiRequest was created - the body is already in memory, so this does NOT
+ * protect against memory DoS. Use `maxRequestBodySize` in DI for that (reads input with a limit).
+ *
  * Usage:
  * ```neon
  * api:

@@ -15,6 +15,7 @@ use stdClass;
 use function array_keys;
 use function fclose;
 use function fopen;
+use function ftell;
 use function fwrite;
 use function rewind;
 use function sprintf;
@@ -1247,6 +1248,25 @@ final class ApiRequestTest extends TestCase
 
 		try {
 			ApiRequest::readBodyWithLimit($stream, 500);
+		} finally {
+			fclose($stream);
+		}
+	}
+
+	#[Test]
+	public function readBodyWithLimitStopsReadingShortlyAfterLimit(): void
+	{
+		// maxRequestBodySize protects memory: a 1 MB body is not read whole when limit is 10 KB
+		$stream = fopen('php://temp', 'r+');
+		fwrite($stream, str_repeat('x', 1_048_576));
+		rewind($stream);
+
+		try {
+			ApiRequest::readBodyWithLimit($stream, 10_240);
+			self::fail('Expected 413');
+		} catch (ClientErrorException $e) {
+			self::assertSame(413, $e->getCode());
+			self::assertLessThanOrEqual(10_240 + 8_192, ftell($stream));
 		} finally {
 			fclose($stream);
 		}

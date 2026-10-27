@@ -14,7 +14,7 @@ api:
 - Pro chunked transfer čte postupně s hard limitem
 - Vrací `413 Payload Too Large` s human-readable velikostí (např. "10 MB")
 
-Alternativně lze použít `RequestSizeLimitMiddleware` pro jemnější kontrolu.
+`RequestSizeLimitMiddleware` **není náhrada** - běží až po načtení body do paměti, takže paměť nechrání. Hodí se jen jako dodatečný přísnější limit vedle `maxRequestBodySize`.
 
 ## Rate Limiting
 

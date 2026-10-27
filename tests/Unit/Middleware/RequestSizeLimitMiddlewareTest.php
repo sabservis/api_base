@@ -9,6 +9,7 @@ use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RequestSizeLimitMiddleware;
 use function str_repeat;
+use function strlen;
 
 final class RequestSizeLimitMiddlewareTest extends TestCase
 {
@@ -204,6 +205,28 @@ final class RequestSizeLimitMiddlewareTest extends TestCase
 		$this->expectExceptionMessage('Payload Too Large');
 
 		$middleware($request, $response, $next);
+	}
+
+	#[Test]
+	public function receivesBodyAlreadyLoadedInMemory(): void
+	{
+		// Middleware runs after ApiRequest was built - body without Content-Length (chunked)
+		// is already a string in memory, the middleware can only reject it afterwards.
+		$body = str_repeat('x', 4_096);
+		$request = new ApiRequest(method: 'POST', uri: '/upload', body: $body);
+
+		self::assertSame(4_096, strlen($request->getContents()));
+
+		try {
+			(new RequestSizeLimitMiddleware(maxBodySize: 1_024))(
+				$request,
+				new ApiResponse(),
+				static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res,
+			);
+			self::fail('Expected 413');
+		} catch (ClientErrorException $e) {
+			self::assertSame(413, $e->getCode());
+		}
 	}
 
 }
