@@ -12,7 +12,9 @@ use Attribute;
  * #[CookieParameter(name: 'session', description: 'Session cookie')]
  * ```
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
+#[Attribute(
+	Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE,
+)]
 final class CookieParameter extends RequestParameter
 {
 

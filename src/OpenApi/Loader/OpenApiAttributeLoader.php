@@ -660,6 +660,24 @@ final class OpenApiAttributeLoader
 				$parameters[$name] = $this->parameterEngine->buildParameter($instance, $method);
 			}
 		}
+
+		// Attributes on method arguments: #[HeaderParameter(name: 'X-API-Key')] string $apiKey
+		foreach ($method->getParameters() as $argument) {
+			foreach ($argument->getAttributes(
+				RequestParameter::class,
+				ReflectionAttribute::IS_INSTANCEOF,
+			) as $attribute) {
+				$instance = $attribute->newInstance();
+				assert($instance instanceof RequestParameter);
+				$instance->name ??= $argument->getName();
+
+				$parameters[$instance->name] = $this->parameterEngine->buildParameter(
+					$instance,
+					$method,
+					$argument->getName(),
+				);
+			}
+		}
 	}
 
 	/**

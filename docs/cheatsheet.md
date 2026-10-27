@@ -162,8 +162,10 @@ class UserDto
 ```php
 #[PathParameter(name: 'id', type: 'int', description: 'User ID')]
 #[QueryParameter(name: 'limit', type: 'int', description: 'Max items')]
-#[HeaderParameter(name: 'X-API-Key', type: 'string')]
-#[CookieParameter(name: 'session', type: 'string')]
+#[CookieParameter(name: 'session', type: 'string')]     // → string $session
+
+// Jiné jméno než argument → atribut na argumentu
+public function get(#[HeaderParameter(name: 'X-API-Key')] string $apiKey): array
 ```
 
 ### Request body

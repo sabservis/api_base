@@ -4,6 +4,7 @@ namespace Sabservis\Api\OpenApi\Loader;
 
 use BackedEnum;
 use DateTimeInterface;
+use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
 use ReflectionNamedType;
@@ -72,7 +73,7 @@ final class ParameterInferenceEngine
 			$paramName = $param->getName();
 
 			// Skip if already defined via explicit attribute
-			if (isset($parameters[$paramName])) {
+			if (isset($parameters[$paramName]) || $this->hasParameterAttribute($param)) {
 				continue;
 			}
 
@@ -148,7 +149,7 @@ final class ParameterInferenceEngine
 			$paramName = $param->getName();
 
 			// Respect explicit parameter attributes
-			if (isset($parameters[$paramName])) {
+			if (isset($parameters[$paramName]) || $this->hasParameterAttribute($param)) {
 				continue;
 			}
 
@@ -241,10 +242,15 @@ final class ParameterInferenceEngine
 	 * Build parameter array from RequestParameter attribute.
 	 *
 	 * Without explicit type or schema type, the type of the matching method argument is used.
+	 * $argument is set for attributes placed on a method argument (#[HeaderParameter(name: 'X-API-Key')] string $apiKey).
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function buildParameter(RequestParameter $param, ReflectionMethod|null $method = null): array
+	public function buildParameter(
+		RequestParameter $param,
+		ReflectionMethod|null $method = null,
+		string|null $argument = null,
+	): array
 	{
 		// Extract type from schema if provided, otherwise use explicit type
 		$type = $param->type;
@@ -263,15 +269,25 @@ final class ParameterInferenceEngine
 			$schemaRef = $param->schema->ref;
 		}
 
-		if (!$param->hasExplicitType() && !isset($schemaSpec['type']) && $method !== null) {
-			$type = $this->resolveSignatureType($method, $param->name) ?? $type;
+		$signatureParameter = $method !== null ? $this->findArgument($method, $argument ?? $param->name) : null;
+
+		if (!$param->hasExplicitType() && !isset($schemaSpec['type']) && $signatureParameter !== null) {
+			$type = $this->resolveSignatureType($signatureParameter) ?? $type;
+		}
+
+		$required = $param->isRequired();
+
+		// Bound argument without explicit required: same rule as inferred parameters
+		if ($argument !== null && $param->required === null && $signatureParameter !== null) {
+			$required = !$signatureParameter->allowsNull() && !$signatureParameter->isOptional();
 		}
 
 		return [
 			'name' => $param->name,
+			'argument' => $argument,
 			'type' => $type,
 			'in' => $param->in,
-			'required' => $param->isRequired(),
+			'required' => $required,
 			'description' => $param->description,
 			'deprecated' => $param->deprecated,
 			'allowEmptyValue' => $param->allowEmptyValue,
@@ -332,23 +348,34 @@ final class ParameterInferenceEngine
 		};
 	}
 
-	private function resolveSignatureType(ReflectionMethod $method, string|null $name): string|null
+	/**
+	 * Whether the argument has its own parameter attribute (#[HeaderParameter] string $apiKey).
+	 */
+	public function hasParameterAttribute(ReflectionParameter $parameter): bool
+	{
+		return $parameter->getAttributes(RequestParameter::class, ReflectionAttribute::IS_INSTANCEOF) !== [];
+	}
+
+	private function findArgument(ReflectionMethod $method, string|null $name): ReflectionParameter|null
 	{
 		foreach ($method->getParameters() as $parameter) {
-			if ($parameter->getName() !== $name) {
-				continue;
+			if ($parameter->getName() === $name) {
+				return $parameter;
 			}
-
-			$typeName = $this->resolveParameterType($parameter)['name'] ?? null;
-
-			if ($typeName === null || $typeName === ApiRequest::class || $typeName === ApiResponse::class) {
-				return null;
-			}
-
-			return $this->mapPhpTypeToParameterType($typeName);
 		}
 
 		return null;
+	}
+
+	private function resolveSignatureType(ReflectionParameter $parameter): string|null
+	{
+		$typeName = $this->resolveParameterType($parameter)['name'] ?? null;
+
+		if ($typeName === null || $typeName === ApiRequest::class || $typeName === ApiResponse::class) {
+			return null;
+		}
+
+		return $this->mapPhpTypeToParameterType($typeName);
 	}
 
 	/**

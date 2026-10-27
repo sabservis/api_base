@@ -24,9 +24,15 @@ use Sabservis\Api\Attribute\OpenApi\CookieParameter;
 #[Get(path: '/users/{id}')]
 #[PathParameter(name: 'id', type: 'int', description: 'User ID')]
 #[QueryParameter(name: 'include', type: 'string', required: false)]
-#[HeaderParameter(name: 'X-API-Key', type: 'string')]
-public function get(int $id, ?string $include, string $apiKey): UserDto
+public function get(
+    int $id,
+    ?string $include,
+    #[HeaderParameter(name: 'X-API-Key')] string $apiKey,
+    #[CookieParameter(name: 'session')] ?string $sessionId,
+): UserDto
 ```
+
+Atribut na metodě se do argumentu dosadí podle **stejného jména** (`#[CookieParameter(name: 'session')]` + `string $session`, u hlaviček bez ohledu na velikost písmen). Když se jméno liší (`X-API-Key` → `$apiKey`), dej atribut přímo na argument. Povinnost se pak odvodí ze signatury (`string` → povinný, `?string` / default → volitelný), pokud ji neurčíš přes `required:`.
 
 Hodnoty path parametrů jsou URL-dekódované (`/users/john%20doe` → `'john doe'`, `+` zůstává `+`, `%2F` → `/` uvnitř jednoho segmentu).
 

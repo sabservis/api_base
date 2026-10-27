@@ -109,7 +109,39 @@ class RequestParameterMapping
 
 		$convertedValue = $this->converter->convert($value, $parameter->getType(), $parameter);
 
-		return $this->updateRequest($request, $parameter, $name, $convertedValue);
+		return $this->bindArgument(
+			$this->updateRequest($request, $parameter, $name, $convertedValue),
+			$parameter,
+			$name,
+			$convertedValue,
+		);
+	}
+
+	/**
+	 * Expose value under the controller argument name (read by ServiceHandler).
+	 */
+	private function bindArgument(
+		ApiRequest $request,
+		EndpointParameter $parameter,
+		string $name,
+		mixed $value,
+	): ApiRequest
+	{
+		$argument = $parameter->getArgument();
+		$in = $parameter->getIn();
+
+		if ($argument === null && ($in === EndpointParameter::InPath || $in === EndpointParameter::InQuery)) {
+			return $request; // already stored under $name by updateRequest()
+		}
+
+		$parameters = $request->getAttribute(RequestAttributes::Parameters->value, []);
+
+		// Header/cookie matched only by name must not shadow path/query values
+		$parameters = $argument !== null
+			? [$argument => $value] + $parameters
+			: $parameters + [$name => $value];
+
+		return $request->withAttribute(RequestAttributes::Parameters->value, $parameters);
 	}
 
 	private function validateProvided(EndpointParameter $parameter, mixed $value): void

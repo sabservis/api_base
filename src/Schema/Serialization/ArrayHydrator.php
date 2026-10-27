@@ -112,6 +112,7 @@ class ArrayHydrator implements Hydrator
 				$parameter->setExplode($param['explode'] ?? null);
 				$parameter->setSchemaSpec($param['schemaSpec'] ?? null);
 				$parameter->setSchemaRef($param['schemaRef'] ?? null);
+				$parameter->setArgument($param['argument'] ?? null);
 
 				$endpoint->addParameter($parameter);
 			}

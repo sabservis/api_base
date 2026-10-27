@@ -12,7 +12,9 @@ use Attribute;
  * #[PathParameter(name: 'id', type: 'int', description: 'User ID')]
  * ```
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
+#[Attribute(
+	Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::TARGET_PARAMETER | Attribute::IS_REPEATABLE,
+)]
 final class PathParameter extends RequestParameter
 {
 

@@ -45,6 +45,8 @@ class EndpointParameter
 	/** @var class-string|null Original class reference for schema registration */
 	private string|null $schemaRef = null;
 
+	private string|null $argument = null;
+
 	public function __construct(
 		private string $name,
 		private string $type = self::TypeString,
@@ -172,6 +174,19 @@ class EndpointParameter
 	public function setSchemaRef(string|null $schemaRef): void
 	{
 		$this->schemaRef = $schemaRef;
+	}
+
+	/**
+	 * Controller method argument bound to this parameter (when its name differs, e.g. X-API-Key → $apiKey).
+	 */
+	public function getArgument(): string|null
+	{
+		return $this->argument;
+	}
+
+	public function setArgument(string|null $argument): void
+	{
+		$this->argument = $argument;
 	}
 
 }
