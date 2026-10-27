@@ -265,9 +265,12 @@ final class SchemaBuilder
 
 		// Handle union types (e.g., int|string, DateTimeImmutable|null)
 		if ($type instanceof ReflectionUnionType) {
-			$schema = $this->buildUnionTypeSchema($type);
+			$schema = $this->buildUnionTypeSchema($type, $property);
+		} elseif ($type instanceof ReflectionNamedType && $type->getName() === 'mixed') {
+			// Any value - no type constraint
+			$schema = new SchemaObject();
 		} elseif ($type instanceof ReflectionNamedType) {
-			$typeName = $type->getName();
+			$typeName = $this->resolveTypeName($type, $property);
 
 			// DateTime types should be mapped to string with format, not as $ref
 			if (TypeMapper::isDateType($typeName)) {
@@ -348,7 +351,20 @@ final class SchemaBuilder
 	 *
 	 * Uses oneOf for multiple non-null types, or nullable for simple ?Type.
 	 */
-	private function buildUnionTypeSchema(ReflectionUnionType $type): SchemaObject
+
+	/**
+	 * self/static resolve to the declaring class (e.g. tree structures: public ?self $parent).
+	 */
+	private function resolveTypeName(ReflectionNamedType $type, ReflectionProperty $property): string
+	{
+		$typeName = $type->getName();
+
+		return $typeName === 'self' || $typeName === 'static'
+			? $property->getDeclaringClass()->getName()
+			: $typeName;
+	}
+
+	private function buildUnionTypeSchema(ReflectionUnionType $type, ReflectionProperty $property): SchemaObject
 	{
 		$types = $type->getTypes();
 		$allowsNull = $type->allowsNull();
@@ -364,7 +380,7 @@ final class SchemaBuilder
 
 		// Single non-null type with nullable = simple nullable type
 		if (count($nonNullTypes) === 1) {
-			$typeName = $nonNullTypes[0]->getName();
+			$typeName = $this->resolveTypeName($nonNullTypes[0], $property);
 
 			// DateTime types should be mapped to string with format, not as $ref
 			if (TypeMapper::isDateType($typeName)) {
@@ -400,7 +416,7 @@ final class SchemaBuilder
 		$oneOfSchemas = [];
 
 		foreach ($nonNullTypes as $unionType) {
-			$typeName = $unionType->getName();
+			$typeName = $this->resolveTypeName($unionType, $property);
 
 			if (TypeMapper::isDateType($typeName)) {
 				$openApiType = TypeMapper::phpToOpenApi($typeName);

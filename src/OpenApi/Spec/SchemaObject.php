@@ -3,6 +3,7 @@
 namespace Sabservis\Api\OpenApi\Spec;
 
 use JsonSerializable;
+use stdClass;
 
 final class SchemaObject implements JsonSerializable
 {
@@ -236,6 +237,9 @@ final class SchemaObject implements JsonSerializable
 
 		if ($this->items !== null) {
 			$data['items'] = $this->items;
+		} elseif ($this->type === 'array') {
+			// OpenAPI 3.0 requires items for arrays - {} = any value
+			$data['items'] = new stdClass();
 		}
 
 		if ($this->additionalProperties !== null) {
