@@ -11,6 +11,8 @@ use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Utils\Regex;
+use function is_array;
+use function is_string;
 use function mb_strlen;
 use function mb_substr;
 use function sprintf;
@@ -103,8 +105,7 @@ final class Router
 		if ($this->cache !== null) {
 			$cached = $this->cache->get($cacheKey);
 
-			if ($cached !== null) {
-				$this->loadFromCache($cached);
+			if (is_array($cached) && $this->loadFromCache($cached)) {
 				$this->compiled = true;
 
 				return;
@@ -119,42 +120,63 @@ final class Router
 	}
 
 	/**
-	 * @param array{staticRoutes: array<string, array<string, int>>, dynamicRoutes: array<string, array<array{pattern: string, endpointIndex: int}>>} $cached
+	 * Restores routes from cache. Endpoints are referenced by stable key (class::method@mask),
+	 * never by position, so reordering controllers/methods cannot route to a wrong handler.
+	 *
+	 * @param array<mixed> $cached
+	 * @return bool false when cache is stale or in unknown format (caller recompiles)
 	 */
-	private function loadFromCache(array $cached): void
+	private function loadFromCache(array $cached): bool
 	{
-		$endpoints = $this->schema->getEndpoints();
+		$endpointMap = $this->buildEndpointMap($this->schema->getEndpoints());
+		$staticRoutes = [];
+		$dynamicRoutes = [];
+
+		if (!is_array($cached['staticRoutes'] ?? null) || !is_array($cached['dynamicRoutes'] ?? null)) {
+			return false;
+		}
 
 		foreach ($cached['staticRoutes'] as $method => $routes) {
-			foreach ($routes as $path => $endpointIndex) {
-				$this->staticRoutes[$method][$path] = $endpoints[$endpointIndex];
+			foreach ($routes as $path => $endpointKey) {
+				if (!is_string($endpointKey) || !isset($endpointMap[$endpointKey])) {
+					return false;
+				}
+
+				$staticRoutes[$method][$path] = $endpointMap[$endpointKey];
 			}
 		}
 
 		foreach ($cached['dynamicRoutes'] as $method => $routes) {
 			foreach ($routes as $route) {
-				$this->dynamicRoutes[$method][] = [
+				$endpointKey = $route['endpointKey'] ?? null;
+
+				if (!is_string($endpointKey) || !isset($endpointMap[$endpointKey])) {
+					return false;
+				}
+
+				$dynamicRoutes[$method][] = [
 					'pattern' => $route['pattern'],
-					'endpoint' => $endpoints[$route['endpointIndex']],
+					'endpoint' => $endpointMap[$endpointKey],
 				];
 			}
 		}
+
+		$this->staticRoutes = $staticRoutes;
+		$this->dynamicRoutes = $dynamicRoutes;
+
+		return true;
 	}
 
 	/**
-	 * @return array{staticRoutes: array<string, array<string, int>>, dynamicRoutes: array<string, array<array{pattern: string, endpointIndex: int}>>}
+	 * @return array{staticRoutes: array<string, array<string, string>>, dynamicRoutes: array<string, array<array{pattern: string, endpointKey: string}>>}
 	 */
 	private function buildCacheData(): array
 	{
-		$endpoints = $this->schema->getEndpoints();
-		$endpointIndexMap = $this->buildEndpointIndexMap($endpoints);
-
 		$staticRoutes = [];
 
 		foreach ($this->staticRoutes as $method => $routes) {
 			foreach ($routes as $path => $endpoint) {
-				$key = $this->getEndpointKey($endpoint);
-				$staticRoutes[$method][$path] = $endpointIndexMap[$key];
+				$staticRoutes[$method][$path] = $this->getEndpointKey($endpoint);
 			}
 		}
 
@@ -162,10 +184,9 @@ final class Router
 
 		foreach ($this->dynamicRoutes as $method => $routes) {
 			foreach ($routes as $route) {
-				$key = $this->getEndpointKey($route['endpoint']);
 				$dynamicRoutes[$method][] = [
 					'pattern' => $route['pattern'],
-					'endpointIndex' => $endpointIndexMap[$key],
+					'endpointKey' => $this->getEndpointKey($route['endpoint']),
 				];
 			}
 		}
@@ -177,20 +198,15 @@ final class Router
 	}
 
 	/**
-	 * Build a map of endpoint keys to their indices.
-	 *
-	 * Uses controller class + method as stable identifier (survives between requests).
-	 *
 	 * @param array<Endpoint> $endpoints
-	 * @return array<string, int>
+	 * @return array<string, Endpoint>
 	 */
-	private function buildEndpointIndexMap(array $endpoints): array
+	private function buildEndpointMap(array $endpoints): array
 	{
 		$map = [];
 
-		foreach ($endpoints as $index => $endpoint) {
-			$key = $this->getEndpointKey($endpoint);
-			$map[$key] = $index;
+		foreach ($endpoints as $endpoint) {
+			$map[$this->getEndpointKey($endpoint)] = $endpoint;
 		}
 
 		return $map;

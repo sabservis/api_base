@@ -12,6 +12,8 @@ use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Schema\Schema;
+use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Cache\Psr16Cache;
 
 final class RouterTest extends TestCase
 {
@@ -176,7 +178,7 @@ final class RouterTest extends TestCase
 		// Simulate cached data structure
 		$cachedData = [
 			'staticRoutes' => [
-				'GET' => ['/users' => 0], // index into endpoints array
+				'GET' => ['/users' => 'TestController::testMethod@/users'],
 			],
 			'dynamicRoutes' => [],
 		];
@@ -197,6 +199,28 @@ final class RouterTest extends TestCase
 
 		self::assertInstanceOf(ApiRequest::class, $matched);
 		self::assertSame($endpoint, $matched->getAttribute(RequestAttributes::Endpoint->value));
+	}
+
+	#[Test]
+	public function recompilesWhenCachedEndpointIsUnknown(): void
+	{
+		$schema = new Schema();
+		$schema->addEndpoint($this->createEndpoint('UserController', 'list', 'GET', '/users'));
+
+		$cache = $this->createMock(CacheInterface::class);
+		$cache->method('get')->willReturn([
+			// Legacy index-based format / endpoint no longer present
+			'staticRoutes' => ['GET' => ['/users' => 0]],
+			'dynamicRoutes' => [],
+		]);
+		$cache->expects($this->once())->method('set')->willReturn(true);
+
+		$matched = (new Router($schema, $cache))->match(new ApiRequest(method: 'GET', uri: 'http://example.com/users'));
+
+		self::assertInstanceOf(ApiRequest::class, $matched);
+		$endpoint = $matched->getAttribute(RequestAttributes::Endpoint->value);
+		self::assertInstanceOf(Endpoint::class, $endpoint);
+		self::assertSame('list', $endpoint->getControllerMethod());
 	}
 
 	#[Test]
@@ -221,6 +245,59 @@ final class RouterTest extends TestCase
 	}
 
 	#[Test]
+	public function cachedRoutesSurviveEndpointReorder(): void
+	{
+		$cache = new Psr16Cache(new ArrayAdapter());
+
+		// Deploy 1: list() declared before create()
+		$schema1 = new Schema();
+		$schema1->addEndpoint($this->createEndpoint('UserController', 'list', 'GET', '/users'));
+		$schema1->addEndpoint($this->createEndpoint('UserController', 'create', 'POST', '/users'));
+
+		(new Router($schema1, $cache))->match(new ApiRequest(method: 'GET', uri: 'http://example.com/users'));
+
+		// Deploy 2: same routes, methods reordered in controller
+		$schema2 = new Schema();
+		$schema2->addEndpoint($this->createEndpoint('UserController', 'create', 'POST', '/users'));
+		$schema2->addEndpoint($this->createEndpoint('UserController', 'list', 'GET', '/users'));
+
+		$matched = (new Router($schema2, $cache))->match(
+			new ApiRequest(method: 'GET', uri: 'http://example.com/users'),
+		);
+
+		self::assertInstanceOf(ApiRequest::class, $matched);
+		$endpoint = $matched->getAttribute(RequestAttributes::Endpoint->value);
+		self::assertInstanceOf(Endpoint::class, $endpoint);
+		self::assertSame('list', $endpoint->getControllerMethod());
+	}
+
+	#[Test]
+	public function cachedRoutesSurviveEndpointMovedToAnotherController(): void
+	{
+		$cache = new Psr16Cache(new ArrayAdapter());
+
+		$schema1 = new Schema();
+		$schema1->addEndpoint($this->createEndpoint('UserController', 'list', 'GET', '/users'));
+		$schema1->addEndpoint($this->createEndpoint('OrderController', 'list', 'GET', '/orders'));
+
+		(new Router($schema1, $cache))->match(new ApiRequest(method: 'GET', uri: 'http://example.com/users'));
+
+		// Masks and methods unchanged, but handlers swapped between controllers
+		$schema2 = new Schema();
+		$schema2->addEndpoint($this->createEndpoint('UserController', 'list', 'GET', '/orders'));
+		$schema2->addEndpoint($this->createEndpoint('OrderController', 'list', 'GET', '/users'));
+
+		$matched = (new Router($schema2, $cache))->match(
+			new ApiRequest(method: 'GET', uri: 'http://example.com/users'),
+		);
+
+		self::assertInstanceOf(ApiRequest::class, $matched);
+		$endpoint = $matched->getAttribute(RequestAttributes::Endpoint->value);
+		self::assertInstanceOf(Endpoint::class, $endpoint);
+		self::assertSame('OrderController', $endpoint->getControllerClass());
+	}
+
+	#[Test]
 	public function worksWithoutCache(): void
 	{
 		$endpoint = new Endpoint('TestController', 'testMethod');
@@ -236,6 +313,15 @@ final class RouterTest extends TestCase
 		$matched = $router->match($request);
 
 		self::assertInstanceOf(ApiRequest::class, $matched);
+	}
+
+	private function createEndpoint(string $class, string $method, string $httpMethod, string $mask): Endpoint
+	{
+		$endpoint = new Endpoint($class, $method);
+		$endpoint->addMethod($httpMethod);
+		$endpoint->setMask($mask);
+
+		return $endpoint;
 	}
 
 }
