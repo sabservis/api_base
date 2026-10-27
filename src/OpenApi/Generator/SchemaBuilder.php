@@ -3,6 +3,7 @@
 namespace Sabservis\Api\OpenApi\Generator;
 
 use Closure;
+use Pocta\DataMapper\Attributes\MapProperty;
 use ReflectionClass;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -525,11 +526,20 @@ final class SchemaBuilder
 		return $ref;
 	}
 
+	/**
+	 * JSON key: explicit #[Property(property:)], then data-mapper #[MapProperty(name:)] (key used on the wire).
+	 */
 	private function getPropertyName(ReflectionProperty $property): string
 	{
 		$attr = $this->getPropertyAttribute($property);
 
-		return $attr?->property ?? $property->getName();
+		if ($attr?->property !== null) {
+			return $attr->property;
+		}
+
+		$mapProperty = $property->getAttributes(MapProperty::class)[0] ?? null;
+
+		return $mapProperty?->newInstance()->name ?? $property->getName();
 	}
 
 	/**

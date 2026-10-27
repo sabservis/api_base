@@ -118,6 +118,23 @@ class UserDto
 }
 ```
 
+### Názvy property (JSON klíče)
+
+Název ve schématu odpovídá klíči, který posílá a čte serializer:
+
+1. `#[Property(property: 'x')]` - explicitní název pro OpenAPI
+2. `#[MapProperty(name: 'user_name')]` (data-mapper) - klíč na drátě
+3. název PHP property
+
+```php
+use Pocta\DataMapper\Attributes\MapProperty;
+
+#[MapProperty(name: 'created_at')]
+public string $createdAt;     // ve schématu i v JSON: created_at
+```
+
+**Pozor:** `#[MapProperty(path: 'address.city')]` čte vnořený vstup (`{"address": {"city": ...}}`), ale ven serializuje plochý klíč `city`. Schéma ukazuje `city` (výstup).
+
 ### DateTime property
 
 `DateTime`, `DateTimeImmutable` a `DateTimeInterface` se automaticky mapuji na `type: string, format: date-time`:
