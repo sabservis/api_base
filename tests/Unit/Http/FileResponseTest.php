@@ -10,10 +10,18 @@ use Sabservis\Api\Http\FileResponse;
 use function basename;
 use function file_exists;
 use function file_put_contents;
+use function fopen;
+use function fseek;
+use function fwrite;
 use function mkdir;
+use function pclose;
+use function popen;
 use function realpath;
+use function rewind;
 use function rmdir;
 use function sprintf;
+use function stream_get_contents;
+use function strlen;
 use function symlink;
 use function sys_get_temp_dir;
 use function uniqid;
@@ -194,6 +202,63 @@ final class FileResponseTest extends TestCase
 
 			self::assertNotNull($response->getHeader('content-security-policy'), $filename);
 		}
+	}
+
+	#[Test]
+	public function fromResourceAtStartSendsWholeContent(): void
+	{
+		$handle = fopen('php://memory', 'w+b');
+		fwrite($handle, 'hello world');
+		rewind($handle);
+
+		$this->assertResourceSends('hello world', FileResponse::fromResource($handle, 'a.txt'));
+	}
+
+	#[Test]
+	public function fromResourceAfterWriteSendsWholeContent(): void
+	{
+		// Typical: build content in php://temp, return handle without rewind()
+		$handle = fopen('php://temp', 'w+b');
+		fwrite($handle, 'hello world');
+
+		$this->assertResourceSends('hello world', FileResponse::fromResource($handle, 'a.txt'));
+	}
+
+	#[Test]
+	public function fromResourceAfterSeekSendsWholeContent(): void
+	{
+		$handle = fopen('php://memory', 'w+b');
+		fwrite($handle, 'hello world');
+		fseek($handle, 6);
+
+		$this->assertResourceSends('hello world', FileResponse::fromResource($handle, 'a.txt'));
+	}
+
+	#[Test]
+	public function fromNonSeekableResourceOmitsContentLength(): void
+	{
+		$handle = popen('printf "hello"', 'r');
+		self::assertIsResource($handle);
+
+		$fileResponse = FileResponse::fromResource($handle, 'a.txt');
+		$response = $fileResponse->toApiResponse();
+
+		self::assertNull($fileResponse->getSize());
+		self::assertFalse($response->hasHeader('Content-Length'));
+		self::assertSame('hello', stream_get_contents($response->getBody()));
+		pclose($handle);
+	}
+
+	private function assertResourceSends(string $expected, FileResponse $fileResponse): void
+	{
+		$response = $fileResponse->toApiResponse();
+		$body = $response->getBody();
+		self::assertIsResource($body);
+
+		$sent = stream_get_contents($body);
+
+		self::assertSame($expected, $sent);
+		self::assertSame((string) strlen($sent), $response->getHeader('Content-Length'));
 	}
 
 	#[Test]

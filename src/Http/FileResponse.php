@@ -16,8 +16,10 @@ use function pathinfo;
 use function rawurlencode;
 use function readlink;
 use function realpath;
+use function rewind;
 use function str_replace;
 use function str_starts_with;
+use function stream_get_meta_data;
 use function strlen;
 use function strtolower;
 use function trim;
@@ -215,6 +217,9 @@ final class FileResponse
 	/**
 	 * Create FileResponse from resource handle.
 	 *
+	 * Seekable handles are rewound and sent whole (no manual rewind() needed after writing).
+	 * Non-seekable handles (pipes, sockets) are streamed without Content-Length.
+	 *
 	 * @param resource $handle Open file handle
 	 * @param string $filename Filename for download
 	 * @param string|null $contentType Custom MIME type (auto-detected from filename if null)
@@ -229,8 +234,14 @@ final class FileResponse
 			throw new RuntimeStateException('Expected resource handle');
 		}
 
-		$stat = fstat($handle);
-		$size = $stat['size'] ?? null;
+		// Like PSR-7 emitters (Slim, Laminas): seekable streams are sent whole from the start.
+		// Non-seekable (pipe, socket) have no reliable size - fstat() reports 0, so omit Content-Length.
+		$size = null;
+
+		if (stream_get_meta_data($handle)['seekable']) {
+			rewind($handle);
+			$size = fstat($handle)['size'] ?? null;
+		}
 
 		return new self(
 			$handle,
