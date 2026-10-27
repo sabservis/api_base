@@ -63,6 +63,85 @@ final class IpMatcherTest extends TestCase
 	}
 
 	#[Test]
+	#[DataProvider('provideMalformedCidrs')]
+	public function matchesCidrRejectsMalformedPrefix(string $ip, string $cidr): void
+	{
+		// IP lies inside the subnet, so any lenient prefix parsing would produce a match
+		self::assertFalse(IpMatcher::matchesCidr($ip, $cidr));
+		self::assertFalse(IpMatcher::matchesCidr('8.8.8.8', $cidr));
+		self::assertFalse(IpMatcher::matchesAny($ip, [$cidr]));
+	}
+
+	/**
+	 * @return array<string, array{string, string}>
+	 */
+	public static function provideMalformedCidrs(): array
+	{
+		return [
+			'empty prefix' => ['10.1.2.3', '10.0.0.0/'],
+			'trailing space' => ['10.1.2.3', '10.0.0.0/8 '],
+			'leading space' => ['10.1.2.3', '10.0.0.0/ 8'],
+			'non-numeric' => ['10.1.2.3', '10.0.0.0/abc'],
+			'signed' => ['10.1.2.3', '10.0.0.0/+8'],
+			'negative zero' => ['10.1.2.3', '10.0.0.0/-0'],
+			'double slash' => ['10.1.2.3', '10.0.0.0/8/8'],
+			'ipv6 non-numeric' => ['fe80::1', 'fe80::/x'],
+			'ipv6 empty prefix' => ['2001:db8::1', '2001:db8::/'],
+		];
+	}
+
+	#[Test]
+	public function matchesCidrAcceptsExplicitZeroPrefix(): void
+	{
+		self::assertTrue(IpMatcher::matchesCidr('8.8.8.8', '0.0.0.0/0'));
+		self::assertTrue(IpMatcher::matchesCidr('2001:4860::8888', '::/0'));
+	}
+
+	#[Test]
+	#[DataProvider('provideValidPatterns')]
+	public function isValidPatternAcceptsIpAndCidr(string $pattern): void
+	{
+		self::assertTrue(IpMatcher::isValidPattern($pattern));
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function provideValidPatterns(): array
+	{
+		return [
+			'ipv4' => ['10.0.0.1'],
+			'ipv4 cidr' => ['10.0.0.0/8'],
+			'ipv4 zero' => ['0.0.0.0/0'],
+			'ipv6' => ['::1'],
+			'ipv6 cidr' => ['2001:db8::/32'],
+		];
+	}
+
+	#[Test]
+	#[DataProvider('provideInvalidPatterns')]
+	public function isValidPatternRejectsMalformed(string $pattern): void
+	{
+		self::assertFalse(IpMatcher::isValidPattern($pattern));
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function provideInvalidPatterns(): array
+	{
+		return [
+			'empty prefix' => ['10.0.0.0/'],
+			'trailing space' => ['10.0.0.0/8 '],
+			'prefix too large v4' => ['10.0.0.0/33'],
+			'prefix too large v6' => ['2001:db8::/129'],
+			'invalid subnet' => ['10.0.0/8'],
+			'hostname' => ['proxy.local'],
+			'empty' => [''],
+		];
+	}
+
+	#[Test]
 	public function matchesAnyWithExactMatch(): void
 	{
 		$patterns = ['192.168.1.1', '10.0.0.1'];

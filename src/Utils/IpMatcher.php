@@ -2,6 +2,7 @@
 
 namespace Sabservis\Api\Utils;
 
+use function count;
 use function explode;
 use function filter_var;
 use function inet_pton;
@@ -69,24 +70,68 @@ final class IpMatcher
 	 */
 	public static function matchesCidr(string $ip, string $cidr): bool
 	{
-		if (!str_contains($cidr, '/')) {
+		$parsed = self::parseCidr($cidr);
+
+		if ($parsed === null) {
 			return false;
 		}
 
-		[$subnet, $bits] = explode('/', $cidr, 2);
-		$bitsInt = (int) $bits;
+		[$subnet, $bits] = $parsed;
 
 		// Detect IP version and use appropriate matching
 		if (self::isIpv4($ip) && self::isIpv4($subnet)) {
-			return self::matchesCidrV4($ip, $subnet, $bitsInt);
+			return self::matchesCidrV4($ip, $subnet, $bits);
 		}
 
 		if (self::isIpv6($ip) && self::isIpv6($subnet)) {
-			return self::matchesCidrV6($ip, $subnet, $bitsInt);
+			return self::matchesCidrV6($ip, $subnet, $bits);
 		}
 
 		// Mixed IP versions or invalid IPs
 		return false;
+	}
+
+	/**
+	 * Validate a trusted-proxy style pattern: exact IP address or CIDR with in-range prefix.
+	 */
+	public static function isValidPattern(string $pattern): bool
+	{
+		if (!str_contains($pattern, '/')) {
+			return filter_var($pattern, FILTER_VALIDATE_IP) !== false;
+		}
+
+		$parsed = self::parseCidr($pattern);
+
+		if ($parsed === null) {
+			return false;
+		}
+
+		[$subnet, $bits] = $parsed;
+
+		if (self::isIpv4($subnet)) {
+			return $bits <= self::IPV4_BITS;
+		}
+
+		return self::isIpv6($subnet) && $bits <= self::IPV6_BITS;
+	}
+
+	/**
+	 * Split CIDR into subnet and prefix length.
+	 *
+	 * SECURITY: Prefix must be plain digits. Casting e.g. "" or "abc" to int yields 0,
+	 * which would turn a config typo into "/0" = match every address.
+	 *
+	 * @return array{string, int}|null
+	 */
+	private static function parseCidr(string $cidr): array|null
+	{
+		$parts = explode('/', $cidr);
+
+		if (count($parts) !== 2 || preg_match('/^[0-9]{1,3}\z/', $parts[1]) !== 1) {
+			return null;
+		}
+
+		return [$parts[0], (int) $parts[1]];
 	}
 
 	/**

@@ -142,6 +142,17 @@ final class ApiExtensionTest extends TestCase
 	}
 
 	#[Test]
+	public function throwsForMalformedTrustedProxy(): void
+	{
+		$this->expectException(RuntimeStateException::class);
+		$this->expectExceptionMessage('10.0.0.0/');
+
+		$this->createContainer([
+			'trustedProxies' => ['127.0.0.1', '10.0.0.0/'],
+		]);
+	}
+
+	#[Test]
 	public function setsTrustedProxies(): void
 	{
 		$container = $this->createContainer([

@@ -36,6 +36,7 @@ use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Sabservis\Api\Security\AuthorizationChecker;
 use Sabservis\Api\Utils\ChainBuilder;
+use Sabservis\Api\Utils\IpMatcher;
 use stdClass;
 use function assert;
 use function class_exists;
@@ -198,8 +199,15 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			}
 		}
 
-		// Validate trustedProxies with maxRequestBodySize
-		// (Without trustedProxies, X-Forwarded-* headers are ignored which is correct behavior)
+		// Fail fast on malformed trustedProxies - a silently ignored entry breaks client IP/HTTPS detection
+		foreach ($config->trustedProxies as $proxy) {
+			if (!IpMatcher::isValidPattern($proxy)) {
+				throw new RuntimeStateException(sprintf(
+					'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
+					$proxy,
+				));
+			}
+		}
 	}
 
 	/**
