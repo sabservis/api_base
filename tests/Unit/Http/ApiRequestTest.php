@@ -12,6 +12,7 @@ use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Schema\Endpoint;
 use stdClass;
+use function array_keys;
 use function fclose;
 use function fopen;
 use function fwrite;
@@ -593,6 +594,104 @@ final class ApiRequestTest extends TestCase
 
 		self::assertSame(UPLOAD_ERR_INI_SIZE, $files[1]->getError());
 		self::assertSame(UPLOAD_ERR_PARTIAL, $files[2]->getError());
+	}
+
+	#[Test]
+	public function multipleFilesSkippingNoFileAreReindexed(): void
+	{
+		$request = new ApiRequest(
+			method: 'POST',
+			uri: '/',
+			files: [
+				'documents' => [
+					'name' => ['a.pdf', '', 'c.pdf'],
+					'type' => ['application/pdf', '', 'application/pdf'],
+					'size' => [100, 0, 300],
+					'tmp_name' => ['/tmp/php1', '', '/tmp/php3'],
+					'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_NO_FILE, UPLOAD_ERR_OK],
+				],
+			],
+		);
+
+		$files = $request->getUploadedFiles('documents');
+
+		self::assertSame([0, 1], array_keys($files));
+		self::assertSame('a.pdf', $files[0]->getName());
+		self::assertSame('c.pdf', $files[1]->getName());
+	}
+
+	#[Test]
+	public function namedMultipleFileKeysArePreserved(): void
+	{
+		// <input type="file" name="doc[main]"> + name="doc[attachment]"
+		$request = new ApiRequest(
+			method: 'POST',
+			uri: '/',
+			files: [
+				'doc' => [
+					'name' => ['main' => 'main.pdf', 'attachment' => 'att.pdf'],
+					'type' => ['main' => 'application/pdf', 'attachment' => 'application/pdf'],
+					'size' => ['main' => 100, 'attachment' => 200],
+					'tmp_name' => ['main' => '/tmp/php1', 'attachment' => '/tmp/php2'],
+					'error' => ['main' => UPLOAD_ERR_OK, 'attachment' => UPLOAD_ERR_OK],
+				],
+			],
+		);
+
+		$files = $request->getUploadedFiles('doc');
+
+		self::assertSame(['main', 'attachment'], array_keys($files));
+		self::assertSame('main.pdf', $files['main']->getName());
+		self::assertSame(200, $files['attachment']->getSize());
+	}
+
+	#[Test]
+	public function nestedMultipleFilesAreFlattenedWithPathKeys(): void
+	{
+		// <input type="file" name="doc[0][0]"> + name="doc[0][1]" + name="doc[x][]"
+		$request = new ApiRequest(
+			method: 'POST',
+			uri: '/',
+			files: [
+				'doc' => [
+					'name' => [['a.pdf', 'b.pdf'], 'x' => ['x.pdf']],
+					'type' => [['application/pdf', 'application/pdf'], 'x' => ['application/pdf']],
+					'size' => [[100, 200], 'x' => [300]],
+					'tmp_name' => [['/tmp/php1', '/tmp/php2'], 'x' => ['/tmp/php3']],
+					'error' => [[UPLOAD_ERR_OK, UPLOAD_ERR_OK], 'x' => [UPLOAD_ERR_OK]],
+				],
+			],
+		);
+
+		$files = $request->getUploadedFiles('doc');
+
+		self::assertSame(['0.0', '0.1', 'x.0'], array_keys($files));
+		self::assertSame('a.pdf', $files['0.0']->getName());
+		self::assertSame('b.pdf', $files['0.1']->getName());
+		self::assertSame('x.pdf', $files['x.0']->getName());
+	}
+
+	#[Test]
+	public function malformedMultipleFileEntriesAreSkipped(): void
+	{
+		$request = new ApiRequest(
+			method: 'POST',
+			uri: '/',
+			files: [
+				'doc' => [
+					'name' => ['ok.pdf', 'missing-tmp.pdf', ['wrong' => 'shape']],
+					'type' => ['application/pdf', 'application/pdf', 'application/pdf'],
+					'size' => [100, 200, 300],
+					'tmp_name' => ['/tmp/php1'],
+					'error' => [UPLOAD_ERR_OK, UPLOAD_ERR_OK, UPLOAD_ERR_OK],
+				],
+			],
+		);
+
+		$files = $request->getUploadedFiles('doc');
+
+		self::assertCount(1, $files);
+		self::assertSame('ok.pdf', $files[0]->getName());
 	}
 
 	// =====================

@@ -12,8 +12,10 @@ use Sabservis\Api\Utils\ClientIpResolver;
 use Sabservis\Api\Utils\IpMatcher;
 use Sabservis\Api\Utils\JsonLimits;
 use function array_change_key_case;
+use function array_filter;
 use function array_key_exists;
 use function array_keys;
+use function array_values;
 use function count;
 use function ctype_digit;
 use function fclose;
@@ -21,7 +23,9 @@ use function feof;
 use function file_get_contents;
 use function fopen;
 use function fread;
+use function implode;
 use function is_array;
+use function is_int;
 use function is_string;
 use function json_decode;
 use function json_last_error;
@@ -562,8 +566,6 @@ class ApiRequest
 
 			// Multiple files: name[], tmp_name[], etc. are arrays
 			if (is_array($file['error'])) {
-				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
-				/** @var array{name: array<string>, type: array<string>, size: array<int>, tmp_name: array<string>, error: array<int>} $file */
 				$normalized[$name] = $this->normalizeMultipleFiles($file);
 			} elseif ($file['error'] !== UPLOAD_ERR_NO_FILE) {
 				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
@@ -578,29 +580,89 @@ class ApiRequest
 	/**
 	 * Normalize multiple file upload structure.
 	 *
-	 * @param array{name: array<string>, type: array<string>, size: array<int>, tmp_name: array<string>, error: array<int>} $file
-	 * @return array<UploadedFile>
+	 * Flat lists (name[]) are reindexed, named keys (name[main]) are kept,
+	 * deeper nesting (name[0][1]) is flattened to dot-separated keys ("0.1").
+	 * Malformed entries are skipped.
+	 *
+	 * @param array<mixed> $file
+	 * @return array<int|string, UploadedFile>
 	 */
 	private function normalizeMultipleFiles(array $file): array
 	{
 		$files = [];
-		$count = count($file['error']);
+		$this->collectNestedFiles($file, $file['error'], [], $files);
 
-		for ($i = 0; $i < $count; $i++) {
-			if ($file['error'][$i] === UPLOAD_ERR_NO_FILE) {
+		return array_filter(array_keys($files), 'is_int') === array_keys($files)
+			? array_values($files)
+			: $files;
+	}
+
+	/**
+	 * @param array<mixed> $file
+	 * @param array<int|string> $path
+	 * @param array<int|string, UploadedFile> $files
+	 */
+	private function collectNestedFiles(array $file, mixed $errors, array $path, array &$files): void
+	{
+		if (!is_array($errors)) {
+			return;
+		}
+
+		foreach ($errors as $key => $error) {
+			$keyPath = [...$path, $key];
+
+			if (is_array($error)) {
+				$this->collectNestedFiles($file, $error, $keyPath, $files);
+
 				continue;
 			}
 
-			$files[] = new UploadedFile(
-				name: $file['name'][$i],
-				type: $file['type'][$i],
-				size: $file['size'][$i],
-				tmpName: $file['tmp_name'][$i],
-				error: $file['error'][$i],
+			if ($error === UPLOAD_ERR_NO_FILE) {
+				continue;
+			}
+
+			$name = $this->nestedFileValue($file, 'name', $keyPath);
+			$type = $this->nestedFileValue($file, 'type', $keyPath);
+			$size = $this->nestedFileValue($file, 'size', $keyPath);
+			$tmpName = $this->nestedFileValue($file, 'tmp_name', $keyPath);
+
+			if (
+				!is_int($error)
+				|| !is_string($name)
+				|| !is_string($type)
+				|| !is_int($size)
+				|| !is_string($tmpName)
+			) {
+				continue;
+			}
+
+			$files[count($keyPath) === 1 ? $key : implode('.', $keyPath)] = new UploadedFile(
+				name: $name,
+				type: $type,
+				size: $size,
+				tmpName: $tmpName,
+				error: $error,
 			);
 		}
+	}
 
-		return $files;
+	/**
+	 * @param array<mixed> $file
+	 * @param array<int|string> $path
+	 */
+	private function nestedFileValue(array $file, string $field, array $path): mixed
+	{
+		$value = $file[$field] ?? null;
+
+		foreach ($path as $key) {
+			if (!is_array($value) || !array_key_exists($key, $value)) {
+				return null;
+			}
+
+			$value = $value[$key];
+		}
+
+		return $value;
 	}
 
 	// === Attributes ===
