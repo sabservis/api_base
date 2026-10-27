@@ -3,6 +3,7 @@
 namespace Sabservis\Api\Http;
 
 use JsonSerializable;
+use function array_values;
 
 /**
  * Response wrapper for list/collection endpoints with data wrapper.
@@ -15,14 +16,19 @@ use JsonSerializable;
 final class PaginatedListResponse implements JsonSerializable
 {
 
+	/** @var list<T> */
+	private array $data;
+
 	/**
 	 * @param array<T> $data
 	 */
 	public function __construct(
-		private array $data,
+		array $data,
 		private ListMeta|null $meta = null,
 	)
 	{
+		// Reindex - array_filter() etc. leave gaps and json_encode() would emit an object
+		$this->data = array_values($data);
 	}
 
 	/**
