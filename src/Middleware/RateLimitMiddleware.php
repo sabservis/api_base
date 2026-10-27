@@ -7,11 +7,13 @@ use Sabservis\Api\Attribute\Core\MiddlewarePriority;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use Sabservis\Api\Middleware\RateLimit\LockingRateLimitCache;
 use Sabservis\Api\Middleware\RateLimit\Psr6RateLimitCache;
 use Sabservis\Api\Middleware\RateLimit\RateLimitCache;
 use Sabservis\Api\Middleware\RateLimit\SymfonyContractsRateLimitCache;
 use Sabservis\Api\Utils\ClientIpResolver;
 use Sabservis\Api\Utils\IpMatcher;
+use Symfony\Component\Lock\LockFactory;
 use Symfony\Contracts\Cache\CacheInterface;
 use function array_key_exists;
 use function floor;
@@ -33,8 +35,9 @@ use function time;
  * - Sliding window algorithm for accurate limiting
  * - Trusted proxy support for accurate client IP detection
  *
- * For best atomicity, use CacheItemPoolInterface (PSR-6) or Psr6RateLimitCache.
- * With CacheInterface, there's a small race condition window under high concurrency.
+ * CONCURRENCY: Cache adapters increment via read-modify-write, which is NOT atomic.
+ * Concurrent requests may read the same count and exceed the limit. Pass a lockFactory
+ * (symfony/lock with a store shared by all workers, e.g. Redis) for exact limits.
  *
  * SECURITY: When behind a reverse proxy (nginx, Cloudflare, etc.), configure
  * trustedProxies to enable X-Forwarded-For parsing. Without this, all users
@@ -53,6 +56,7 @@ final class RateLimitMiddleware implements Middleware
 	 * @param array<string, array{maxRequests: int, windowSeconds?: int}> $ipLimits Per-IP limits
 	 * @param array<string> $trustedProxies List of trusted proxy IPs (enables X-Forwarded-For parsing)
 	 * @param string $clientIpHeader Header name for client IP (default: X-Forwarded-For)
+	 * @param LockFactory|null $lockFactory Serializes counter increments (requires symfony/lock)
 	 */
 	public function __construct(
 		RateLimitCache|CacheInterface|CacheItemPoolInterface $cache,
@@ -61,6 +65,7 @@ final class RateLimitMiddleware implements Middleware
 		private readonly array $ipLimits = [],
 		private readonly array $trustedProxies = [],
 		private readonly string $clientIpHeader = 'X-Forwarded-For',
+		LockFactory|null $lockFactory = null,
 	)
 	{
 		foreach ($trustedProxies as $proxy) {
@@ -72,7 +77,9 @@ final class RateLimitMiddleware implements Middleware
 			}
 		}
 
-		$this->cache = $this->wrapCache($cache);
+		$this->cache = $lockFactory !== null
+			? new LockingRateLimitCache($this->wrapCache($cache), $lockFactory)
+			: $this->wrapCache($cache);
 	}
 
 	/**

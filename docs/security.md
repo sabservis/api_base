@@ -36,6 +36,23 @@ api:
 
 **DŮLEŽITÉ:** Za reverse proxy (nginx, Cloudflare) nastavte `trustedProxies`, jinak všichni uživatelé sdílí rate limit IP proxy serveru.
 
+### Souběžné požadavky (atomicita)
+
+Inkrement čítače je read-modify-write, takže paralelní požadavky mohou přečíst stejnou hodnotu a limit překročit. Pro přesný limit předej `lockFactory` (`composer require symfony/lock`) se storem sdíleným všemi workery:
+
+```neon
+services:
+    rateLimitLockFactory: Symfony\Component\Lock\LockFactory(Symfony\Component\Lock\Store\RedisStore(@redis))
+
+api:
+    middlewares:
+        - Sabservis\Api\Middleware\RateLimitMiddleware(
+            cache: @cache.rateLimit
+            maxRequests: 100
+            lockFactory: @rateLimitLockFactory
+        )
+```
+
 ### Per-IP limity
 
 ```neon

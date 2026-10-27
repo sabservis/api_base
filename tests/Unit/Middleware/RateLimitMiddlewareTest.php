@@ -10,6 +10,9 @@ use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RateLimitMiddleware;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
+use Symfony\Component\Lock\LockFactory;
+use Symfony\Component\Lock\Store\InMemoryStore;
+use Tests\Unit\Middleware\RateLimit\LockProbingRateLimitCache;
 
 final class RateLimitMiddlewareTest extends TestCase
 {
@@ -21,6 +24,21 @@ final class RateLimitMiddlewareTest extends TestCase
 		$this->expectExceptionMessage('10.0.0.0/');
 
 		new RateLimitMiddleware(new ArrayAdapter(), trustedProxies: ['127.0.0.1', '10.0.0.0/']);
+	}
+
+	#[Test]
+	public function usesLockFactoryForAtomicIncrement(): void
+	{
+		$lockFactory = new LockFactory(new InMemoryStore());
+		$cache = new LockProbingRateLimitCache($lockFactory);
+		$middleware = new RateLimitMiddleware($cache, maxRequests: 10, lockFactory: $lockFactory);
+
+		$request = new ApiRequest(method: 'GET', uri: '/', serverParams: ['REMOTE_ADDR' => '127.0.0.1']);
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+
+		$middleware($request, new ApiResponse(), $next);
+
+		self::assertTrue($cache->lockWasHeld);
 	}
 
 	#[Test]

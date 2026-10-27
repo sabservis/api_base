@@ -14,8 +14,8 @@ use const INF;
 /**
  * Rate limit cache adapter using Symfony Cache Contracts.
  *
- * Note: Has a small race condition window under very high concurrency.
- * For better atomicity, prefer Psr6RateLimitCache.
+ * Note: Read-modify-write is not atomic under concurrent requests.
+ * Wrap in LockingRateLimitCache (RateLimitMiddleware lockFactory) for exact limits.
  */
 final class SymfonyContractsRateLimitCache implements RateLimitCache
 {

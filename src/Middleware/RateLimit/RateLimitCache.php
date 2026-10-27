@@ -7,7 +7,8 @@ use Sabservis\Api\Exception\Api\ClientErrorException;
 /**
  * Interface for rate limit cache operations.
  *
- * Provides atomic increment operation for rate limiting.
+ * Implementations are not required to be atomic; wrap in LockingRateLimitCache
+ * for exact limits under concurrent requests.
  */
 interface RateLimitCache
 {
