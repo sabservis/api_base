@@ -24,6 +24,7 @@ use Sabservis\Api\UI\Controller\Controller as ControllerInterface;
 use Sabservis\Api\Utils\Regex;
 use function array_filter;
 use function array_merge;
+use function array_unshift;
 use function assert;
 use function class_exists;
 use function class_parents;
@@ -698,12 +699,31 @@ final class OpenApiAttributeLoader
 	}
 
 	/**
+	 * Collects Authorize attributes from the class and all its ancestors (root first).
+	 * PHP does not inherit attributes, so parent requirements must be gathered explicitly;
+	 * AND semantics means a subclass can only add requirements, never drop them.
+	 *
 	 * @param ReflectionClass<object> $reflectionClass
 	 * @return array<array{activity: string, authorizer: class-string<Authorizer>}>
 	 */
 	private function parseAuthorizeAttributesFromClass(ReflectionClass $reflectionClass): array
 	{
-		return $this->parseAuthorizeAttributes($reflectionClass->getAttributes(Authorize::class));
+		$hierarchy = [];
+
+		for ($class = $reflectionClass; $class !== false; $class = $class->getParentClass()) {
+			array_unshift($hierarchy, $class);
+		}
+
+		$authorizations = [];
+
+		foreach ($hierarchy as $class) {
+			$authorizations = array_merge(
+				$authorizations,
+				$this->parseAuthorizeAttributes($class->getAttributes(Authorize::class)),
+			);
+		}
+
+		return $authorizations;
 	}
 
 	/**
