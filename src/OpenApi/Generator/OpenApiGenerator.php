@@ -212,6 +212,7 @@ final class OpenApiGenerator
 	private function buildPaths(Schema $schema): array
 	{
 		$paths = [];
+		$operations = [];
 
 		foreach ($schema->getEndpoints() as $endpoint) {
 			$mask = $endpoint->getMask();
@@ -236,6 +237,25 @@ final class OpenApiGenerator
 
 			foreach ($endpoint->getMethods() as $method) {
 				$paths[$path] = $paths[$path]->withMethod($method, $operation);
+				$operations[] = [
+					'path' => $path,
+					'httpMethod' => $method,
+					'operation' => $operation,
+					'class' => $endpoint->getControllerClass(),
+					'id' => (string) $operation->operationId,
+					'explicit' => $endpoint->getTag(Endpoint::TAG_ID) !== null,
+				];
+			}
+		}
+
+		// operationId must be unique - disambiguate generated collisions
+		foreach (OperationIdResolver::resolve($operations) as $index => $operationId) {
+			$entry = $operations[$index];
+
+			if ($operationId !== $entry['id']) {
+				$operation = clone $entry['operation'];
+				$operation->operationId = $operationId;
+				$paths[$entry['path']] = $paths[$entry['path']]->withMethod($entry['httpMethod'], $operation);
 			}
 		}
 

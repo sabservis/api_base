@@ -33,6 +33,17 @@ public function get(int $id): UserDto
 | `operationId` | Unikátní ID pro generované API klienty |
 | `deprecated` | Označí endpoint jako deprecated |
 
+### operationId
+
+Bez `operationId` se vygeneruje z controlleru a metody: `UserController::list()` → `userList`. Kolize se řeší automaticky (OpenAPI vyžaduje unikátnost), nekolidující ID se nemění:
+
+| Situace | operationId |
+|---------|-------------|
+| `Admin\UserController::list()` + `Front\UserController::list()` | `adminUserList`, `frontUserList` |
+| `#[Get]` + `#[Post]` na jedné metodě `PingController::check()` | `pingCheckGet`, `pingCheckPost` |
+
+Explicitní `operationId` se nikdy nemění. Pro veřejné API ho doporučujeme psát ručně ve tvaru `slovesoPodstatnéJméno` (`listUsers`, `getUser`, `createOrder`) - stane se z něj název metody v generovaném klientovi a nezmění se při přejmenování controlleru.
+
 ## Response dokumentace
 
 ```php
