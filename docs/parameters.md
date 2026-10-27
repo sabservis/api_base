@@ -28,6 +28,8 @@ use Sabservis\Api\Attribute\OpenApi\CookieParameter;
 public function get(int $id, ?string $include, string $apiKey): UserDto
 ```
 
+Hodnoty path parametrů jsou URL-dekódované (`/users/john%20doe` → `'john doe'`, `+` zůstává `+`, `%2F` → `/` uvnitř jednoho segmentu).
+
 Bez `type:` se typ převezme z argumentu metody se stejným jménem (`#[PathParameter(name: 'id', description: 'User ID')]` + `int $id` → `int`). Explicitní `type:` nebo `schema` s typem má přednost. Pokud argument se stejným jménem neexistuje, použije se `string`.
 
 ## Parameter-level example, style, explode

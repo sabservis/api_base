@@ -15,6 +15,7 @@ use function is_array;
 use function is_string;
 use function mb_strlen;
 use function mb_substr;
+use function rawurldecode;
 use function sprintf;
 use function str_contains;
 use function str_starts_with;
@@ -339,8 +340,9 @@ final class Router
 		foreach ($endpoint->getParametersByIn(EndpointParameter::InPath) as $param) {
 			$name = $param->getName();
 
+			// Decoded after match so %2F cannot split segments; rawurldecode keeps "+" (RFC 3986)
 			if (isset($pathParams[$name])) {
-				$pathParameters[$name] = $pathParams[$name];
+				$pathParameters[$name] = rawurldecode($pathParams[$name]);
 			}
 		}
 

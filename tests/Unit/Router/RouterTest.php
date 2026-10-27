@@ -45,6 +45,48 @@ final class RouterTest extends TestCase
 	}
 
 	#[Test]
+	public function pathParameterIsUrlDecoded(): void
+	{
+		$params = $this->matchNameParameter('/users/john%20doe');
+
+		self::assertSame('john doe', $params['name']);
+	}
+
+	#[Test]
+	public function pathParameterUtf8IsUrlDecoded(): void
+	{
+		$params = $this->matchNameParameter('/users/%C5%BElu%C5%A5ou%C4%8Dk%C3%BD');
+
+		self::assertSame('žluťoučký', $params['name']);
+	}
+
+	#[Test]
+	public function pathParameterKeepsPlusSign(): void
+	{
+		// RFC 3986: "+" is not a space in path (unlike form-encoded query)
+		$params = $this->matchNameParameter('/users/a+b');
+
+		self::assertSame('a+b', $params['name']);
+	}
+
+	#[Test]
+	public function encodedSlashDoesNotSplitPathSegment(): void
+	{
+		// Decoded after match - %2F stays inside one segment, value contains "/"
+		$params = $this->matchNameParameter('/users/a%2Fb');
+
+		self::assertSame('a/b', $params['name']);
+	}
+
+	#[Test]
+	public function pathParameterIsDecodedOnlyOnce(): void
+	{
+		$params = $this->matchNameParameter('/users/100%2525');
+
+		self::assertSame('100%25', $params['name']);
+	}
+
+	#[Test]
 	public function matchParametersFooBar(): void
 	{
 		$endpoint = new Endpoint('TestController', 'testMethod');
@@ -313,6 +355,29 @@ final class RouterTest extends TestCase
 		$matched = $router->match($request);
 
 		self::assertInstanceOf(ApiRequest::class, $matched);
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function matchNameParameter(string $path): array
+	{
+		$endpoint = $this->createEndpoint('TestController', 'show', 'GET', '/users/{name}');
+		$endpoint->setPattern('#^/users/(?P<name>[^/]+)$#');
+		$name = new EndpointParameter('name');
+		$name->setIn(EndpointParameter::InPath);
+		$endpoint->addParameter($name);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+
+		$matched = (new Router($schema))->match(new ApiRequest(method: 'GET', uri: 'http://example.com' . $path));
+		self::assertInstanceOf(ApiRequest::class, $matched);
+
+		$params = $matched->getAttribute(RequestAttributes::Parameters->value);
+		self::assertSame($params['name'], $matched->getAttribute(RequestAttributes::PathParameters->value)['name']);
+
+		return $params;
 	}
 
 	private function createEndpoint(string $class, string $method, string $httpMethod, string $mask): Endpoint
