@@ -18,7 +18,7 @@ final class PathParameter extends RequestParameter
 
 	public function __construct(
 		string|null $name = null,
-		string $type = 'string',
+		string|null $type = null,
 		string|null $description = null,
 		bool $deprecated = false,
 		string|null $format = null,

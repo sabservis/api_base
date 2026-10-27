@@ -240,9 +240,11 @@ final class ParameterInferenceEngine
 	/**
 	 * Build parameter array from RequestParameter attribute.
 	 *
+	 * Without explicit type or schema type, the type of the matching method argument is used.
+	 *
 	 * @return array<string, mixed>
 	 */
-	public function buildParameter(RequestParameter $param): array
+	public function buildParameter(RequestParameter $param, ReflectionMethod|null $method = null): array
 	{
 		// Extract type from schema if provided, otherwise use explicit type
 		$type = $param->type;
@@ -259,6 +261,10 @@ final class ParameterInferenceEngine
 
 			// Preserve original ref for class registration in OpenApiGenerator
 			$schemaRef = $param->schema->ref;
+		}
+
+		if (!$param->hasExplicitType() && !isset($schemaSpec['type']) && $method !== null) {
+			$type = $this->resolveSignatureType($method, $param->name) ?? $type;
 		}
 
 		return [
@@ -324,6 +330,25 @@ final class ParameterInferenceEngine
 			'array' => 'array',
 			default => $phpType, // class name (DateTimeImmutable, enum, etc.)
 		};
+	}
+
+	private function resolveSignatureType(ReflectionMethod $method, string|null $name): string|null
+	{
+		foreach ($method->getParameters() as $parameter) {
+			if ($parameter->getName() !== $name) {
+				continue;
+			}
+
+			$typeName = $this->resolveParameterType($parameter)['name'] ?? null;
+
+			if ($typeName === null || $typeName === ApiRequest::class || $typeName === ApiResponse::class) {
+				return null;
+			}
+
+			return $this->mapPhpTypeToParameterType($typeName);
+		}
+
+		return null;
 	}
 
 	/**

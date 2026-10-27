@@ -657,7 +657,7 @@ final class OpenApiAttributeLoader
 					continue;
 				}
 
-				$parameters[$name] = $this->parameterEngine->buildParameter($instance);
+				$parameters[$name] = $this->parameterEngine->buildParameter($instance, $method);
 			}
 		}
 	}

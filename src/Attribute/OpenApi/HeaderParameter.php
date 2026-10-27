@@ -18,7 +18,7 @@ final class HeaderParameter extends RequestParameter
 
 	public function __construct(
 		string|null $name = null,
-		string $type = 'string',
+		string|null $type = null,
 		string|null $description = null,
 		bool|null $required = null,
 		bool $deprecated = false,

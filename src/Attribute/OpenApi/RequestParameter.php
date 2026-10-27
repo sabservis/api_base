@@ -24,10 +24,14 @@ class RequestParameter implements OpenApiAttributeInterface
 
 	public const InCookie = 'cookie';
 
+	public string $type;
+
+	private bool $explicitType;
+
 	public function __construct(
 		public string|null $name = null,
 		public string $in = self::InQuery,
-		public string $type = 'string',
+		string|null $type = null,
 		public string|null $description = null,
 		public bool|null $required = null,
 		public bool $deprecated = false,
@@ -39,10 +43,19 @@ class RequestParameter implements OpenApiAttributeInterface
 		public Schema|null $schema = null,
 	)
 	{
+		// Without explicit type, the method signature type is used (see ParameterInferenceEngine)
+		$this->type = $type ?? 'string';
+		$this->explicitType = $type !== null;
+
 		// Path parameters are always required
 		if ($this->in === self::InPath && $this->required === null) {
 			$this->required = true;
 		}
+	}
+
+	public function hasExplicitType(): bool
+	{
+		return $this->explicitType;
 	}
 
 	public function isRequired(): bool

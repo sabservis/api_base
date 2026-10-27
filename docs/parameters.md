@@ -27,6 +27,8 @@ use Sabservis\Api\Attribute\OpenApi\CookieParameter;
 public function get(int $id, ?string $include, string $apiKey): UserDto
 ```
 
+Bez `type:` se typ převezme z argumentu metody se stejným jménem (`#[PathParameter(name: 'id', description: 'User ID')]` + `int $id` → `int`). Explicitní `type:` nebo `schema` s typem má přednost. Pokud argument se stejným jménem neexistuje, použije se `string`.
+
 ## Parameter-level example, style, explode
 
 Parametry podporují `example`, `style` a `explode` přímo na úrovni parametru (bez schema):

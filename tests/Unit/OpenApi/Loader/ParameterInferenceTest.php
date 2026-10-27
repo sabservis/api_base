@@ -133,6 +133,48 @@ final class ParameterInferenceTest extends TestCase
 	}
 
 	#[Test]
+	public function attributeWithoutTypeUsesSignatureType(): void
+	{
+		$param = $this->loadSingleEndpoint(UntypedAttributeController::class)['parameters']['id'];
+
+		self::assertSame('User ID', $param['description']);
+		self::assertSame('int', $param['type']);
+		self::assertSame(EndpointParameter::InPath, $param['in']);
+	}
+
+	#[Test]
+	public function queryAttributeWithoutTypeUsesSignatureType(): void
+	{
+		$parameters = $this->loadSingleEndpoint(UntypedQueryAttributeController::class)['parameters'];
+
+		self::assertSame('int', $parameters['limit']['type']);
+		self::assertSame(DateTimeImmutable::class, $parameters['since']['type']);
+	}
+
+	#[Test]
+	public function explicitAttributeTypeOverridesSignatureType(): void
+	{
+		$param = $this->loadSingleEndpoint(ExplicitStringTypeController::class)['parameters']['code'];
+
+		self::assertSame('string', $param['type']);
+	}
+
+	#[Test]
+	public function attributeWithoutTypeAndWithoutSignatureParameterDefaultsToString(): void
+	{
+		$param = $this->loadSingleEndpoint(UntypedAttributeWithoutArgumentController::class)['parameters']['q'];
+
+		self::assertSame('string', $param['type']);
+	}
+
+	#[Test]
+	public function attributeTypePropertyKeepsStringDefault(): void
+	{
+		self::assertSame('string', (new PathParameter(name: 'id'))->type);
+		self::assertSame('string', (new QueryParameter(name: 'q'))->type);
+	}
+
+	#[Test]
 	public function skipsApiRequestAndApiResponse(): void
 	{
 		$containerBuilder = new ContainerBuilder();
@@ -294,6 +336,22 @@ final class ParameterInferenceTest extends TestCase
 		self::assertArrayNotHasKey('input', $endpoint['parameters']);
 		self::assertArrayHasKey('requestBody', $endpoint);
 		self::assertSame(RequestBodyUpdateDto::class, $endpoint['requestBody']['entity']);
+	}
+
+	/**
+	 * @param class-string $controllerClass
+	 * @return array<string, mixed>
+	 */
+	private function loadSingleEndpoint(string $controllerClass): array
+	{
+		$containerBuilder = new ContainerBuilder();
+		$containerBuilder->addDefinition('testController')
+			->setType($controllerClass);
+
+		$endpoints = (new OpenApiAttributeLoader($containerBuilder))->load()['endpoints'];
+		self::assertCount(1, $endpoints);
+
+		return $endpoints[0];
 	}
 
 }
@@ -458,5 +516,54 @@ class RequestBodyUpdateDto
 {
 
 	public string $name;
+
+}
+
+class UntypedAttributeController implements Controller
+{
+
+	#[Get(path: '/users/{id}')]
+	#[PathParameter(name: 'id', description: 'User ID')]
+	public function get(int $id): array
+	{
+		return [];
+	}
+
+}
+
+class UntypedQueryAttributeController implements Controller
+{
+
+	#[Get(path: '/users')]
+	#[QueryParameter(name: 'limit', description: 'Max items')]
+	#[QueryParameter(name: 'since')]
+	public function list(int $limit, DateTimeImmutable $since): array
+	{
+		return [];
+	}
+
+}
+
+class ExplicitStringTypeController implements Controller
+{
+
+	#[Get(path: '/codes/{code}')]
+	#[PathParameter(name: 'code', type: 'string')]
+	public function get(int $code): array
+	{
+		return [];
+	}
+
+}
+
+class UntypedAttributeWithoutArgumentController implements Controller
+{
+
+	#[Get(path: '/search')]
+	#[QueryParameter(name: 'q')]
+	public function search(ApiRequest $request): array
+	{
+		return [];
+	}
 
 }
