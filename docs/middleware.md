@@ -7,7 +7,7 @@ Middleware umožňuje zpracovat request/response v pipeline.
 | Middleware | Priorita | Popis |
 |------------|----------|-------|
 | `RequestIdMiddleware` | 5 | Generuje/propaguje X-Request-ID |
-| `MethodOverrideMiddleware` | 10 | X-HTTP-Method-Override header |
+| `MethodOverrideMiddleware` | 10 | X-HTTP-Method-Override header (jen u POST) |
 | `LoggingMiddleware` | 10 | Request/response logging |
 | `RequestSizeLimitMiddleware` | 15 | Omezení velikosti body |
 | `EnforceHttpsMiddleware` | 20 | Odmítne HTTP (400) před autentizací a rate limitem |
@@ -105,6 +105,18 @@ api:
             ipLimits:
                 '10.0.0.0/8': { maxRequests: 1000 }  # Interní síť
         )
+```
+
+## Method Override
+
+`X-HTTP-Method-Override` se uplatní jen u **POST** requestu (stejně jako Symfony/Laravel). GET, HEAD a ostatní metody se nepřepíší - cache, proxy a WAF považují GET za bezpečný, `GET` + override `DELETE` by jejich pravidla obešel.
+
+```neon
+api:
+    middlewares:
+        - Sabservis\Api\Middleware\MethodOverrideMiddleware
+        # Staré chování (override i z GET) - nedoporučeno
+        - Sabservis\Api\Middleware\MethodOverrideMiddleware(overridableMethods: [POST, GET])
 ```
 
 ## Request Size Limit

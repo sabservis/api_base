@@ -21,10 +21,18 @@ class MethodOverrideMiddleware implements Middleware
 	private const AllowedMethods = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'];
 
 	/**
+	 * Original request methods that may be overridden.
+	 * Only POST by default (like Symfony/Laravel) - GET must stay safe for caches, proxies and WAF rules.
+	 */
+	private const OverridableMethods = ['POST'];
+
+	/**
 	 * @param list<string> $allowedMethods Custom list of allowed override methods (uppercase)
+	 * @param list<string> $overridableMethods Original methods that may be overridden (uppercase)
 	 */
 	public function __construct(
 		private readonly array $allowedMethods = self::AllowedMethods,
+		private readonly array $overridableMethods = self::OverridableMethods,
 	)
 	{
 	}
@@ -37,7 +45,9 @@ class MethodOverrideMiddleware implements Middleware
 	{
 		$override = $request->getHeader(self::OverrideHeader);
 
-		if ($override !== null && $override !== '') {
+		$overridable = in_array(strtoupper($request->getMethod()), $this->overridableMethods, true);
+
+		if ($overridable && $override !== null && $override !== '') {
 			$method = strtoupper($override);
 
 			if (in_array($method, $this->allowedMethods, true)) {

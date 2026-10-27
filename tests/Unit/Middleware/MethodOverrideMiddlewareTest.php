@@ -272,4 +272,51 @@ final class MethodOverrideMiddlewareTest extends TestCase
 		self::assertSame('PUT', $capturedRequest->getMethod());
 	}
 
+	#[Test]
+	public function getRequestCannotBeOverridden(): void
+	{
+		self::assertSame('GET', $this->methodAfterOverride(new MethodOverrideMiddleware(), 'GET', 'DELETE'));
+	}
+
+	#[Test]
+	public function nonPostRequestCannotBeOverridden(): void
+	{
+		self::assertSame('PUT', $this->methodAfterOverride(new MethodOverrideMiddleware(), 'PUT', 'DELETE'));
+		self::assertSame('HEAD', $this->methodAfterOverride(new MethodOverrideMiddleware(), 'HEAD', 'DELETE'));
+	}
+
+	#[Test]
+	public function postRequestCanBeOverridden(): void
+	{
+		self::assertSame('DELETE', $this->methodAfterOverride(new MethodOverrideMiddleware(), 'POST', 'DELETE'));
+	}
+
+	#[Test]
+	public function overridableMethodsCanBeConfigured(): void
+	{
+		$middleware = new MethodOverrideMiddleware(overridableMethods: ['POST', 'GET']);
+
+		self::assertSame('DELETE', $this->methodAfterOverride($middleware, 'GET', 'DELETE'));
+	}
+
+	private function methodAfterOverride(MethodOverrideMiddleware $middleware, string $method, string $override): string
+	{
+		$captured = null;
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$captured): ApiResponse {
+			$captured = $req;
+
+			return $res;
+		};
+
+		$request = new ApiRequest(
+			method: $method,
+			uri: '/api/users/1',
+			headers: [MethodOverrideMiddleware::OverrideHeader => $override],
+		);
+		$middleware($request, new ApiResponse(), $next);
+		self::assertInstanceOf(ApiRequest::class, $captured);
+
+		return $captured->getMethod();
+	}
+
 }
