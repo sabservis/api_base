@@ -35,9 +35,9 @@ extensions:
 api:
     debug: %debugMode%
     maxRequestBodySize: 10485760  # 10MB limit (DoS ochrana)
-    trustedProxies:               # Za reverse proxy (nginx, Cloudflare)
-        - 10.0.0.0/8
-        - 172.16.0.0/12
+    trustedProxies:               # Jen adresy reverse proxy (nginx, LB), ne celé sítě
+        - 10.0.1.10
+        - 10.0.1.11
     router:
         basePath: /api
 ```

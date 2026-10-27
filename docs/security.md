@@ -30,7 +30,7 @@ api:
             cache: @cache.rateLimit
             maxRequests: 100
             windowSeconds: 60
-            trustedProxies: ['10.0.0.0/8', '172.16.0.0/12']  # Pro správnou detekci klientské IP
+            trustedProxies: ['10.0.1.10', '10.0.1.11']  # Jen adresy proxy (viz HTTPS Detection)
         )
 ```
 
@@ -148,10 +148,11 @@ $request->isSecured();  // true pro HTTPS
 ```neon
 api:
     trustedProxies:
-        - 10.0.0.0/8       # interní síť
-        - 172.16.0.0/12    # Docker
-        - 192.168.0.0/16   # LAN
+        - 10.0.1.10        # nginx / load balancer
+        - 10.0.1.11
 ```
+
+**POZOR:** Uváděj jen adresy skutečných proxy, ne celé interní sítě (`10.0.0.0/8`, `172.16.0.0/12`, síť podů v k8s). Každý host z trusted rozsahu je považován za proxy a jeho `X-Forwarded-For` / `X-Forwarded-Proto` se přijímá bez ověření. Kompromitovaná nebo libovolná interní služba pak může podvrhnout klientskou IP (obejít rate limit, IP allowlist, audit log) i HTTPS.
 
 **SECURITY:** Bez `trustedProxies` je `X-Forwarded-Proto` header ignorován, aby útočník nemohl spoofovat HTTPS. Header je důvěryhodný pouze pokud request přichází z trusted proxy IP.
 
