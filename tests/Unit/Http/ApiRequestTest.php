@@ -16,6 +16,7 @@ use function fclose;
 use function fopen;
 use function fwrite;
 use function rewind;
+use function sprintf;
 use function str_repeat;
 use function strlen;
 use const UPLOAD_ERR_INI_SIZE;
@@ -169,6 +170,18 @@ final class ApiRequestTest extends TestCase
 		$httpsRequest = new ApiRequest(method: 'GET', uri: '/', serverParams: ['HTTPS' => 'on']);
 		self::assertSame('https', $httpsRequest->getScheme());
 		self::assertTrue($httpsRequest->isSecured());
+	}
+
+	#[Test]
+	public function isSecuredTreatsHttpsOffAsInsecure(): void
+	{
+		// IIS and some FastCGI setups send HTTPS=off for plain HTTP
+		foreach (['off', 'OFF', 'Off'] as $value) {
+			$request = new ApiRequest(method: 'GET', uri: '/', serverParams: ['HTTPS' => $value]);
+
+			self::assertFalse($request->isSecured(), sprintf('HTTPS=%s must not be secured', $value));
+			self::assertSame('http', $request->getScheme());
+		}
 	}
 
 	#[Test]

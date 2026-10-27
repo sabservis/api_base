@@ -255,8 +255,10 @@ class ApiRequest
 	 */
 	public function isSecured(): bool
 	{
-		// Direct HTTPS connection - always trusted
-		if (($this->serverParams['HTTPS'] ?? '') !== '') {
+		// Direct HTTPS connection - always trusted (IIS/FastCGI send "off" for plain HTTP)
+		$https = $this->serverParams['HTTPS'] ?? '';
+
+		if (is_string($https) && $https !== '' && strtolower($https) !== 'off') {
 			return true;
 		}
 
