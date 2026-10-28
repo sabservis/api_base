@@ -3,7 +3,10 @@
 namespace Sabservis\Api\OpenApi\Generator;
 
 use Closure;
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\InputOnly;
 use Pocta\DataMapper\Attributes\MapProperty;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionClass;
 use ReflectionEnum;
 use ReflectionEnumBackedCase;
@@ -187,7 +190,8 @@ final class SchemaBuilder
 		$required = [];
 
 		foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
-			if ($property->getAttributes(Hidden::class) !== []) {
+			// #[Ignore] - data-mapper never sends nor reads the property
+			if ($property->getAttributes(Hidden::class) !== [] || $property->getAttributes(Ignore::class) !== []) {
 				continue;
 			}
 
@@ -342,6 +346,15 @@ final class SchemaBuilder
 				oneOf: $schema->oneOf,
 				anyOf: $schema->anyOf,
 			);
+		}
+
+		// data-mapper direction; explicit #[Property(readOnly:/writeOnly:)] wins
+		if ($property->getAttributes(OutputOnly::class) !== []) {
+			$schema->readOnly ??= true;
+		}
+
+		if ($property->getAttributes(InputOnly::class) !== []) {
+			$schema->writeOnly ??= true;
 		}
 
 		return $schema;

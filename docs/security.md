@@ -140,7 +140,9 @@ api:
   `#[OutputOnly]` – jen výstup (`id`, `role`); `#[InputOnly]` – jen vstup (`password`)
 
 `#[Hidden]` property jen skryje z OpenAPI, vstup neblokuje. OpenAPI dokumentuje public property pod klíčem
-z `#[MapProperty(name:)]` – vnořenou `path`, neveřejné property s `#[MapProperty]` ani `#[Ignore]`/`#[OutputOnly]`/`#[InputOnly]` nezohledňuje.
+z `#[MapProperty(name:)]`; `#[OutputOnly]` → `readOnly`, `#[InputOnly]` → `writeOnly`, `#[Ignore]` vynechá
+(explicitní `#[Property(readOnly:/writeOnly:)]` má přednost). Vnořenou `path` ani neveřejné property s `#[MapProperty]` nepopisuje.
+Multipart (`MultipartEntityHydrator`) atributy data-mapperu zatím nerespektuje – ani při hydrataci, ani ve schématu.
 
 ## JSON Depth Limit
 

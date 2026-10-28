@@ -4,7 +4,10 @@ namespace Tests\Unit\OpenApi\Generator;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\InputOnly;
 use Pocta\DataMapper\Attributes\MapProperty;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
 use Sabservis\Api\OpenApi\Generator\SchemaBuilder;
@@ -54,6 +57,58 @@ final class SerializerNamingSchemaTest extends TestCase
 		self::assertSame($wireKeys, $schemaKeys);
 	}
 
+	#[Test]
+	public function outputOnlyPropertyIsReadOnly(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertTrue($schema['properties']['id']['readOnly']);
+		self::assertArrayNotHasKey('writeOnly', $schema['properties']['id']);
+	}
+
+	#[Test]
+	public function inputOnlyPropertyIsWriteOnly(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertTrue($schema['properties']['password']['writeOnly']);
+		self::assertArrayNotHasKey('readOnly', $schema['properties']['password']);
+	}
+
+	#[Test]
+	public function ignoredPropertyIsNotInSchema(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertArrayNotHasKey('internalNote', $schema['properties']);
+		self::assertNotContains('internalNote', $schema['required']);
+	}
+
+	#[Test]
+	public function plainPropertyHasNoDirection(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertArrayNotHasKey('readOnly', $schema['properties']['name']);
+		self::assertArrayNotHasKey('writeOnly', $schema['properties']['name']);
+	}
+
+	#[Test]
+	public function explicitPropertyDirectionWins(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertFalse($schema['properties']['code']['readOnly']);
+	}
+
+	#[Test]
+	public function directionWorksForClassReference(): void
+	{
+		$schema = $this->schema(DirectionDto::class);
+
+		self::assertTrue($schema['properties']['owner']['readOnly']);
+	}
+
 	/**
 	 * @param class-string $class
 	 * @return array<string, mixed>
@@ -97,5 +152,28 @@ final class WireContractDto
 	public bool $isActive = true;
 
 	public string $name = 'x';
+
+}
+
+final class DirectionDto
+{
+
+	#[OutputOnly]
+	public int $id = 1;
+
+	#[InputOnly]
+	public string $password = '';
+
+	#[Ignore]
+	public string $internalNote = '';
+
+	public string $name = '';
+
+	#[OutputOnly]
+	#[Property(readOnly: false)]
+	public string $code = '';
+
+	#[OutputOnly]
+	public WireContractDto $owner;
 
 }
