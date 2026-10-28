@@ -10,6 +10,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Tests\Unit\OpenApi\Fixtures\Collision\CollisionController;
+use Tests\Unit\OpenApi\Fixtures\Collision\PinnedMultipartController;
 use Tests\Unit\OpenApi\Fixtures\Collision\PinnedNameController;
 use Tests\Unit\OpenApi\Fixtures\Collision\SameContextController;
 use function array_column;
@@ -108,6 +109,17 @@ final class SchemaNameCollisionTest extends TestCase
 			'#/components/schemas/ShippingLine',
 			$paths['/shipping/items']['post']['requestBody']['content']['application/json']['schema']['$ref'],
 		);
+	}
+
+	#[Test]
+	public function multipartPropertyReferencesPinnedNameOfItsOwnClass(): void
+	{
+		$spec = $this->generate(PinnedMultipartController::class);
+		$schema = $spec['paths']['/basket']['post']['requestBody']['content']['multipart/form-data']['schema'];
+
+		self::assertSame(['total'], array_keys($spec['components']['schemas']['CartDto']['properties']));
+		self::assertSame('#/components/schemas/CartDto', $schema['properties']['basket']['$ref']);
+		self::assertSame('#/components/schemas/CollisionCartDto', $this->responseRef($spec['paths'], '/cart'));
 	}
 
 	/**

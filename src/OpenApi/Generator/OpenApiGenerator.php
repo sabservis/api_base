@@ -487,8 +487,10 @@ final class OpenApiGenerator
 
 					if (class_exists($className)) {
 						$schemaName = $this->schemaBuilder->registerClass($className);
+						// _class: the name is already resolved, buildSchemaFromSpec() must not re-resolve it
 						$spec['properties'][$name] = [
 							'$ref' => '#/components/schemas/' . $schemaName,
+							'_class' => $className,
 						];
 					}
 				}
