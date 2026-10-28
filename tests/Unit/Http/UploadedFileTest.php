@@ -11,7 +11,6 @@ use function file_get_contents;
 use function file_put_contents;
 use function fopen;
 use function mb_check_encoding;
-use function mb_strlen;
 use function mkdir;
 use function rmdir;
 use function str_repeat;
@@ -977,9 +976,10 @@ final class UploadedFileTest extends TestCase
 	{
 		$result = UploadedFile::sanitizeFilename(str_repeat('ž', 300) . '.pdf');
 
+		// Same 255-byte budget as before, minus the half character that used to be cut
+		self::assertSame(str_repeat('ž', 125) . '.pdf', $result);
 		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
-		self::assertSame(255, mb_strlen($result));
-		self::assertStringEndsWith('.pdf', $result);
+		self::assertLessThanOrEqual(255, strlen($result));
 	}
 
 	#[Test]
@@ -987,8 +987,8 @@ final class UploadedFileTest extends TestCase
 	{
 		$result = UploadedFile::sanitizeFilename(str_repeat('📄', 300));
 
-		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
-		self::assertSame(255, mb_strlen($result));
+		self::assertSame(str_repeat('📄', 63), $result);
+		self::assertLessThanOrEqual(255, strlen($result));
 	}
 
 	#[Test]
@@ -996,8 +996,17 @@ final class UploadedFileTest extends TestCase
 	{
 		$result = UploadedFile::sanitizeFilename('ž.' . str_repeat('č', 300), 10);
 
+		self::assertSame('ž.ččč', $result);
 		self::assertTrue(mb_check_encoding($result, 'UTF-8'));
-		self::assertSame(10, mb_strlen($result));
+	}
+
+	#[Test]
+	public function sanitizeFilenameKeepsMultibyteNameWithinCharacterLimit(): void
+	{
+		// Not longer than $maxLength characters -> untouched, as before
+		$name = str_repeat('ž', 200) . '.pdf';
+
+		self::assertSame($name, UploadedFile::sanitizeFilename($name));
 	}
 
 	#[Test]
