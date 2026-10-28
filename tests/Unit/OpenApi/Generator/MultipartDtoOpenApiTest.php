@@ -5,6 +5,9 @@ namespace Tests\Unit\OpenApi\Generator;
 use Nette\DI\ContainerBuilder;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\InputOnly;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Attribute\OpenApi\Post;
 use Sabservis\Api\Attribute\OpenApi\RequestBody;
@@ -17,6 +20,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Sabservis\Api\UI\Controller\Controller;
+use function array_keys;
 use function json_decode;
 use function json_encode;
 
@@ -156,6 +160,16 @@ final class MultipartDtoOpenApiTest extends TestCase
 		self::assertSame('binary', $schema['properties']['document']['format']);
 	}
 
+	#[Test]
+	public function multipartSchemaOmitsPropertiesNotReadFromInput(): void
+	{
+		$spec = $this->generateSpecForController(MultipartDirectionController::class);
+		$schema = $spec['paths']['/upload-direction']['post']['requestBody']['content']['multipart/form-data']['schema'];
+
+		self::assertSame(['title', 'password', 'file'], array_keys($schema['properties']));
+		self::assertSame(['title', 'password', 'file'], $schema['required']);
+	}
+
 	/**
 	 * @param class-string $controllerClass
 	 * @return array<string, mixed>
@@ -250,6 +264,30 @@ class MultipartMultipleFilesDto
 
 }
 
+#[Schema]
+class MultipartDirectionDto
+{
+
+	public string $title;
+
+	#[OutputOnly]
+	public string $role;
+
+	#[Ignore]
+	public string $note;
+
+	#[InputOnly]
+	public string $password;
+
+	#[OutputOnly]
+	#[FileUpload(name: 'thumbnail')]
+	public UploadedFile $thumbnail;
+
+	#[FileUpload(name: 'file')]
+	public UploadedFile $file;
+
+}
+
 // ==================== TEST CONTROLLERS ====================
 
 class MultipartDtoController implements Controller
@@ -318,6 +356,18 @@ class MethodLevelFileUploadController implements Controller
 	#[Post(path: '/upload-method-level')]
 	#[FileUpload(name: 'document', required: true)]
 	public function upload(ApiRequest $request): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
+
+class MultipartDirectionController implements Controller
+{
+
+	#[Post(path: '/upload-direction')]
+	#[RequestBody(ref: MultipartDirectionDto::class)]
+	public function upload(MultipartDirectionDto $input): ApiResponse
 	{
 		return new ApiResponse();
 	}

@@ -2,6 +2,8 @@
 
 namespace Sabservis\Api\OpenApi\Loader;
 
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionMethod;
@@ -230,7 +232,12 @@ final class RequestBodyBuilder
 		$fileUploads = [];
 
 		foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
-			if ($refProperty->getAttributes(Hidden::class) !== []) {
+			// #[OutputOnly]/#[Ignore] are never read from the request
+			if (
+				$refProperty->getAttributes(Hidden::class) !== []
+				|| $refProperty->getAttributes(OutputOnly::class) !== []
+				|| $refProperty->getAttributes(Ignore::class) !== []
+			) {
 				continue;
 			}
 

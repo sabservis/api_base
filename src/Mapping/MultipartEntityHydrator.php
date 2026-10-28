@@ -3,6 +3,8 @@
 namespace Sabservis\Api\Mapping;
 
 use BackedEnum;
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionClass;
 use ReflectionNamedType;
 use ReflectionProperty;
@@ -46,6 +48,11 @@ class MultipartEntityHydrator
 		$data = is_array($parsedBody) ? $parsedBody : [];
 
 		foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+			// Same as data-mapper for JSON: never hydrate #[OutputOnly]/#[Ignore] from input
+			if ($property->getAttributes(OutputOnly::class) !== [] || $property->getAttributes(Ignore::class) !== []) {
+				continue;
+			}
+
 			$fileUploadAttrs = $property->getAttributes(FileUpload::class);
 
 			if ($fileUploadAttrs !== []) {

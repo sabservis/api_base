@@ -4,6 +4,9 @@ namespace Tests\Unit\Mapping;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pocta\DataMapper\Attributes\Ignore;
+use Pocta\DataMapper\Attributes\InputOnly;
+use Pocta\DataMapper\Attributes\OutputOnly;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\UploadedFile;
@@ -115,6 +118,26 @@ class ParentWithNullableNestedObjectDto
 	public string $name;
 
 	public NestedAddressDto|null $address = null;
+
+}
+
+class DirectionMultipartDto
+{
+
+	public string $name;
+
+	#[OutputOnly]
+	public string $role = 'user';
+
+	#[Ignore]
+	public string $note = 'internal';
+
+	#[InputOnly]
+	public string $password = '';
+
+	#[OutputOnly]
+	#[FileUpload]
+	public UploadedFile|null $avatar = null;
 
 }
 
@@ -275,6 +298,42 @@ final class MultipartEntityHydratorTest extends TestCase
 		self::assertInstanceOf(ParentWithNullableNestedObjectDto::class, $dto);
 		self::assertSame('John', $dto->name);
 		self::assertNull($dto->address);
+	}
+
+	#[Test]
+	public function outputOnlyPropertyIsNotHydratedFromInput(): void
+	{
+		$dto = $this->hydrateDirectionDto();
+
+		self::assertSame('user', $dto->role);
+		self::assertNull($dto->avatar);
+	}
+
+	#[Test]
+	public function ignoredPropertyIsNotHydratedFromInput(): void
+	{
+		self::assertSame('internal', $this->hydrateDirectionDto()->note);
+	}
+
+	#[Test]
+	public function inputOnlyAndPlainPropertiesAreHydrated(): void
+	{
+		$dto = $this->hydrateDirectionDto();
+
+		self::assertSame('John', $dto->name);
+		self::assertSame('secret', $dto->password);
+	}
+
+	private function hydrateDirectionDto(): DirectionMultipartDto
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['name' => 'John', 'role' => 'admin', 'note' => 'x', 'password' => 'secret'])
+			->withUploadedFiles(['avatar' => new UploadedFile('a.png', 'image/png', 3, '/tmp/a', 0)]);
+
+		$dto = $this->hydrator->hydrate($request, DirectionMultipartDto::class);
+		self::assertInstanceOf(DirectionMultipartDto::class, $dto);
+
+		return $dto;
 	}
 
 }

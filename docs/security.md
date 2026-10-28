@@ -142,7 +142,8 @@ api:
 `#[Hidden]` property jen skryje z OpenAPI, vstup neblokuje. OpenAPI dokumentuje public property pod klíčem
 z `#[MapProperty(name:)]`; `#[OutputOnly]` → `readOnly`, `#[InputOnly]` → `writeOnly`, `#[Ignore]` vynechá
 (explicitní `#[Property(readOnly:/writeOnly:)]` má přednost). Vnořenou `path` ani neveřejné property s `#[MapProperty]` nepopisuje.
-Multipart (`MultipartEntityHydrator`) atributy data-mapperu zatím nerespektuje – ani při hydrataci, ani ve schématu.
+Multipart (`MultipartEntityHydrator`) respektuje `#[OutputOnly]` a `#[Ignore]` stejně (nenaplní je, ve schématu requestu chybí);
+ostatní pravidla data-mapperu (validace typů, `MapProperty`, opt-in volby) pro multipart neplatí.
 
 ## JSON Depth Limit
 
