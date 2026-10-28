@@ -8,6 +8,7 @@ use Pocta\DataMapper\Attributes\Ignore;
 use Pocta\DataMapper\Attributes\InputOnly;
 use Pocta\DataMapper\Attributes\OutputOnly;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
@@ -69,6 +70,22 @@ class EnumPropertyDto
 {
 
 	public TestCategory $category;
+
+}
+
+enum MultipartPriority: int
+{
+
+	case Low = 1;
+
+	case High = 10;
+
+}
+
+class IntEnumPropertyDto
+{
+
+	public MultipartPriority $priority;
 
 }
 
@@ -334,6 +351,59 @@ final class MultipartEntityHydratorTest extends TestCase
 		self::assertInstanceOf(DirectionMultipartDto::class, $dto);
 
 		return $dto;
+	}
+
+	#[Test]
+	public function invalidEnumValueThrowsValidationException(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['category' => 'podcast']);
+
+		try {
+			$this->hydrator->hydrate($request, EnumPropertyDto::class);
+			self::fail('Expected ValidationException');
+		} catch (ValidationException $e) {
+			self::assertSame(422, $e->getCode());
+			self::assertSame('Request body contains validation errors', $e->getMessage());
+			self::assertSame(
+				['validation' => ['category' => "Invalid value for field 'category'. Expected one of: news, blog, tutorial, got: podcast"]],
+				$e->getContext(),
+			);
+		}
+	}
+
+	#[Test]
+	public function nonScalarEnumValueThrowsValidationException(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['category' => ['blog']]);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, EnumPropertyDto::class);
+	}
+
+	#[Test]
+	public function hydratesIntBackedEnumFromNumericString(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['priority' => '10']);
+
+		$dto = $this->hydrator->hydrate($request, IntEnumPropertyDto::class);
+
+		self::assertInstanceOf(IntEnumPropertyDto::class, $dto);
+		self::assertSame(MultipartPriority::High, $dto->priority);
+	}
+
+	#[Test]
+	public function invalidIntBackedEnumValueThrowsValidationException(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['priority' => 'abc']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, IntEnumPropertyDto::class);
 	}
 
 }

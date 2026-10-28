@@ -6,18 +6,27 @@ use BackedEnum;
 use Pocta\DataMapper\Attributes\Ignore;
 use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionClass;
+use ReflectionEnum;
 use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionType;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use function array_key_exists;
+use function array_map;
 use function class_exists;
 use function filter_var;
+use function get_debug_type;
+use function implode;
 use function is_array;
+use function is_int;
+use function is_scalar;
 use function is_string;
 use function is_subclass_of;
+use function preg_match;
+use function sprintf;
 use const FILTER_VALIDATE_BOOLEAN;
 
 class MultipartEntityHydrator
@@ -128,7 +137,7 @@ class MultipartEntityHydrator
 			if (is_subclass_of($typeName, BackedEnum::class)) {
 				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
 				/** @var class-string<BackedEnum> $typeName */
-				$property->setValue($instance, $typeName::from($value));
+				$property->setValue($instance, $this->toEnum($typeName, $name, $value));
 
 				return;
 			}
@@ -143,6 +152,43 @@ class MultipartEntityHydrator
 		}
 
 		$property->setValue($instance, $this->castToType($value, $type));
+	}
+
+	/**
+	 * Form values are strings - int-backed enums accept integer strings ("10").
+	 * Invalid value → 422 with the same message as data-mapper uses for JSON bodies.
+	 *
+	 * @param class-string<BackedEnum> $enumClass
+	 */
+	private function toEnum(string $enumClass, string $field, mixed $value): BackedEnum
+	{
+		$intBacked = (string) (new ReflectionEnum($enumClass))->getBackingType() === 'int';
+		$backingValue = match (true) {
+			$intBacked && is_int($value) => $value,
+			$intBacked && is_string($value) && preg_match('/^-?\d+\z/', $value) === 1 => (int) $value,
+			!$intBacked && (is_string($value) || is_int($value)) => (string) $value,
+			default => null,
+		};
+
+		$enum = $backingValue !== null ? $enumClass::tryFrom($backingValue) : null;
+
+		if ($enum === null) {
+			$expected = implode(
+				', ',
+				array_map(static fn (BackedEnum $case): string => (string) $case->value, $enumClass::cases()),
+			);
+
+			throw (new ValidationException('Request body contains validation errors'))->withFields([
+				$field => sprintf(
+					"Invalid value for field '%s'. Expected one of: %s, got: %s",
+					$field,
+					$expected,
+					is_scalar($value) ? (string) $value : get_debug_type($value),
+				),
+			]);
+		}
+
+		return $enum;
 	}
 
 	private function castToType(mixed $value, ReflectionType|null $type): mixed
