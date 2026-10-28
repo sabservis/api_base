@@ -33,4 +33,17 @@ final class OperationIdResolverTest extends TestCase
 		self::assertSame(['userList', 'userList3', 'userList2'], $ids);
 	}
 
+	#[Test]
+	public function aliasesAreNumberedByPathNotByAttributeOrder(): void
+	{
+		$ids = OperationIdResolver::resolve([
+			['class' => 'App\\ContactController', 'httpMethod' => 'GET', 'id' => 'contactList', 'explicit' => false, 'path' => '/contacts'],
+			['class' => 'App\\ContactController', 'httpMethod' => 'GET', 'id' => 'contactList', 'explicit' => false, 'path' => '/zeta'],
+			['class' => 'App\\ContactController', 'httpMethod' => 'GET', 'id' => 'contactList', 'explicit' => false, 'path' => '/alpha'],
+		]);
+
+		// The endpoint's own path (registered first) keeps the plain id
+		self::assertSame(['contactList', 'contactList3', 'contactList2'], $ids);
+	}
+
 }

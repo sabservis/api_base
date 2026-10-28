@@ -15,6 +15,7 @@ use function lcfirst;
 use function max;
 use function strtolower;
 use function ucfirst;
+use function usort;
 
 /**
  * Makes generated operationIds unique (OpenAPI requires it).
@@ -28,7 +29,7 @@ final class OperationIdResolver
 {
 
 	/**
-	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool}> $operations
+	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool, path?: string}> $operations
 	 * @return list<string>
 	 */
 	public static function resolve(array $operations): array
@@ -69,7 +70,7 @@ final class OperationIdResolver
 	}
 
 	/**
-	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool}> $operations
+	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool, path?: string}> $operations
 	 * @param list<int> $indexes
 	 * @param array<string, bool> $taken
 	 * @return array<int, string>
@@ -88,8 +89,14 @@ final class OperationIdResolver
 
 		foreach ($aliases as $group) {
 			$base = $resolved[$group[0]];
+			// Numbered by path, not by attribute order - reordering aliases must not swap their ids
+			$rest = array_slice($group, 1);
+			usort(
+				$rest,
+				static fn (int $a, int $b): int => ($operations[$a]['path'] ?? '') <=> ($operations[$b]['path'] ?? ''),
+			);
 
-			foreach (array_slice($group, 1) as $index) {
+			foreach ($rest as $index) {
 				$n = 2;
 
 				while (isset($assigned[$base . $n])) {
@@ -105,7 +112,7 @@ final class OperationIdResolver
 	}
 
 	/**
-	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool}> $operations
+	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool, path?: string}> $operations
 	 * @param list<int> $indexes
 	 * @param array<string, bool> $taken
 	 * @return array<int, string>
@@ -154,7 +161,7 @@ final class OperationIdResolver
 	}
 
 	/**
-	 * @param array{class: string, httpMethod: string, id: string, explicit: bool} $operation
+	 * @param array{class: string, httpMethod: string, id: string, explicit: bool, path?: string} $operation
 	 */
 	private static function candidate(array $operation, string $id, int $depth, bool $withMethod): string
 	{
