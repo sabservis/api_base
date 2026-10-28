@@ -47,7 +47,7 @@ final class JsonContent implements OpenApiAttributeInterface
 		$schema = [];
 
 		if ($this->ref !== null) {
-			$schema['$ref'] = '#/components/schemas/' . $this->resolveRefName($this->ref);
+			$schema = $this->buildRefSpec($this->ref);
 		} else {
 			if ($this->type !== null) {
 				$schema['type'] = $this->type;

@@ -202,7 +202,7 @@ final class CompositionSupportTest extends TestCase
 
 		$spec = $schema->toOpenApiSpec();
 
-		self::assertSame(['$ref' => '#/components/schemas/UserDto'], $spec);
+		self::assertSame(['$ref' => '#/components/schemas/UserDto', '_class' => 'App\\DTO\\UserDto'], $spec);
 	}
 
 	#[Test]
@@ -213,7 +213,7 @@ final class CompositionSupportTest extends TestCase
 
 		$spec = $items->toOpenApiSpec();
 
-		self::assertSame(['$ref' => '#/components/schemas/UserDto'], $spec);
+		self::assertSame(['$ref' => '#/components/schemas/UserDto', '_class' => 'App\\DTO\\UserDto'], $spec);
 	}
 
 	#[Test]

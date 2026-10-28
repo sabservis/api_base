@@ -4,6 +4,7 @@ namespace Sabservis\Api\Attribute\OpenApi;
 
 use function end;
 use function explode;
+use function ltrim;
 use function str_contains;
 
 /**
@@ -58,6 +59,23 @@ trait ClassNameSupport
 		}
 
 		return $ref;
+	}
+
+	/**
+	 * Build a $ref spec. A class reference also carries the class name (`_class`) so the generator
+	 * can tell apart classes sharing a short name; the marker never reaches the generated document.
+	 *
+	 * @return array<string, string>
+	 */
+	protected function buildRefSpec(string $ref): array
+	{
+		$spec = ['$ref' => '#/components/schemas/' . $this->resolveRefName($ref)];
+
+		if ($this->looksLikeClassName($ref)) {
+			$spec['_class'] = ltrim($ref, '\\');
+		}
+
+		return $spec;
 	}
 
 }

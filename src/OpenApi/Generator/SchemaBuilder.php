@@ -66,7 +66,7 @@ final class SchemaBuilder
 	 */
 	public function registerClass(string $className): string
 	{
-		$schemaName = $this->getSchemaName($className);
+		$schemaName = $this->getSchemaNameForClass($className);
 
 		// Already registered, filtered out or in progress (circular reference)
 		if (isset($this->classes[$className])) {
@@ -114,6 +114,16 @@ final class SchemaBuilder
 		}
 
 		return $this->schemaNames[$candidates[0]];
+	}
+
+	/**
+	 * Component name of a class (namespace-prefixed when its short name collides).
+	 *
+	 * @param class-string $className
+	 */
+	public function getSchemaNameForClass(string $className): string
+	{
+		return $this->schemaNames[$className] ?? SchemaNameResolver::shortName($className);
 	}
 
 	/**
@@ -623,14 +633,6 @@ final class SchemaBuilder
 		}
 
 		return $attributes[0]->newInstance();
-	}
-
-	/**
-	 * @param class-string $className
-	 */
-	private function getSchemaName(string $className): string
-	{
-		return $this->schemaNames[$className] ?? SchemaNameResolver::shortName($className);
 	}
 
 }

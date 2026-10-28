@@ -31,7 +31,7 @@ class AdditionalProperties implements OpenApiAttributeInterface
 	public function toOpenApiSpec(): array
 	{
 		if ($this->ref !== null) {
-			return ['$ref' => '#/components/schemas/' . $this->resolveRefName($this->ref)];
+			return $this->buildRefSpec($this->ref);
 		}
 
 		$spec = [];

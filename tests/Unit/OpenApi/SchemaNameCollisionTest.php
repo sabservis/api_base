@@ -11,6 +11,8 @@ use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Tests\Unit\OpenApi\Fixtures\Collision\CollisionController;
 use Tests\Unit\OpenApi\Fixtures\Collision\PinnedNameController;
+use Tests\Unit\OpenApi\Fixtures\Collision\SameContextController;
+use function array_column;
 use function array_keys;
 use function json_decode;
 use function json_encode;
@@ -58,6 +60,54 @@ final class SchemaNameCollisionTest extends TestCase
 		self::assertSame(['sku', 'quantity'], array_keys($schemas['ItemDto']['properties']));
 		self::assertSame('#/components/schemas/ShippingLine', $this->responseRef($spec['paths'], '/shipping/item'));
 		self::assertSame('#/components/schemas/ItemDto', $this->responseRef($spec['paths'], '/orders/item'));
+	}
+
+	#[Test]
+	public function collidingClassesInOneResponseKeepTheirOwnRefs(): void
+	{
+		$paths = $this->generate(SameContextController::class)['paths'];
+		$schema = $paths['/items']['get']['responses']['200']['content']['application/json']['schema'];
+
+		self::assertSame(
+			['#/components/schemas/OrderItemDto', '#/components/schemas/InvoiceItemDto'],
+			array_column($schema['properties']['data']['items']['oneOf'], '$ref'),
+		);
+	}
+
+	#[Test]
+	public function collidingClassesInInlineResponseSchemaKeepTheirOwnRefs(): void
+	{
+		$paths = $this->generate(SameContextController::class)['paths'];
+		$schema = $paths['/items/any']['get']['responses']['200']['content']['application/json']['schema'];
+
+		self::assertSame(
+			['#/components/schemas/OrderItemDto', '#/components/schemas/InvoiceItemDto'],
+			array_column($schema['oneOf'], '$ref'),
+		);
+	}
+
+	#[Test]
+	public function collidingClassesInInlineRequestBodyKeepTheirOwnRefs(): void
+	{
+		$spec = $this->generate(SameContextController::class);
+		$schema = $spec['paths']['/items/import']['post']['requestBody']['content']['application/json']['schema'];
+
+		self::assertSame(
+			['#/components/schemas/InvoiceItemDto', '#/components/schemas/ShippingLine'],
+			array_column($schema['oneOf'], '$ref'),
+		);
+		self::assertStringNotContainsString('_class', json_encode($spec, JSON_THROW_ON_ERROR));
+	}
+
+	#[Test]
+	public function requestBodyReferencesItsOwnClass(): void
+	{
+		$paths = $this->generate(SameContextController::class)['paths'];
+
+		self::assertSame(
+			'#/components/schemas/ShippingLine',
+			$paths['/shipping/items']['post']['requestBody']['content']['application/json']['schema']['$ref'],
+		);
 	}
 
 	/**

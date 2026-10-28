@@ -531,7 +531,9 @@ final class OpenApiGenerator
 
 		// Attributes reference classes by short name - map to the (possibly prefixed) component name
 		if ($ref !== null) {
-			$ref = $this->schemaBuilder->resolveRefName($ref, $this->refContext);
+			$ref = isset($spec['_class']) && is_string($spec['_class']) && class_exists($spec['_class'])
+				? $this->schemaBuilder->getSchemaNameForClass($spec['_class'])
+				: $this->schemaBuilder->resolveRefName($ref, $this->refContext);
 		}
 
 		// Handle oneOf/anyOf/allOf composition
