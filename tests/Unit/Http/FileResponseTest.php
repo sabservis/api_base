@@ -191,6 +191,15 @@ final class FileResponseTest extends TestCase
 			'text xml' => ['text/xml'],
 			'javascript' => ['application/javascript'],
 			'text javascript' => ['text/javascript'],
+			'rss' => ['application/rss+xml'],
+			'atom' => ['application/atom+xml'],
+			'xslt' => ['application/xslt+xml'],
+			'mathml' => ['application/mathml+xml'],
+			'any xml suffix' => ['application/vnd.example+xml; charset=utf-8'],
+			'text xsl' => ['text/xsl'],
+			'ecmascript' => ['application/ecmascript'],
+			'text ecmascript' => ['text/ecmascript'],
+			'x-javascript' => ['application/x-javascript'],
 		];
 	}
 

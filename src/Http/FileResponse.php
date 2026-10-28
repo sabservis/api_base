@@ -17,6 +17,7 @@ use function rawurlencode;
 use function readlink;
 use function realpath;
 use function rewind;
+use function str_ends_with;
 use function str_replace;
 use function str_starts_with;
 use function stream_get_meta_data;
@@ -132,8 +133,12 @@ final class FileResponse
 		'image/svg+xml',
 		'application/xml',
 		'text/xml',
+		'text/xsl',
 		'application/javascript',
+		'application/ecmascript',
+		'application/x-javascript',
 		'text/javascript',
+		'text/ecmascript',
 	];
 
 	/** @var array<string> Allowed directories for file serving (empty = allow all with warning) */
@@ -469,7 +474,8 @@ final class FileResponse
 	{
 		$mimeType = strtolower(trim(explode(';', $this->contentType, 2)[0]));
 
-		return in_array($mimeType, self::ACTIVE_CONTENT_TYPES, true);
+		// Any XML-based type (RSS, Atom, XSLT, ...) can embed XHTML with scripts
+		return in_array($mimeType, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($mimeType, '+xml');
 	}
 
 	/**
