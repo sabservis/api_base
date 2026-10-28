@@ -7,6 +7,7 @@ use Nette\DI\Container;
 use Nette\DI\ContainerLoader;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Pocta\DataMapper\Attributes\MapProperty;
 use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use ReflectionProperty;
 use Sabservis\Api\Application\ApiApplication;
@@ -429,6 +430,46 @@ final class ApiExtensionTest extends TestCase
 		self::assertSame([LatePriorityMiddleware::class, ReferencePriorityMiddleware::class], $order);
 	}
 
+	#[Test]
+	public function defaultSerializerKeepsDataMapperDefaults(): void
+	{
+		$serializer = $this->createContainer([])->getByType(EntitySerializer::class);
+		assert($serializer instanceof EntitySerializer);
+
+		self::assertSame(
+			'{"city":"Prague","secret":"s"}',
+			$serializer->serialize(new SerializerHardeningDto()),
+		);
+	}
+
+	#[Test]
+	public function serializerAcceptsHardenedMapperOptionsFromNeon(): void
+	{
+		$container = $this->createContainerFromNeon(<<<'NEON'
+			api:
+			    serializer: Sabservis\Api\Mapping\Serializer\DataMapperSerializer(
+			        Pocta\DataMapper\MapperOptions(publicPropertiesOnly: true, symmetricPropertyPaths: true)
+			    )
+			NEON);
+
+		$serializer = $container->getByType(EntitySerializer::class);
+		assert($serializer instanceof EntitySerializer);
+
+		self::assertSame(
+			'{"address":{"city":"Prague"}}',
+			$serializer->serialize(new SerializerHardeningDto()),
+		);
+
+		$dto = $serializer->deserialize(
+			'{"secret":"injected","address":{"city":"Brno"}}',
+			SerializerHardeningDto::class,
+		);
+		assert($dto instanceof SerializerHardeningDto);
+
+		self::assertSame('s', $dto->getSecret());
+		self::assertSame('Brno', $dto->city);
+	}
+
 	/**
 	 * @param array<string, mixed> $config
 	 */
@@ -586,6 +627,21 @@ final class ApiExtensionTest extends TestCase
 }
 
 // Test fixtures
+
+final class SerializerHardeningDto
+{
+
+	#[MapProperty(path: 'address.city')]
+	public string $city = 'Prague';
+
+	private string $secret = 's';
+
+	public function getSecret(): string
+	{
+		return $this->secret;
+	}
+
+}
 
 #[MiddlewarePriority(300)]
 final class ReferencePriorityMiddleware implements Middleware

@@ -120,6 +120,28 @@ return FileResponse::fromPath('/uploads/' . $filename);
 return FileResponse::fromPath($userInput);  // Path traversal!
 ```
 
+## DTO mapping – únik dat a mass assignment
+
+Výchozí `DataMapperSerializer` (data-mapper 1.x) mapuje **i private/protected property**: posílá je v odpovědi
+a nastavuje je z request body. Property s `#[MapProperty(path: 'address.city')]` čte vnořenou cestu, ale vrací plochý klíč.
+
+Ochrana je opt-in (výchozí chování se nemění):
+
+```neon
+api:
+    serializer: Sabservis\Api\Mapping\Serializer\DataMapperSerializer(
+        Pocta\DataMapper\MapperOptions(publicPropertiesOnly: true, symmetricPropertyPaths: true)
+    )
+```
+
+- `publicPropertiesOnly` – mapuje jen public property; neveřejnou jen s `#[MapProperty]`
+- `symmetricPropertyPaths` – `path` se vrací ve stejné vnořené struktuře, ve které se čte
+- atributy data-mapperu (platí i bez opt-in voleb): `#[Ignore]` – ani vstup, ani výstup;
+  `#[OutputOnly]` – jen výstup (`id`, `role`); `#[InputOnly]` – jen vstup (`password`)
+
+`#[Hidden]` property jen skryje z OpenAPI, vstup neblokuje. OpenAPI dokumentuje public property pod klíčem
+z `#[MapProperty(name:)]` – vnořenou `path`, neveřejné property s `#[MapProperty]` ani `#[Ignore]`/`#[OutputOnly]`/`#[InputOnly]` nezohledňuje.
+
 ## JSON Depth Limit
 
 Ochrana proti stack overflow útokům:
