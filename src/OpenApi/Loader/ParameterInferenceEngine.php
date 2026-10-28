@@ -278,8 +278,8 @@ final class ParameterInferenceEngine
 
 		$required = $param->isRequired();
 
-		// Bound argument without explicit required: same rule as inferred parameters
-		if ($argument !== null && $param->required === null && $signatureParameter !== null) {
+		// Matching argument without explicit required: same rule as inferred parameters
+		if ($param->required === null && $signatureParameter !== null) {
 			$required = !$signatureParameter->allowsNull() && !$signatureParameter->isOptional();
 		}
 
