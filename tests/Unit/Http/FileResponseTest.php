@@ -200,6 +200,10 @@ final class FileResponseTest extends TestCase
 			'ecmascript' => ['application/ecmascript'],
 			'text ecmascript' => ['text/ecmascript'],
 			'x-javascript' => ['application/x-javascript'],
+			'text x-javascript' => ['text/x-javascript'],
+			'x-ecmascript' => ['application/x-ecmascript'],
+			'jscript' => ['text/jscript'],
+			'unknown type' => ['application/x-something-new'],
 		];
 	}
 
@@ -268,6 +272,40 @@ final class FileResponseTest extends TestCase
 
 		self::assertSame($expected, $sent);
 		self::assertSame((string) strlen($sent), $response->getHeader('Content-Length'));
+	}
+
+	#[Test]
+	#[DataProvider('providePassiveContentTypes')]
+	public function passiveContentTypeIsNotSandboxed(string $contentType): void
+	{
+		$response = FileResponse::fromContent('data', 'file.bin', $contentType)->inline()->toApiResponse();
+
+		self::assertNull($response->getHeader('content-security-policy'), $contentType);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function providePassiveContentTypes(): array
+	{
+		return [
+			'pdf' => ['application/pdf'],
+			'jpeg' => ['image/jpeg'],
+			'webp' => ['image/webp'],
+			'mp4' => ['video/mp4'],
+			'mp3' => ['audio/mpeg'],
+			'woff2' => ['font/woff2'],
+			'plain text' => ['text/plain; charset=utf-8'],
+			'csv' => ['text/csv'],
+			'json' => ['application/json'],
+			'octet-stream' => ['application/octet-stream'],
+			'zip' => ['application/zip'],
+			'docx' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+			'xlsx' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'],
+			'xls' => ['application/vnd.ms-excel'],
+			'odt' => ['application/vnd.oasis.opendocument.text'],
+			'doc' => ['application/msword'],
+		];
 	}
 
 	#[Test]

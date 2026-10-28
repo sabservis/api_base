@@ -125,20 +125,35 @@ final class FileResponse
 	];
 
 	/**
-	 * Content types the browser can execute scripts in (stored XSS when user uploads are served).
+	 * Content types a browser can't execute scripts in - everything else gets the CSP sandbox
+	 * (allowlist: unknown or legacy script types like text/jscript are sandboxed by default).
 	 */
-	private const ACTIVE_CONTENT_TYPES = [
-		'text/html',
-		'application/xhtml+xml',
-		'image/svg+xml',
-		'application/xml',
-		'text/xml',
-		'text/xsl',
-		'application/javascript',
-		'application/ecmascript',
-		'application/x-javascript',
-		'text/javascript',
-		'text/ecmascript',
+	private const PASSIVE_CONTENT_TYPES = [
+		'application/pdf',
+		'text/plain',
+		'text/csv',
+		'application/json',
+		'application/octet-stream',
+		'application/zip',
+		'application/gzip',
+		'application/x-gzip',
+		'application/x-tar',
+		'application/x-7z-compressed',
+		'application/vnd.rar',
+		'application/x-rar-compressed',
+		'application/msword',
+		'application/rtf',
+	];
+
+	/** Passive type families; image/svg+xml and any *+xml stay active */
+	private const PASSIVE_CONTENT_TYPE_PREFIXES = [
+		'image/',
+		'audio/',
+		'video/',
+		'font/',
+		'application/vnd.ms-',
+		'application/vnd.openxmlformats-officedocument.',
+		'application/vnd.oasis.opendocument.',
 	];
 
 	/** @var array<string> Allowed directories for file serving (empty = allow all with warning) */
@@ -457,7 +472,7 @@ final class FileResponse
 			->withHeader('Pragma', 'public')
 			->withBody($this->body);
 
-		// SECURITY: Scripts in served HTML/SVG/XML would run on the API origin (stored XSS).
+		// SECURITY: Scripts in served HTML/SVG/XML/JS would run on the API origin (stored XSS).
 		// Not applied to passive types - CSP sandbox breaks Chrome's inline PDF viewer.
 		if ($this->isActiveContent()) {
 			$response = $response->withHeader('Content-Security-Policy', "sandbox; default-src 'none'");
@@ -474,8 +489,22 @@ final class FileResponse
 	{
 		$mimeType = strtolower(trim(explode(';', $this->contentType, 2)[0]));
 
-		// Any XML-based type (RSS, Atom, XSLT, ...) can embed XHTML with scripts
-		return in_array($mimeType, self::ACTIVE_CONTENT_TYPES, true) || str_ends_with($mimeType, '+xml');
+		// Any XML-based type (SVG, RSS, Atom, XSLT, ...) can embed XHTML with scripts
+		if (str_ends_with($mimeType, '+xml')) {
+			return true;
+		}
+
+		if (in_array($mimeType, self::PASSIVE_CONTENT_TYPES, true)) {
+			return false;
+		}
+
+		foreach (self::PASSIVE_CONTENT_TYPE_PREFIXES as $prefix) {
+			if (str_starts_with($mimeType, $prefix)) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/**
