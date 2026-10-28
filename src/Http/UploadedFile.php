@@ -14,7 +14,6 @@ use function in_array;
 use function is_dir;
 use function is_uploaded_file;
 use function mb_strcut;
-use function mb_strlen;
 use function mkdir;
 use function move_uploaded_file;
 use function pathinfo;
@@ -25,6 +24,7 @@ use function rtrim;
 use function set_error_handler;
 use function str_replace;
 use function stream_copy_to_stream;
+use function strlen;
 use function strtolower;
 use function trim;
 use const FILEINFO_MIME_TYPE;
@@ -129,8 +129,7 @@ final class UploadedFile
 	 * Sanitize a filename for safe filesystem operations.
 	 *
 	 * @param string $filename Raw filename to sanitize
-	 * @param int $maxLength Names longer than this many characters are truncated to at most this many
-	 *                       bytes (default 255, the filesystem limit); never cuts a UTF-8 character.
+	 * @param int $maxLength Maximum length in bytes (default 255, the filesystem limit); never cuts a UTF-8 character.
 	 * @return string Safe filename
 	 */
 	public static function sanitizeFilename(string $filename, int $maxLength = 255): string
@@ -171,12 +170,12 @@ final class UploadedFile
 		}
 
 		// Limit length while preserving extension
-		if (mb_strlen($filename) > $maxLength) {
+		if (strlen($filename) > $maxLength) {
 			$extension = pathinfo($filename, PATHINFO_EXTENSION);
 			$name = pathinfo($filename, PATHINFO_FILENAME);
 
 			if ($extension !== '') {
-				$extLength = mb_strlen($extension) + 1; // +1 for dot
+				$extLength = strlen($extension) + 1; // +1 for dot
 				$nameLength = $maxLength - $extLength;
 
 				$filename = $nameLength > 0

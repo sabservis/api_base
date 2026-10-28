@@ -1001,10 +1001,27 @@ final class UploadedFileTest extends TestCase
 	}
 
 	#[Test]
-	public function sanitizeFilenameKeepsMultibyteNameWithinCharacterLimit(): void
+	public function sanitizeFilenameTruncatesMultibyteNameOverByteLimit(): void
 	{
-		// Not longer than $maxLength characters -> untouched, as before
-		$name = str_repeat('ž', 200) . '.pdf';
+		// 204 characters but 404 bytes - over the 255-byte filesystem limit
+		$result = UploadedFile::sanitizeFilename(str_repeat('ž', 200) . '.pdf');
+
+		self::assertSame(str_repeat('ž', 125) . '.pdf', $result);
+	}
+
+	#[Test]
+	public function sanitizeFilenameCountsMultibyteExtensionInBytes(): void
+	{
+		$result = UploadedFile::sanitizeFilename(str_repeat('a', 300) . '.ččč');
+
+		self::assertSame(str_repeat('a', 248) . '.ččč', $result);
+		self::assertSame(255, strlen($result));
+	}
+
+	#[Test]
+	public function sanitizeFilenameKeepsMultibyteNameWithinByteLimit(): void
+	{
+		$name = str_repeat('ž', 100) . '.pdf';
 
 		self::assertSame($name, UploadedFile::sanitizeFilename($name));
 	}
