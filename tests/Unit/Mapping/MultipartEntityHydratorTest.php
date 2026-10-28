@@ -112,6 +112,23 @@ class NullableEnumWithEmptyCaseDto
 
 }
 
+class NullableScalarsDto
+{
+
+	public int|null $quantity = null;
+
+	public float|null $price = null;
+
+	public bool|null $active = null;
+
+	public string|null $note = null;
+
+	public NestedAddressDto|null $address = null;
+
+	public int $count = 5;
+
+}
+
 class ExplicitFileNameDto
 {
 
@@ -451,6 +468,48 @@ final class MultipartEntityHydratorTest extends TestCase
 		$this->expectException(ValidationException::class);
 
 		$this->hydrator->hydrate($request, NullableEnumPropertyDto::class);
+	}
+
+	#[Test]
+	public function emptyStringForNullablePropertiesHydratesNull(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['quantity' => '', 'price' => '', 'active' => '', 'address' => '']);
+
+		$dto = $this->hydrator->hydrate($request, NullableScalarsDto::class);
+
+		self::assertInstanceOf(NullableScalarsDto::class, $dto);
+		self::assertNull($dto->quantity);
+		self::assertNull($dto->price);
+		self::assertNull($dto->active);
+		self::assertNull($dto->address);
+	}
+
+	#[Test]
+	public function emptyStringStaysStringAndNonNullableKeepsCast(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['note' => '', 'count' => '']);
+
+		$dto = $this->hydrator->hydrate($request, NullableScalarsDto::class);
+
+		self::assertInstanceOf(NullableScalarsDto::class, $dto);
+		self::assertSame('', $dto->note);
+		self::assertSame(0, $dto->count);
+	}
+
+	#[Test]
+	public function nonEmptyNullableValuesAreCast(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['quantity' => '3', 'price' => '1.5', 'active' => 'true']);
+
+		$dto = $this->hydrator->hydrate($request, NullableScalarsDto::class);
+
+		self::assertInstanceOf(NullableScalarsDto::class, $dto);
+		self::assertSame(3, $dto->quantity);
+		self::assertSame(1.5, $dto->price);
+		self::assertTrue($dto->active);
 	}
 
 	#[Test]

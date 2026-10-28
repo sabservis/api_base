@@ -21,6 +21,7 @@ use function class_exists;
 use function filter_var;
 use function get_debug_type;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_int;
 use function is_scalar;
@@ -132,18 +133,19 @@ class MultipartEntityHydrator
 		$value = $data[$name];
 		$type = $property->getType();
 
+		if ($type instanceof ReflectionNamedType && $type->allowsNull() && $this->isEmptyValue($value, $type)) {
+			$property->setValue($instance, null);
+
+			return;
+		}
+
 		if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
 			$typeName = $type->getName();
 
 			if (is_subclass_of($typeName, BackedEnum::class)) {
-				/** @var class-string<BackedEnum> $enumClass */
-				$enumClass = $typeName;
-				// Empty form field (unselected <select>) means "no value" for a nullable enum
-				$isEmpty = $value === null || ($value === '' && !$this->hasEmptyCase($enumClass));
-				$property->setValue(
-					$instance,
-					$isEmpty && $type->allowsNull() ? null : $this->toEnum($enumClass, $name, $value),
-				);
+				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
+				/** @var class-string<BackedEnum> $typeName */
+				$property->setValue($instance, $this->toEnum($typeName, $name, $value));
 
 				return;
 			}
@@ -198,17 +200,30 @@ class MultipartEntityHydrator
 	}
 
 	/**
-	 * @param class-string<BackedEnum> $enumClass
+	 * Empty form field (e.g. unselected <select>) means "no value" - except for string, mixed and enums
+	 * with a '' case, where '' is a valid value.
 	 */
-	private function hasEmptyCase(string $enumClass): bool
+	private function isEmptyValue(mixed $value, ReflectionNamedType $type): bool
 	{
-		foreach ($enumClass::cases() as $case) {
-			if ($case->value === '') {
-				return true;
+		if ($value === null) {
+			return true;
+		}
+
+		if ($value !== '' || in_array($type->getName(), ['string', 'mixed'], true)) {
+			return false;
+		}
+
+		$typeName = $type->getName();
+
+		if (is_subclass_of($typeName, BackedEnum::class)) {
+			foreach ($typeName::cases() as $case) {
+				if ($case->value === '') {
+					return false;
+				}
 			}
 		}
 
-		return false;
+		return true;
 	}
 
 	private function castToType(mixed $value, ReflectionType|null $type): mixed
