@@ -531,10 +531,11 @@ final class OpenApiGenerator
 			$ref = substr($ref, strlen('#/components/schemas/'));
 		}
 
-		// Attributes reference classes by short name - map to the (possibly prefixed) component name
+		// Attributes reference classes by short name - map to the (possibly prefixed) component name.
+		// A known class (_class) is registered too: inline request body refs have no other registration.
 		if ($ref !== null) {
 			$ref = isset($spec['_class']) && is_string($spec['_class']) && class_exists($spec['_class'])
-				? $this->schemaBuilder->getSchemaNameForClass($spec['_class'])
+				? $this->schemaBuilder->registerClass($spec['_class'])
 				: $this->schemaBuilder->resolveRefName($ref, $this->refContext);
 		}
 

@@ -10,6 +10,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Tests\Unit\OpenApi\Fixtures\Collision\CollisionController;
+use Tests\Unit\OpenApi\Fixtures\Collision\InlineOnlyController;
 use Tests\Unit\OpenApi\Fixtures\Collision\PinnedMultipartController;
 use Tests\Unit\OpenApi\Fixtures\Collision\PinnedNameController;
 use Tests\Unit\OpenApi\Fixtures\Collision\SameContextController;
@@ -120,6 +121,16 @@ final class SchemaNameCollisionTest extends TestCase
 		self::assertSame(['total'], array_keys($spec['components']['schemas']['CartDto']['properties']));
 		self::assertSame('#/components/schemas/CartDto', $schema['properties']['basket']['$ref']);
 		self::assertSame('#/components/schemas/CollisionCartDto', $this->responseRef($spec['paths'], '/cart'));
+	}
+
+	#[Test]
+	public function classReferencedOnlyFromInlineRequestBodyIsRegistered(): void
+	{
+		$spec = $this->generate(InlineOnlyController::class);
+		$schema = $spec['paths']['/inline']['post']['requestBody']['content']['application/json']['schema'];
+
+		self::assertSame('#/components/schemas/ItemDto', $schema['oneOf'][0]['$ref']);
+		self::assertSame(['sku', 'quantity'], array_keys($spec['components']['schemas']['ItemDto']['properties']));
 	}
 
 	/**
