@@ -188,7 +188,7 @@ class MultipartEntityHydrator
 
 			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED))->withFields([
 				$field => sprintf(
-					"Invalid value for field '%s'. Expected one of: %s, got: %s",
+					ErrorMessages::BODY_INVALID_ENUM,
 					$field,
 					$expected,
 					is_scalar($value) ? (string) $value : get_debug_type($value),

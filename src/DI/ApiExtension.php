@@ -193,10 +193,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		// Validate CORS configuration
 		if ($config->cors->enabled && $config->cors->allowCredentials) {
 			if ($config->cors->allowedOrigins === []) {
-				throw new RuntimeStateException(
-					'CORS: allowCredentials requires explicit allowedOrigins. ' .
-					'Using credentials with wildcard origin is a security vulnerability.',
-				);
+				throw new RuntimeStateException(ErrorMessages::CORS_CREDENTIALS_NO_ORIGINS);
 			}
 		}
 

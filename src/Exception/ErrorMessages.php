@@ -37,6 +37,8 @@ final class ErrorMessages
 	public const TRUSTED_PROXY_INVALID = 'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).';
 
 	// CORS
+	public const CORS_CREDENTIALS_NO_ORIGINS = 'CORS: allowCredentials requires explicit allowedOrigins. Using credentials with wildcard origin is a security vulnerability.';
+
 	public const CORS_CREDENTIALS_WILDCARD = 'CORS configuration error: allowCredentials cannot be used with wildcard origin "*". This is a security vulnerability. Specify explicit allowed origins instead.';
 
 	public const CORS_CREDENTIALS_EMPTY = 'CORS configuration error: allowCredentials cannot be used with empty allowedOrigins (which allows all origins). Specify explicit allowed origins for security.';
@@ -82,5 +84,7 @@ final class ErrorMessages
 	public const BODY_NOT_OBJECT = 'Invalid input data - expected JSON object';
 
 	public const BODY_VALIDATION_FAILED = 'Request body contains validation errors';
+
+	public const BODY_INVALID_ENUM = "Invalid value for field '%s'. Expected one of: %s, got: %s";
 
 }

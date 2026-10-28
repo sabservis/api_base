@@ -125,7 +125,9 @@ final class ApiExtensionTest extends TestCase
 	public function throwsExceptionForCorsCredentialsWithoutOrigins(): void
 	{
 		$this->expectException(RuntimeStateException::class);
-		$this->expectExceptionMessage('CORS: allowCredentials requires explicit allowedOrigins');
+		$this->expectExceptionMessage(
+			'CORS: allowCredentials requires explicit allowedOrigins. Using credentials with wildcard origin is a security vulnerability.',
+		);
 
 		$this->createContainer([
 			'cors' => [
