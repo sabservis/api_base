@@ -4,6 +4,7 @@ namespace Sabservis\Api\OpenApi\Generator;
 
 use function array_column;
 use function array_count_values;
+use function array_fill_keys;
 use function array_slice;
 use function array_unique;
 use function count;
@@ -21,7 +22,7 @@ use function ucfirst;
  * Explicit operationIds are never changed. Generated ids that collide get:
  * - namespace prefix when controllers differ (Admin\UserController::list → adminUserList)
  * - HTTP method suffix when one method serves several HTTP methods (pingCheckGet, pingCheckPost)
- * - numeric suffix as last resort
+ * - numeric suffix for aliases of one endpoint (same class and HTTP method) and as last resort
  */
 final class OperationIdResolver
 {
@@ -74,6 +75,42 @@ final class OperationIdResolver
 	 * @return array<int, string>
 	 */
 	private static function disambiguate(array $operations, array $indexes, string $id, array $taken): array
+	{
+		// Aliases (same class and HTTP method) can't be told apart - resolve one of them, number the rest
+		$aliases = [];
+
+		foreach ($indexes as $index) {
+			$aliases[$operations[$index]['class'] . ' ' . $operations[$index]['httpMethod']][] = $index;
+		}
+
+		$resolved = self::disambiguateDistinct($operations, array_column($aliases, 0), $id, $taken);
+		$assigned = $taken + array_fill_keys($resolved, true);
+
+		foreach ($aliases as $group) {
+			$base = $resolved[$group[0]];
+
+			foreach (array_slice($group, 1) as $index) {
+				$n = 2;
+
+				while (isset($assigned[$base . $n])) {
+					$n++;
+				}
+
+				$resolved[$index] = $base . $n;
+				$assigned[$base . $n] = true;
+			}
+		}
+
+		return $resolved;
+	}
+
+	/**
+	 * @param list<array{class: string, httpMethod: string, id: string, explicit: bool}> $operations
+	 * @param list<int> $indexes
+	 * @param array<string, bool> $taken
+	 * @return array<int, string>
+	 */
+	private static function disambiguateDistinct(array $operations, array $indexes, string $id, array $taken): array
 	{
 		$classes = [];
 		$maxDepth = 0;

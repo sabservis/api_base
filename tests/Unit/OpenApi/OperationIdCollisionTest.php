@@ -10,6 +10,7 @@ use Sabservis\Api\OpenApi\Loader\OpenApiAttributeLoader;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Serialization\ArrayHydrator;
 use Tests\Unit\OpenApi\Fixtures\OperationId\Admin\UserController as AdminUserController;
+use Tests\Unit\OpenApi\Fixtures\OperationId\ContactController;
 use Tests\Unit\OpenApi\Fixtures\OperationId\Front\UserController as FrontUserController;
 use Tests\Unit\OpenApi\Fixtures\OperationId\PingController;
 use function array_count_values;
@@ -50,6 +51,16 @@ final class OperationIdCollisionTest extends TestCase
 	}
 
 	#[Test]
+	public function aliasesOfOneEndpointGetNumericSuffix(): void
+	{
+		$ids = $this->operationIds();
+
+		self::assertSame('contactList', $ids['GET /contacts']);
+		self::assertSame('contactList2', $ids['GET /people']);
+		self::assertSame('contactList3', $ids['GET /persons']);
+	}
+
+	#[Test]
 	public function allOperationIdsAreUnique(): void
 	{
 		$duplicates = array_filter(
@@ -67,7 +78,7 @@ final class OperationIdCollisionTest extends TestCase
 	{
 		$containerBuilder = new ContainerBuilder();
 
-		foreach ([AdminUserController::class, FrontUserController::class, PingController::class] as $i => $class) {
+		foreach ([AdminUserController::class, FrontUserController::class, PingController::class, ContactController::class] as $i => $class) {
 			$containerBuilder->addDefinition('controller' . $i)->setType($class);
 		}
 
