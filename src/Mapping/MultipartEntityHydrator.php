@@ -135,9 +135,14 @@ class MultipartEntityHydrator
 			$typeName = $type->getName();
 
 			if (is_subclass_of($typeName, BackedEnum::class)) {
-				// phpcs:ignore SlevomatCodingStandard.Commenting.InlineDocCommentDeclaration.NoAssignment
-				/** @var class-string<BackedEnum> $typeName */
-				$property->setValue($instance, $this->toEnum($typeName, $name, $value));
+				/** @var class-string<BackedEnum> $enumClass */
+				$enumClass = $typeName;
+				// Empty form field (unselected <select>) means "no value" for a nullable enum
+				$isEmpty = $value === null || ($value === '' && !$this->hasEmptyCase($enumClass));
+				$property->setValue(
+					$instance,
+					$isEmpty && $type->allowsNull() ? null : $this->toEnum($enumClass, $name, $value),
+				);
 
 				return;
 			}
@@ -189,6 +194,20 @@ class MultipartEntityHydrator
 		}
 
 		return $enum;
+	}
+
+	/**
+	 * @param class-string<BackedEnum> $enumClass
+	 */
+	private function hasEmptyCase(string $enumClass): bool
+	{
+		foreach ($enumClass::cases() as $case) {
+			if ($case->value === '') {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function castToType(mixed $value, ReflectionType|null $type): mixed

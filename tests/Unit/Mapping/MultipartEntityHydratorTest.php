@@ -89,6 +89,29 @@ class IntEnumPropertyDto
 
 }
 
+class NullableEnumPropertyDto
+{
+
+	public TestCategory|null $category = null;
+
+}
+
+enum MultipartVisibility: string
+{
+
+	case Default = '';
+
+	case Hidden = 'hidden';
+
+}
+
+class NullableEnumWithEmptyCaseDto
+{
+
+	public MultipartVisibility|null $visibility = null;
+
+}
+
 class ExplicitFileNameDto
 {
 
@@ -381,6 +404,53 @@ final class MultipartEntityHydratorTest extends TestCase
 		$this->expectException(ValidationException::class);
 
 		$this->hydrator->hydrate($request, EnumPropertyDto::class);
+	}
+
+	#[Test]
+	public function emptyStringForNullableEnumHydratesNull(): void
+	{
+		// Unselected <select> sends an empty string
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['category' => '']);
+
+		$dto = $this->hydrator->hydrate($request, NullableEnumPropertyDto::class);
+
+		self::assertInstanceOf(NullableEnumPropertyDto::class, $dto);
+		self::assertNull($dto->category);
+	}
+
+	#[Test]
+	public function emptyStringForNonNullableEnumThrowsValidationException(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['category' => '']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, EnumPropertyDto::class);
+	}
+
+	#[Test]
+	public function emptyStringMatchingEnumCaseHydratesThatCase(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['visibility' => '']);
+
+		$dto = $this->hydrator->hydrate($request, NullableEnumWithEmptyCaseDto::class);
+
+		self::assertInstanceOf(NullableEnumWithEmptyCaseDto::class, $dto);
+		self::assertSame(MultipartVisibility::Default, $dto->visibility);
+	}
+
+	#[Test]
+	public function invalidValueForNullableEnumThrowsValidationException(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['category' => 'podcast']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, NullableEnumPropertyDto::class);
 	}
 
 	#[Test]
