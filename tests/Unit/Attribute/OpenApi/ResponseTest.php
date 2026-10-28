@@ -239,8 +239,14 @@ final class ResponseTest extends TestCase
 		self::assertSame('array', $schema['properties']['data']['type']);
 		self::assertArrayHasKey('oneOf', $schema['properties']['data']['items']);
 		self::assertCount(2, $schema['properties']['data']['items']['oneOf']);
-		self::assertSame(['$ref' => '#/components/schemas/TestUserDto'], $schema['properties']['data']['items']['oneOf'][0]);
-		self::assertSame(['$ref' => '#/components/schemas/TestAdminDto'], $schema['properties']['data']['items']['oneOf'][1]);
+		self::assertSame(
+			['$ref' => '#/components/schemas/TestUserDto'],
+			$schema['properties']['data']['items']['oneOf'][0],
+		);
+		self::assertSame(
+			['$ref' => '#/components/schemas/TestAdminDto'],
+			$schema['properties']['data']['items']['oneOf'][1],
+		);
 		self::assertArrayNotHasKey('meta', $schema['properties']);
 		self::assertSame(['data'], $schema['required']);
 	}

@@ -13,9 +13,12 @@ use Sabservis\Api\Application\ApiApplication;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
 use Sabservis\Api\DI\ApiExtension;
 use Sabservis\Api\Dispatcher\ApiDispatcher;
+use Sabservis\Api\ErrorHandler\ErrorContextFilter;
 use Sabservis\Api\ErrorHandler\ErrorHandler;
 use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
+use Sabservis\Api\ErrorHandler\ErrorResponseTransformer;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
+use Sabservis\Api\ErrorHandler\TraceIdProvider;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
@@ -33,6 +36,7 @@ use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Security\AuthorizationChecker;
 use Sabservis\Api\Utils\ChainBuilder;
+use Throwable;
 use function array_filter;
 use function array_map;
 use function array_values;
@@ -564,6 +568,7 @@ final class ApiExtensionTest extends TestCase
 			foreach ($services as $service) {
 				$serviceDefinitions[] = $service;
 			}
+
 			$compiler->addConfig([
 				'parameters' => [
 					'productionMode' => false,
@@ -608,7 +613,7 @@ final class LatePriorityMiddleware implements Middleware
 
 }
 
-final class TestTraceIdProvider implements \Sabservis\Api\ErrorHandler\TraceIdProvider
+final class TestTraceIdProvider implements TraceIdProvider
 {
 
 	public function get(): string|null
@@ -618,7 +623,7 @@ final class TestTraceIdProvider implements \Sabservis\Api\ErrorHandler\TraceIdPr
 
 }
 
-final class TestErrorContextFilter implements \Sabservis\Api\ErrorHandler\ErrorContextFilter
+final class TestErrorContextFilter implements ErrorContextFilter
 {
 
 	public function filter(array $context): array
@@ -630,10 +635,10 @@ final class TestErrorContextFilter implements \Sabservis\Api\ErrorHandler\ErrorC
 
 }
 
-final class TestErrorResponseTransformer implements \Sabservis\Api\ErrorHandler\ErrorResponseTransformer
+final class TestErrorResponseTransformer implements ErrorResponseTransformer
 {
 
-	public function transform(array $data, \Throwable $error): array
+	public function transform(array $data, Throwable $error): array
 	{
 		$data['support'] = 'https://support.example.com';
 

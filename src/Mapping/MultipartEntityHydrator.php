@@ -10,8 +10,8 @@ use ReflectionType;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
-use function class_exists;
 use function array_key_exists;
+use function class_exists;
 use function filter_var;
 use function is_array;
 use function is_string;
@@ -26,6 +26,7 @@ class MultipartEntityHydrator
 	)
 	{
 	}
+
 	/**
 	 * Hydrate a DTO instance from a multipart/form-data request.
 	 *

@@ -2,11 +2,11 @@
 
 namespace Sabservis\Api\ErrorHandler;
 
+use Closure;
 use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\ApiException;
 use Sabservis\Api\Http\ApiResponse;
 use Throwable;
-use Closure;
 use function array_map;
 use function get_debug_type;
 use function is_array;
@@ -69,6 +69,7 @@ final class ErrorResponseBuilder
 	private TraceIdProvider|null $traceIdProvider = null;
 
 	private ErrorResponseTransformer|null $responseTransformer = null;
+
 	/**
 	 * Whether to include context in responses at all.
 	 */
@@ -220,6 +221,7 @@ final class ErrorResponseBuilder
 				$data['traceId'] = $traceId;
 			}
 		}
+
 		// Apply transformer if configured
 		if ($this->responseTransformer !== null) {
 			$data = $this->responseTransformer->transform($data, $error);

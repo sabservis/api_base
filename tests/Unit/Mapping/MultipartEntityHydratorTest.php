@@ -114,7 +114,7 @@ class ParentWithNullableNestedObjectDto
 
 	public string $name;
 
-	public ?NestedAddressDto $address = null;
+	public NestedAddressDto|null $address = null;
 
 }
 

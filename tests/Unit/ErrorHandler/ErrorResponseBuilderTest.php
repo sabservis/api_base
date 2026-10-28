@@ -6,12 +6,13 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use RuntimeException;
 use Sabservis\Api\ErrorHandler\ErrorContextFilter;
+use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
 use Sabservis\Api\ErrorHandler\ErrorResponseTransformer;
 use Sabservis\Api\ErrorHandler\TraceIdProvider;
-use Sabservis\Api\ErrorHandler\ErrorResponseBuilder;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ServerErrorException;
 use stdClass;
+use Throwable;
 use function array_keys;
 use function json_decode;
 
@@ -586,7 +587,12 @@ final class ErrorResponseBuilderTest extends TestCase
 	public function acceptsTraceIdProviderInterface(): void
 	{
 		$provider = new class implements TraceIdProvider {
-			public function get(): string|null { return 'interface-trace-id'; }
+
+			public function get(): string|null
+			{
+				return 'interface-trace-id';
+			}
+
 		};
 
 		$this->builder->setTraceIdProvider($provider);
@@ -601,11 +607,14 @@ final class ErrorResponseBuilderTest extends TestCase
 	public function acceptsErrorContextFilterInterface(): void
 	{
 		$filter = new class implements ErrorContextFilter {
+
 			public function filter(array $context): array
 			{
 				unset($context['remove_me']);
+
 				return $context;
 			}
+
 		};
 
 		$this->builder->setContextFilter($filter);
@@ -626,11 +635,14 @@ final class ErrorResponseBuilderTest extends TestCase
 	public function responseTransformerModifiesBuildOutput(): void
 	{
 		$transformer = new class implements ErrorResponseTransformer {
-			public function transform(array $data, \Throwable $error): array
+
+			public function transform(array $data, Throwable $error): array
 			{
 				$data['support'] = 'https://support.example.com';
+
 				return $data;
 			}
+
 		};
 
 		$this->builder->setResponseTransformer($transformer);
@@ -646,11 +658,14 @@ final class ErrorResponseBuilderTest extends TestCase
 	public function responseTransformerModifiesBuildFatalOutput(): void
 	{
 		$transformer = new class implements ErrorResponseTransformer {
-			public function transform(array $data, \Throwable $error): array
+
+			public function transform(array $data, Throwable $error): array
 			{
 				$data['support'] = 'https://support.example.com';
+
 				return $data;
 			}
+
 		};
 
 		$this->builder->setResponseTransformer($transformer);
@@ -668,12 +683,18 @@ final class ErrorResponseBuilderTest extends TestCase
 		$receivedException = null;
 
 		$transformer = new class($receivedException) implements ErrorResponseTransformer {
-			public function __construct(private mixed &$ref) {}
-			public function transform(array $data, \Throwable $error): array
+
+			public function __construct(private mixed &$ref)
+			{
+			}
+
+			public function transform(array $data, Throwable $error): array
 			{
 				$this->ref = $error;
+
 				return $data;
 			}
+
 		};
 
 		$original = new ClientErrorException('Original', 422);
@@ -687,8 +708,9 @@ final class ErrorResponseBuilderTest extends TestCase
 	public function responseTransformerAcceptsClosure(): void
 	{
 		$this->builder->setResponseTransformer(
-			static function (array $data, \Throwable $error): array {
+			static function (array $data, Throwable $error): array {
 				$data['custom'] = 'closure-value';
+
 				return $data;
 			},
 		);
@@ -705,10 +727,11 @@ final class ErrorResponseBuilderTest extends TestCase
 		$this->builder->setTraceIdProvider(static fn () => 'trace-123');
 
 		$this->builder->setResponseTransformer(
-			static function (array $data, \Throwable $error): array {
+			static function (array $data, Throwable $error): array {
 				// Transformer sees both traceId and context
 				$data['hasTraceId'] = isset($data['traceId']);
 				$data['hasContext'] = isset($data['context']);
+
 				return $data;
 			},
 		);
