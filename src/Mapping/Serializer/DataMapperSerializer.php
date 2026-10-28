@@ -10,6 +10,7 @@ use Pocta\DataMapper\Validation\Validator;
 use Pocta\DataMapper\Validation\ValidatorResolverInterface;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Http\ListResponse;
 use Sabservis\Api\Http\PaginatedListResponse;
 use Sabservis\Api\Utils\JsonLimits;
@@ -85,13 +86,13 @@ class DataMapperSerializer implements EntitySerializer
 	public function deserialize(mixed $data, mixed $type = null): mixed
 	{
 		if (!is_string($data)) {
-			throw new ClientErrorException('Invalid input data - expected JSON string');
+			throw new ClientErrorException(ErrorMessages::BODY_NOT_STRING);
 		}
 
 		try {
 			$decoded = json_decode($data, true, $this->jsonDepth, JSON_THROW_ON_ERROR);
 		} catch (JsonException $e) {
-			throw new ClientErrorException('Invalid input data (JSON)', previous: $e);
+			throw new ClientErrorException(ErrorMessages::BODY_INVALID_JSON, previous: $e);
 		}
 
 		if ($type === null) {
@@ -100,7 +101,7 @@ class DataMapperSerializer implements EntitySerializer
 
 		// Decoded here (not via Mapper::fromJson) to apply jsonDepth and reject scalar bodies with 400
 		if (!is_array($decoded)) {
-			throw new ClientErrorException('Invalid input data - expected JSON object');
+			throw new ClientErrorException(ErrorMessages::BODY_NOT_OBJECT);
 		}
 
 		/** @var array<string, mixed> $payload */
@@ -111,7 +112,7 @@ class DataMapperSerializer implements EntitySerializer
 			return $this->mapper->fromArray($payload, $type);
 		} catch (DataMapperValidationException $e) {
 			throw (new ValidationException(
-				'Request body contains validation errors',
+				ErrorMessages::BODY_VALIDATION_FAILED,
 				previous: $e,
 			))->withFields($e->getErrors());
 		}

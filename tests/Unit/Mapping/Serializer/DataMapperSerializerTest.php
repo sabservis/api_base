@@ -255,6 +255,7 @@ final class DataMapperSerializerTest extends TestCase
 			self::fail('Expected ClientErrorException');
 		} catch (ClientErrorException $e) {
 			self::assertSame(400, $e->getCode());
+			self::assertSame('Invalid input data - expected JSON object', $e->getMessage());
 			self::assertNotInstanceOf(ValidationException::class, $e);
 		}
 	}
@@ -288,6 +289,7 @@ final class DataMapperSerializerTest extends TestCase
 		$json = '{"name":"John","age":"not-a-number"}';
 
 		$this->expectException(ValidationException::class);
+		$this->expectExceptionMessage('Request body contains validation errors');
 
 		$this->serializer->deserialize($json, TestTypedDto::class);
 	}

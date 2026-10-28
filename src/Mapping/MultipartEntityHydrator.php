@@ -12,6 +12,7 @@ use ReflectionProperty;
 use ReflectionType;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Exception\Api\ValidationException;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use function array_key_exists;
@@ -183,7 +184,7 @@ class MultipartEntityHydrator
 				array_map(static fn (BackedEnum $case): string => (string) $case->value, $enumClass::cases()),
 			);
 
-			throw (new ValidationException('Request body contains validation errors'))->withFields([
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED))->withFields([
 				$field => sprintf(
 					"Invalid value for field '%s'. Expected one of: %s, got: %s",
 					$field,

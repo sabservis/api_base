@@ -71,4 +71,13 @@ final class ErrorMessages
 
 	public const JSON_NOT_ARRAY = 'JSON must be an object or array';
 
+	// Request body mapping (EntitySerializer, multipart hydrator)
+	public const BODY_NOT_STRING = 'Invalid input data - expected JSON string';
+
+	public const BODY_INVALID_JSON = 'Invalid input data (JSON)';
+
+	public const BODY_NOT_OBJECT = 'Invalid input data - expected JSON object';
+
+	public const BODY_VALIDATION_FAILED = 'Request body contains validation errors';
+
 }
