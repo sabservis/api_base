@@ -21,7 +21,9 @@ final class RateLimitMiddlewareTest extends TestCase
 	public function throwsForMalformedTrustedProxy(): void
 	{
 		$this->expectException(InvalidArgumentException::class);
-		$this->expectExceptionMessage('10.0.0.0/');
+		$this->expectExceptionMessage(
+			'Invalid trustedProxies entry "10.0.0.0/". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
+		);
 
 		new RateLimitMiddleware(new ArrayAdapter(), trustedProxies: ['127.0.0.1', '10.0.0.0/']);
 	}

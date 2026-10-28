@@ -285,4 +285,16 @@ final class IpMatcherTest extends TestCase
 		}
 	}
 
+	#[Test]
+	public function findInvalidPatternReturnsFirstMalformedEntry(): void
+	{
+		self::assertSame('10.0.0.0/', IpMatcher::findInvalidPattern(['127.0.0.1', '10.0.0.0/', 'nope']));
+	}
+
+	#[Test]
+	public function findInvalidPatternReturnsNullForValidPatterns(): void
+	{
+		self::assertNull(IpMatcher::findInvalidPattern(['127.0.0.1', '10.0.0.0/8', '::1']));
+	}
+
 }

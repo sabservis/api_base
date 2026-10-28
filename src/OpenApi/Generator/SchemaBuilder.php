@@ -371,23 +371,23 @@ final class SchemaBuilder
 	}
 
 	/**
-	 * Build schema for PHP union types (e.g., int|string, DateTimeImmutable|null).
-	 *
-	 * Uses oneOf for multiple non-null types, or nullable for simple ?Type.
-	 */
-
-	/**
-	 * self/static resolve to the declaring class (e.g. tree structures: public ?self $parent).
+	 * self resolves to the declaring class (e.g. tree structures: public ?self $parent).
+	 * (static is not allowed as a property type.)
 	 */
 	private function resolveTypeName(ReflectionNamedType $type, ReflectionProperty $property): string
 	{
 		$typeName = $type->getName();
 
-		return $typeName === 'self' || $typeName === 'static'
+		return $typeName === 'self'
 			? $property->getDeclaringClass()->getName()
 			: $typeName;
 	}
 
+	/**
+	 * Build schema for PHP union types (e.g., int|string, DateTimeImmutable|null).
+	 *
+	 * Uses oneOf for multiple non-null types, or nullable for simple ?Type.
+	 */
 	private function buildUnionTypeSchema(ReflectionUnionType $type, ReflectionProperty $property): SchemaObject
 	{
 		$types = $type->getTypes();

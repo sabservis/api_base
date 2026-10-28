@@ -151,7 +151,9 @@ final class ApiExtensionTest extends TestCase
 	public function throwsForMalformedTrustedProxy(): void
 	{
 		$this->expectException(RuntimeStateException::class);
-		$this->expectExceptionMessage('10.0.0.0/');
+		$this->expectExceptionMessage(
+			'Invalid trustedProxies entry "10.0.0.0/". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
+		);
 
 		$this->createContainer([
 			'trustedProxies' => ['127.0.0.1', '10.0.0.0/'],

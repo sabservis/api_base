@@ -19,6 +19,7 @@ use Sabservis\Api\ErrorHandler\ErrorResponseTransformer;
 use Sabservis\Api\ErrorHandler\PsrLogErrorHandler;
 use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\ErrorHandler\TraceIdProvider;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Handler\ServiceHandler;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
@@ -200,13 +201,10 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		}
 
 		// Fail fast on malformed trustedProxies - a silently ignored entry breaks client IP/HTTPS detection
-		foreach ($config->trustedProxies as $proxy) {
-			if (!IpMatcher::isValidPattern($proxy)) {
-				throw new RuntimeStateException(sprintf(
-					'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
-					$proxy,
-				));
-			}
+		$invalidProxy = IpMatcher::findInvalidPattern($config->trustedProxies);
+
+		if ($invalidProxy !== null) {
+			throw new RuntimeStateException(sprintf(ErrorMessages::TRUSTED_PROXY_INVALID, $invalidProxy));
 		}
 	}
 

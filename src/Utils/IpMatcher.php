@@ -93,6 +93,22 @@ final class IpMatcher
 	}
 
 	/**
+	 * First pattern failing isValidPattern(), or null when all are valid.
+	 *
+	 * @param array<string> $patterns
+	 */
+	public static function findInvalidPattern(array $patterns): string|null
+	{
+		foreach ($patterns as $pattern) {
+			if (!self::isValidPattern($pattern)) {
+				return $pattern;
+			}
+		}
+
+		return null;
+	}
+
+	/**
 	 * Validate a trusted-proxy style pattern: exact IP address or CIDR with in-range prefix.
 	 */
 	public static function isValidPattern(string $pattern): bool

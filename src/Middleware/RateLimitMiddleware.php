@@ -4,6 +4,7 @@ namespace Sabservis\Api\Middleware;
 
 use Psr\Cache\CacheItemPoolInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
@@ -68,13 +69,10 @@ final class RateLimitMiddleware implements Middleware
 		LockFactory|null $lockFactory = null,
 	)
 	{
-		foreach ($trustedProxies as $proxy) {
-			if (!IpMatcher::isValidPattern($proxy)) {
-				throw new InvalidArgumentException(sprintf(
-					'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).',
-					$proxy,
-				));
-			}
+		$invalidProxy = IpMatcher::findInvalidPattern($trustedProxies);
+
+		if ($invalidProxy !== null) {
+			throw new InvalidArgumentException(sprintf(ErrorMessages::TRUSTED_PROXY_INVALID, $invalidProxy));
 		}
 
 		$this->cache = $lockFactory !== null

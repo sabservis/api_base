@@ -33,6 +33,9 @@ final class ErrorMessages
 	// Authorization
 	public const FORBIDDEN_ACTIVITY = 'Forbidden. Missing permission for activity "%s".';
 
+	// Configuration
+	public const TRUSTED_PROXY_INVALID = 'Invalid trustedProxies entry "%s". Expected IP address or CIDR (e.g. 10.0.0.0/8).';
+
 	// CORS
 	public const CORS_CREDENTIALS_WILDCARD = 'CORS configuration error: allowCredentials cannot be used with wildcard origin "*". This is a security vulnerability. Specify explicit allowed origins instead.';
 
