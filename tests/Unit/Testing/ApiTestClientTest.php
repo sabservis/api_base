@@ -4,10 +4,12 @@ namespace Tests\Unit\Testing;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 use Sabservis\Api\Application\ApiApplication;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Testing\ApiTestClient;
+use function ob_get_level;
 
 final class ApiTestClientTest extends TestCase
 {
@@ -499,6 +501,26 @@ final class ApiTestClientTest extends TestCase
 
 		self::assertTrue($request->isSecured());
 		self::assertSame('10.0.0.2', $request->getClientIp());
+	}
+
+	#[Test]
+	public function outputBufferIsClosedWhenApplicationThrows(): void
+	{
+		$chain = static function (ApiRequest $request, ApiResponse $response, callable $next): ApiResponse {
+			throw new RuntimeException('boom');
+		};
+		$client = new ApiTestClient(new ApiApplication($chain));
+		$level = ob_get_level();
+
+		try {
+			$client->get('/boom');
+			self::fail('Expected the exception to propagate');
+		} catch (RuntimeException) {
+			// expected
+		}
+
+		// A leaked buffer makes PHPUnit flag the test as risky and shifts every later test one level deeper
+		self::assertSame($level, ob_get_level());
 	}
 
 	/**

@@ -98,4 +98,6 @@ final class ErrorMessages
 	// Multipart: array (name[]) sent for a single-value field
 	public const BODY_UNEXPECTED_ARRAY = "Invalid value for field '%s'. Expected a single value, got array";
 
+	public const BODY_INVALID_SCALAR = "Invalid value for field '%s'. Expected %s, got: %s";
+
 }

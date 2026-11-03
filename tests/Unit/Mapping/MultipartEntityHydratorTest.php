@@ -12,6 +12,7 @@ use Pocta\DataMapper\Attributes\InputOnly;
 use Pocta\DataMapper\Attributes\OutputOnly;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Exception\Api\ValidationException;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
@@ -531,8 +532,9 @@ final class MultipartEntityHydratorTest extends TestCase
 	}
 
 	#[Test]
-	public function emptyStringStaysStringAndNonNullableKeepsCast(): void
+	public function emptyStringStaysStringAndEmptyNonNullableIntFallsBackToDefault(): void
 	{
+		// Untouched HTML form fields arrive as "" - for `int $count = 5` that means "use the default", not 0
 		$request = (new ApiRequest(method: 'POST', uri: '/test'))
 			->withParsedBody(['note' => '', 'count' => '']);
 
@@ -540,7 +542,18 @@ final class MultipartEntityHydratorTest extends TestCase
 
 		self::assertInstanceOf(NullableScalarsDto::class, $dto);
 		self::assertSame('', $dto->note);
-		self::assertSame(0, $dto->count);
+		self::assertSame(5, $dto->count);
+	}
+
+	#[Test]
+	public function emptyStringForNonNullableIntWithoutDefaultIsValidationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['count' => '']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, IntPropertyDto::class);
 	}
 
 	#[Test]
@@ -626,6 +639,54 @@ final class MultipartEntityHydratorTest extends TestCase
 		$errors = $this->hydrationErrors(['owner' => '5']);
 
 		self::assertSame(['owner'], array_keys($errors));
+	}
+
+	#[Test]
+	public function invalidIntegerStringIsValidationErrorNotZero(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['count' => 'abc']);
+
+		try {
+			$this->hydrator->hydrate($request, IntPropertyDto::class);
+			self::fail('Expected ValidationException');
+		} catch (ValidationException $e) {
+			self::assertSame(['count'], array_keys($e->getContext()['validation']));
+		}
+	}
+
+	#[Test]
+	public function partiallyNumericIntegerStringIsValidationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['count' => '12abc']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, IntPropertyDto::class);
+	}
+
+	#[Test]
+	public function commaDecimalFloatIsValidationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['price' => '1,5']);
+
+		$this->expectException(ValidationException::class);
+
+		$this->hydrator->hydrate($request, FloatPropertyDto::class);
+	}
+
+	#[Test]
+	public function nestedObjectWithoutSerializerIsConfigurationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['owner' => ['personId' => '1']]);
+
+		$this->expectException(RuntimeStateException::class);
+		$this->expectExceptionMessage('EntitySerializer');
+
+		(new MultipartEntityHydrator())->hydrate($request, ParentWithNestedOwnerDto::class);
 	}
 
 	#[Test]

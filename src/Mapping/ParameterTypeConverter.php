@@ -3,8 +3,10 @@
 namespace Sabservis\Api\Mapping;
 
 use BackedEnum;
+use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
+use ReflectionEnum;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
@@ -15,8 +17,11 @@ use UnitEnum;
 use function array_map;
 use function filter_var;
 use function implode;
-use function is_numeric;
+use function is_array;
+use function is_int;
+use function is_string;
 use function is_subclass_of;
+use function preg_match;
 use function sprintf;
 use const FILTER_NULL_ON_FAILURE;
 use const FILTER_VALIDATE_BOOLEAN;
@@ -44,6 +49,16 @@ class ParameterTypeConverter
 	{
 		if ($value === '' || $value === null) {
 			return null;
+		}
+
+		// ?q[]=x for a scalar parameter: (string) would yield "Array" + E_WARNING
+		if (is_array($value) && $type !== 'array') {
+			throw new ClientErrorException(sprintf(
+				ErrorMessages::PARAMETER_INVALID_TYPE,
+				$parameter->getName(),
+				'array',
+				$type,
+			));
 		}
 
 		try {
@@ -75,7 +90,15 @@ class ParameterTypeConverter
 	protected function convertComplexType(mixed $value, string $type, EndpointParameter $parameter): mixed
 	{
 		if (is_subclass_of($type, DateTimeInterface::class) || $type === DateTimeInterface::class) {
-			return $this->toDateTime($value, $parameter);
+			$date = $this->toDateTime($value, $parameter);
+
+			// Mutable \DateTime (or a subclass of either) in the signature - a DateTimeImmutable would TypeError
+			if ($type !== DateTimeInterface::class && $type !== DateTimeImmutable::class) {
+				/** @var class-string<DateTime|DateTimeImmutable> $type */
+				return $type::createFromInterface($date);
+			}
+
+			return $date;
 		}
 
 		if (is_subclass_of($type, BackedEnum::class)) {
@@ -179,10 +202,15 @@ class ParameterTypeConverter
 	 */
 	protected function toBackedEnum(mixed $value, string $type, EndpointParameter $parameter): BackedEnum
 	{
-		// 1. Try by value first (primary matching)
-		$result = is_numeric($value)
-			? $type::tryFrom((int) $value)
-			: $type::tryFrom((string) $value);
+		// 1. Try by value first (primary matching) - cast according to the enum's backing type:
+		//    int-backed accepts only integer strings ("1", not "1.5"/"1e0"), string-backed keeps "1" as a string
+		$intBacked = (string) (new ReflectionEnum($type))->getBackingType() === 'int';
+		$result = match (true) {
+			$intBacked && is_int($value) => $type::tryFrom($value),
+			$intBacked && is_string($value) && preg_match('/^-?\d+\z/', $value) === 1 => $type::tryFrom((int) $value),
+			$intBacked => null,
+			default => $type::tryFrom((string) $value),
+		};
 
 		if ($result !== null) {
 			return $result;

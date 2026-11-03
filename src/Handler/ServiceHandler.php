@@ -129,6 +129,11 @@ class ServiceHandler
 				}
 			}
 
+			// Variadic (...$tags): isOptional() is true but getDefaultValue() throws - pass nothing
+			if ($param->isVariadic()) {
+				continue;
+			}
+
 			// Parameter not found - check if optional
 			if ($param->isOptional()) {
 				$arguments[] = $param->getDefaultValue();

@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\DI;
 
+use ErrorException;
 use Nette\DI\Compiler;
 use Nette\DI\Container;
 use Nette\DI\ContainerLoader;
@@ -43,9 +44,12 @@ use function array_map;
 use function array_values;
 use function assert;
 use function base64_encode;
+use function error_reporting;
 use function file_put_contents;
 use function is_array;
 use function json_decode;
+use function restore_error_handler;
+use function set_error_handler;
 use function sys_get_temp_dir;
 use function uniqid;
 
@@ -528,6 +532,62 @@ final class ApiExtensionTest extends TestCase
 
 		self::assertSame(429, $limited->getStatusCode());
 		self::assertNotNull($limited->getHeader('Retry-After'));
+	}
+
+	#[Test]
+	public function corsEnabledByConfigHonoursPrioritiesOfOtherMiddlewares(): void
+	{
+		$container = $this->createContainerFromNeon(<<<'NEON'
+			api:
+			    cors:
+			        enabled: true
+			    middlewares:
+			        - Sabservis\Api\Middleware\RequestIdMiddleware
+			NEON);
+
+		$chainBuilder = $container->getService('api.middleware.chain');
+		assert($chainBuilder instanceof ChainBuilder);
+		$chain = $chainBuilder->create();
+
+		// Preflight is answered by CORS (200) - RequestId (5) must already be outside it
+		$preflight = new ApiRequest(
+			method: 'OPTIONS',
+			uri: '/users',
+			headers: ['Origin' => 'https://app.example.com', 'Access-Control-Request-Method' => 'POST'],
+		);
+
+		$response = $chain($preflight, new ApiResponse());
+
+		self::assertNotNull($response->getHeader('Access-Control-Allow-Origin'));
+		self::assertNotNull($response->getHeader('X-Request-ID'));
+	}
+
+	#[Test]
+	public function compilesWithoutProductionModeParameter(): void
+	{
+		$tempDir = sys_get_temp_dir() . '/nette-test-' . uniqid('', true);
+		@mkdir($tempDir, 0o777, true); // @phpcs:ignore
+
+		// Any non-suppressed warning (e.g. "Undefined array key productionMode") fails the test
+		set_error_handler(static function (int $severity, string $message): bool {
+			if ((error_reporting() & $severity) === 0) {
+				return false;
+			}
+
+			throw new ErrorException($message, 0, $severity);
+		});
+
+		try {
+			$loader = new ContainerLoader($tempDir, true);
+			/** @var class-string<Container> $class */
+			$class = $loader->load(static function (Compiler $compiler): void {
+				$compiler->addExtension('api', new ApiExtension());
+			}, uniqid('container_', true));
+		} finally {
+			restore_error_handler();
+		}
+
+		self::assertTrue((new $class())->hasService('api.application'));
 	}
 
 	#[Test]

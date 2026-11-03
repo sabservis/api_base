@@ -138,6 +138,26 @@ final class ServiceHandlerTest extends TestCase
 	}
 
 	#[Test]
+	public function handleSkipsVariadicParameterInsteadOfReadingItsDefault(): void
+	{
+		$container = $this->createMock(Container::class);
+		$container->method('getByType')
+			->willReturn(new InferredParamsController());
+
+		$handler = new ServiceHandler($container);
+
+		$endpoint = new Endpoint(InferredParamsController::class, 'listTags');
+		$request = (new ApiRequest(method: 'GET', uri: '/tags'))
+			->withAttribute(RequestAttributes::Endpoint->value, $endpoint)
+			->withAttribute(RequestAttributes::Parameters->value, ['q' => 'php']);
+
+		// ReflectionParameter::getDefaultValue() throws for variadics - must not become a 500
+		$result = $handler->handle($request, new ApiResponse());
+
+		self::assertSame(['q' => 'php', 'tags' => []], $result);
+	}
+
+	#[Test]
 	public function handleInjectsParametersDirectlyToMethod(): void
 	{
 		$controller = new InferredParamsController();
@@ -363,6 +383,14 @@ class InferredParamsController implements Controller
 			'id' => $id,
 			'header' => $request->getHeader('X-Custom'),
 		];
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	public function listTags(string $q = 'all', string ...$tags): array
+	{
+		return ['q' => $q, 'tags' => $tags];
 	}
 
 }

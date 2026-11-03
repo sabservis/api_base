@@ -805,6 +805,22 @@ final class FileResponseTest extends TestCase
 	}
 
 	#[Test]
+	public function emptyFileFromPathHasContentLengthZero(): void
+	{
+		$empty = sys_get_temp_dir() . '/empty-' . uniqid() . '.txt';
+		file_put_contents($empty, '');
+		FileResponse::resetAllowedDirectories();
+
+		try {
+			$response = FileResponse::fromPath($empty)->toApiResponse();
+
+			self::assertSame('0', $response->getHeader('Content-Length'));
+		} finally {
+			@unlink($empty);
+		}
+	}
+
+	#[Test]
 	public function fromPathRejectsDirectory(): void
 	{
 		FileResponse::resetAllowedDirectories();

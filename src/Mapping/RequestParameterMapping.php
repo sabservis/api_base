@@ -195,7 +195,8 @@ class RequestParameterMapping
 			EndpointParameter::InCookie => $request->withCookies(
 				[$name => $value] + $request->getCookies(),
 			),
-			EndpointParameter::InHeader => $request->withHeader($name, (string) $value),
+			// Raw header stays as sent; the typed value (DateTime, enum, int) is exposed via bindArgument()
+			EndpointParameter::InHeader => $request,
 			default => $request,
 		};
 	}

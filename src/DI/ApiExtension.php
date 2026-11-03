@@ -54,7 +54,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		$parameters = $this->getContainerBuilder()->parameters;
 
 		return Nette\Schema\Expect::structure([
-			'debug' => Nette\Schema\Expect::bool($parameters['productionMode'] === false),
+			'debug' => Nette\Schema\Expect::bool(($parameters['productionMode'] ?? true) === false),
 			'trustedProxies' => Nette\Schema\Expect::arrayOf('string')->default([]),
 			'maxRequestBodySize' => Nette\Schema\Expect::int()->nullable()->default(null),
 			'middlewares' => Nette\Schema\Expect::arrayOf(
@@ -176,10 +176,7 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			// No ErrorResponseTransformer registered
 		}
 
-		// Add CORS middleware to chain first (needs to run before other middlewares for preflight)
-		$this->compileCorsMiddleware();
-
-		// Register all middlewares
+		// Register all middlewares (incl. cors.enabled CORS, sorted by priority)
 		$this->compileDefinedMiddlewares();
 	}
 
@@ -215,20 +212,20 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 		return $loader->load();
 	}
 
-	private function compileCorsMiddleware(): void
+	private function resolvePriorityFromAttribute(string $class): int|null
 	{
-		$builder = $this->getContainerBuilder();
-		$config = $this->getConfig();
-
-		if ($config->cors->enabled !== true) {
-			return;
+		if (!class_exists($class)) {
+			return null;
 		}
 
-		$chain = $builder->getDefinition($this->prefix('middleware.chain'));
-		assert($chain instanceof Nette\DI\Definitions\ServiceDefinition);
+		/** @var ReflectionClass<object> $reflectionClass */
+		$reflectionClass = new ReflectionClass($class);
 
-		$corsMiddleware = $builder->getDefinition($this->prefix('middleware.cors'));
-		$chain->addSetup('add', [$corsMiddleware]);
+		foreach ($reflectionClass->getAttributes(Attribute\Core\MiddlewarePriority::class) as $attribute) {
+			return $attribute->newInstance()->level;
+		}
+
+		return null;
 	}
 
 	private function compileDefinedMiddlewares(): void
@@ -265,21 +262,8 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			// Service references (@name) have no resolvable class here - priority must be explicit
 			$class = $service instanceof Nette\DI\Definitions\Statement ? $service->getEntity() : $service;
 
-			if ($priority === null && is_string($class) && class_exists($class)) {
-				/** @var ReflectionClass<object> $reflectionClass */
-				$reflectionClass = new ReflectionClass($class);
-
-				foreach ($reflectionClass->getAttributes() as $attribute) {
-					$attributeInstance = $attribute->newInstance();
-
-					if (!($attributeInstance instanceof Attribute\Core\MiddlewarePriority)) {
-						continue;
-					}
-
-					$priority = $attributeInstance->level;
-
-					break;
-				}
+			if ($priority === null && is_string($class)) {
+				$priority = $this->resolvePriorityFromAttribute($class);
 			}
 
 			if ($priority !== null) {
@@ -292,6 +276,15 @@ final class ApiExtension extends Nette\DI\CompilerExtension
 			];
 
 			$counter++;
+		}
+
+		// cors.enabled: CORS takes part in the same priority ordering (200) as explicitly listed middlewares,
+		// so RequestId (5) / EnforceHttps (20) still run outside it and see preflight responses
+		if ($config->cors->enabled === true) {
+			$definitions[] = [
+				'definition' => $builder->getDefinition($this->prefix('middleware.cors')),
+				'priority' => $this->resolvePriorityFromAttribute(CORSMiddleware::class) ?? 200,
+			];
 		}
 
 		// Sort by priority

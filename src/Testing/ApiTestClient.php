@@ -166,8 +166,13 @@ final class ApiTestClient
 
 		// Capture output since ApiApplication sends body via echo
 		ob_start();
-		$response = $this->application->runWith($request);
-		$output = ob_get_clean();
+
+		try {
+			$response = $this->application->runWith($request);
+		} finally {
+			// Always close the buffer - a leaked one makes PHPUnit flag the test as risky
+			$output = ob_get_clean();
+		}
 
 		return new TestResponse($response, $output ?: '');
 	}

@@ -135,9 +135,10 @@ class CORSMiddleware implements Middleware
 
 	private function resolveAllowedOrigin(string $origin): string|null
 	{
-		// No origin header = not a CORS request
+		// No Origin header = not a CORS request. With an origin whitelist emit nothing:
+		// "*" next to Allow-Credentials would be the combination the constructor refuses.
 		if ($origin === '') {
-			return '*';
+			return $this->allowedOrigins === [] ? '*' : null;
 		}
 
 		// Empty allowedOrigins = allow all origins (wildcard)

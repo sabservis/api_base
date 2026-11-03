@@ -10,8 +10,7 @@ use function count;
 use function explode;
 use function hash_equals;
 use function password_verify;
-use function str_starts_with;
-use function substr;
+use function preg_match;
 
 #[MiddlewarePriority(460)]
 class BasicAuthMiddleware implements Middleware
@@ -60,11 +59,12 @@ class BasicAuthMiddleware implements Middleware
 	 */
 	protected function parseAuthorizationHeader(string $header): array|null
 	{
-		if (!str_starts_with($header, 'Basic')) {
+		// RFC 7235: scheme name is case-insensitive and must be a whole token ("Basicx" is not Basic)
+		if (preg_match('/^Basic\s+(\S+)\s*\z/i', $header, $matches) !== 1) {
 			return null;
 		}
 
-		$header = explode(':', (string) base64_decode(substr($header, 6), true), 2);
+		$header = explode(':', (string) base64_decode($matches[1], true), 2);
 
 		if (count($header) !== 2) {
 			return null;

@@ -359,4 +359,22 @@ final class CORSMiddlewareTest extends TestCase
 		return $middleware($request, new ApiResponse(), $next)->getHeader('Vary');
 	}
 
+	#[Test]
+	public function requestWithoutOriginAgainstWhitelistGetsNoCorsHeaders(): void
+	{
+		$middleware = new CORSMiddleware(
+			allowedOrigins: ['https://trusted.com'],
+			allowCredentials: true,
+		);
+
+		$request = new ApiRequest(method: 'GET', uri: '/');
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res;
+
+		$result = $middleware($request, new ApiResponse(), $next);
+
+		// "*" + credentials is exactly the combination the constructor refuses
+		self::assertNull($result->getHeader('Access-Control-Allow-Origin'));
+		self::assertNull($result->getHeader('Access-Control-Allow-Credentials'));
+	}
+
 }

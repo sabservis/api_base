@@ -235,4 +235,39 @@ final class BasicAuthMiddlewareTest extends TestCase
 		self::assertStringContainsString('Admin Area', $result->getHeader('www-authenticate'));
 	}
 
+	#[Test]
+	public function schemeNameIsCaseInsensitive(): void
+	{
+		$middleware = new BasicAuthMiddleware();
+		$middleware->addUser('admin', password_hash('secret', PASSWORD_DEFAULT));
+
+		// RFC 7235: auth-scheme is case-insensitive
+		$request = new ApiRequest(
+			method: 'GET',
+			uri: '/',
+			headers: ['Authorization' => 'basic ' . base64_encode('admin:secret')],
+		);
+
+		$result = $middleware($request, new ApiResponse(), $this->createNext());
+
+		self::assertSame(200, $result->getStatusCode());
+	}
+
+	#[Test]
+	public function unknownSchemeWithBasicPrefixIsRejected(): void
+	{
+		$middleware = new BasicAuthMiddleware();
+		$middleware->addUser('admin', password_hash('secret', PASSWORD_DEFAULT));
+
+		$request = new ApiRequest(
+			method: 'GET',
+			uri: '/',
+			headers: ['Authorization' => 'Basicx ' . base64_encode('admin:secret')],
+		);
+
+		$result = $middleware($request, new ApiResponse(), $this->createNext());
+
+		self::assertSame(401, $result->getStatusCode());
+	}
+
 }

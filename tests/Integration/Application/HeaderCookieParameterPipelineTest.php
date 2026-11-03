@@ -2,6 +2,7 @@
 
 namespace Tests\Integration\Application;
 
+use DateTimeImmutable;
 use Nette\DI\Container;
 use Nette\DI\ContainerBuilder;
 use PHPUnit\Framework\Attributes\Test;
@@ -71,6 +72,14 @@ final class HeaderCookieParameterPipelineTest extends TestCase
 		} catch (ClientErrorException $e) {
 			self::assertSame(400, $e->getCode());
 		}
+	}
+
+	#[Test]
+	public function typedHeaderArgumentIsConvertedWithoutTouchingTheRawHeader(): void
+	{
+		$result = $this->dispatch(new ApiRequest(method: 'GET', uri: '/since', headers: ['X-Since' => '2024-01-30']));
+
+		self::assertSame('{"since":"2024-01-30","raw":"2024-01-30"}', $result->getBody());
 	}
 
 	#[Test]
@@ -199,6 +208,19 @@ class HeaderCookieParameterController implements Controller
 	): array
 	{
 		return ['traceId' => $traceId];
+	}
+
+	/**
+	 * @return array<string, string|null>
+	 */
+	#[Get(path: '/since')]
+	public function since(
+		#[HeaderParameter(name: 'X-Since')]
+		DateTimeImmutable $since,
+		ApiRequest $request,
+	): array
+	{
+		return ['since' => $since->format('Y-m-d'), 'raw' => $request->getHeader('X-Since')];
 	}
 
 }

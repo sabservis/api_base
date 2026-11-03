@@ -216,9 +216,11 @@ final class FileResponse
 			throw new RuntimeStateException("Cannot open file: $path");
 		}
 
+		$size = filesize($realPath);
+
 		return new self(
 			$handle,
-			filesize($realPath) ?: null,
+			$size === false ? null : $size, // 0 bytes is a valid size (Content-Length: 0), not "unknown"
 			$filename ?? basename($realPath),
 			$contentType ?? self::detectMimeType($realPath),
 		);

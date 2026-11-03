@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Mapping;
 
+use DateTime;
 use DateTimeImmutable;
 use DateTimeInterface;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -17,6 +18,15 @@ enum TestStatus: int
 	case Active = 1;
 
 	case Inactive = 0;
+
+}
+
+enum TestNumericCode: string
+{
+
+	case One = '1';
+
+	case Two = '2';
 
 }
 
@@ -437,6 +447,63 @@ final class ParameterTypeConverterTest extends TestCase
 		$result = $this->converter->convert('anything', 'UnknownClass', $param);
 
 		self::assertSame('anything', $result);
+	}
+
+	// === Regressions ===
+
+	#[Test]
+	public function convertMutableDateTimeSignatureReturnsMutableInstance(): void
+	{
+		$param = new EndpointParameter('from', DateTime::class);
+
+		$result = $this->converter->convert('2024-01-01', DateTime::class, $param);
+
+		self::assertInstanceOf(DateTime::class, $result);
+		self::assertSame('2024-01-01', $result->format('Y-m-d'));
+	}
+
+	#[Test]
+	public function convertArrayValueForScalarTypeIsClientError(): void
+	{
+		$param = new EndpointParameter('q', 'string');
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage("Parameter 'q': invalid value 'array'. Expected string.");
+
+		$this->converter->convert(['x'], 'string', $param);
+	}
+
+	#[Test]
+	public function convertStringBackedEnumWithNumericStringValue(): void
+	{
+		$param = new EndpointParameter('code', TestNumericCode::class);
+
+		$result = $this->converter->convert('1', TestNumericCode::class, $param);
+
+		self::assertSame(TestNumericCode::One, $result);
+	}
+
+	#[Test]
+	#[DataProvider('lossyIntEnumValueProvider')]
+	public function convertIntBackedEnumRejectsLossyNumericValue(string $value): void
+	{
+		$param = new EndpointParameter('status', TestStatus::class);
+
+		$this->expectException(ClientErrorException::class);
+
+		$this->converter->convert($value, TestStatus::class, $param);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function lossyIntEnumValueProvider(): array
+	{
+		return [
+			'decimal' => ['1.5'],
+			'exponent' => ['1e0'],
+			'leading space' => [' 1'],
+		];
 	}
 
 }

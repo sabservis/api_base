@@ -18,6 +18,7 @@ use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
 use Sabservis\Api\Utils\DateTimeParser;
@@ -39,7 +40,10 @@ use function json_encode;
 use function preg_match;
 use function sprintf;
 use function str_replace;
+use const FILTER_NULL_ON_FAILURE;
 use const FILTER_VALIDATE_BOOLEAN;
+use const FILTER_VALIDATE_FLOAT;
+use const FILTER_VALIDATE_INT;
 use const JSON_THROW_ON_ERROR;
 
 class MultipartEntityHydrator
@@ -154,6 +158,22 @@ class MultipartEntityHydrator
 			return;
 		}
 
+		// Untouched HTML form field ("") on a non-nullable int/float/bool: use the default when there is one,
+		// otherwise castToType() rejects it with 422 (previously a silent cast to 0)
+		if (
+			$value === ''
+			&& $type instanceof ReflectionNamedType
+			&& in_array($type->getName(), ['int', 'float', 'bool'], true)
+		) {
+			$default = PropertyDefault::find($property);
+
+			if ($default !== null) {
+				$property->setValue($instance, $default[0]);
+
+				return;
+			}
+		}
+
 		if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
 			$typeName = $type->getName();
 
@@ -178,8 +198,15 @@ class MultipartEntityHydrator
 					|| is_array($value)
 				)
 				&& class_exists($typeName)
-				&& $this->entitySerializer !== null
 			) {
+				if ($this->entitySerializer === null) {
+					throw new RuntimeStateException(sprintf(
+						'MultipartEntityHydrator needs an EntitySerializer to hydrate nested object property "%s" (%s)',
+						$name,
+						$typeName,
+					));
+				}
+
 				$property->setValue(
 					$instance,
 					$this->toNestedObject($this->entitySerializer, $typeName, $name, $value),
@@ -199,7 +226,7 @@ class MultipartEntityHydrator
 			]);
 		}
 
-		$property->setValue($instance, $this->castToType($value, $type));
+		$property->setValue($instance, $this->castToType($value, $type, $name));
 	}
 
 	/**
@@ -325,7 +352,10 @@ class MultipartEntityHydrator
 		return true;
 	}
 
-	private function castToType(mixed $value, ReflectionType|null $type): mixed
+	/**
+	 * Strict scalar coercion: "abc" / "12abc" / "1,5" are 422 like over JSON, not a lossy PHP cast to 0.
+	 */
+	private function castToType(mixed $value, ReflectionType|null $type, string $field): mixed
 	{
 		if (!$type instanceof ReflectionNamedType) {
 			return $value;
@@ -333,13 +363,26 @@ class MultipartEntityHydrator
 
 		$typeName = $type->getName();
 
-		return match ($typeName) {
-			'int' => (int) $value,
-			'float' => (float) $value,
-			'bool' => filter_var($value, FILTER_VALIDATE_BOOLEAN),
-			'string' => (string) $value,
+		$cast = match ($typeName) {
+			'int' => filter_var($value, FILTER_VALIDATE_INT, FILTER_NULL_ON_FAILURE),
+			'float' => filter_var($value, FILTER_VALIDATE_FLOAT, FILTER_NULL_ON_FAILURE),
+			'bool' => filter_var($value, FILTER_VALIDATE_BOOLEAN, FILTER_NULL_ON_FAILURE),
+			'string' => is_scalar($value) ? (string) $value : null,
 			default => $value,
 		};
+
+		if ($cast === null) {
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED))->withFields([
+				$field => sprintf(
+					ErrorMessages::BODY_INVALID_SCALAR,
+					$field,
+					$typeName,
+					is_scalar($value) ? (string) $value : get_debug_type($value),
+				),
+			]);
+		}
+
+		return $cast;
 	}
 
 }
