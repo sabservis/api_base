@@ -741,6 +741,34 @@ ContentDto:
 - Bez kompozice se `Discriminator` ignoruje
 - `mapping` je volitelný - bez něj klient musí sám určit typ podle `propertyName`
 
+#### Příklady pro polymorfní request body
+
+Swagger UI u request body s kořenovým `oneOf` + `discriminator` vynechá rozlišovací pole z ukázky
+pro „Try it out" (každý pokus pak skončí 422). Generátor proto k `application/json` request body,
+které odkazuje na polymorfní schéma s `mapping`, doplní pojmenované `examples` – jeden na každý klíč
+mappingu (v jeho pořadí):
+
+```yaml
+examples:
+  article:
+    summary: ArticleDto          # #[Schema(title:)] varianty, jinak název schématu
+    description: ...             # #[Schema(description:)] varianty, pokud je
+    value: { type: article, title: Hello }
+```
+
+`value` se skládá jen z toho, co schéma deklaruje (nic se nevymýšlí):
+
+1. rozlišovací vlastnost = klíč mappingu (vždy první)
+2. `example` vlastnosti
+3. `enum` s jedinou hodnotou
+4. `$ref` na objekt → rekurzivně (max. 3 úrovně, cyklus se vynechá)
+5. pole s `items.$ref` na objekt → pole s jednou položkou (prázdná položka → vynechat)
+6. `oneOf` → první varianta (vnořený discriminator dostane první hodnotu mappingu)
+7. ostatní vlastnosti, `readOnly` a `deprecated` se vynechají – i když jsou `required`
+
+Ruční `example` / `examples` v `#[JsonContent(ref: ...)]` mají přednost – pak se nic negeneruje.
+Odpovědi a multipart se neřeší.
+
 ### Custom OpenAPI spec
 
 ```php

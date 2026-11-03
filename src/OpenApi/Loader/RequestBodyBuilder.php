@@ -14,6 +14,7 @@ use Sabservis\Api\Attribute\OpenApi\Encoding;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
 use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\JsonContent;
+use Sabservis\Api\Attribute\OpenApi\MediaType;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\RequestBody;
 use Sabservis\Api\OpenApi\TypeMapper;
@@ -191,6 +192,8 @@ final class RequestBodyBuilder
 			if (isset($spec['content'])) {
 				$contentSpec = $spec['content'];
 			}
+		} elseif ($requestBody->contentArray !== null) {
+			$contentSpec = $this->buildEntityJsonExamples($requestBody->contentArray);
 		}
 
 		return [
@@ -199,6 +202,38 @@ final class RequestBodyBuilder
 			'required' => $requestBody->required ?? false,
 			'contentSpec' => $contentSpec,
 		];
+	}
+
+	/**
+	 * Hand-written example(s) of #[JsonContent] next to an entity ref - the schema itself
+	 * comes from the entity, only the media type examples are kept.
+	 *
+	 * @param array<JsonContent|MediaType> $contentArray
+	 * @return array<string, array<string, mixed>>|null
+	 */
+	private function buildEntityJsonExamples(array $contentArray): array|null
+	{
+		foreach ($contentArray as $content) {
+			if (!$content instanceof JsonContent) {
+				continue;
+			}
+
+			$json = [];
+
+			if ($content->example !== null) {
+				$json['example'] = $content->example;
+			}
+
+			$examples = $content->toOpenApiSpec()['examples'] ?? null;
+
+			if ($examples !== null) {
+				$json['examples'] = $examples;
+			}
+
+			return $json !== [] ? ['application/json' => $json] : null;
+		}
+
+		return null;
 	}
 
 	/**

@@ -67,6 +67,13 @@ final class OpenApiGenerator
 	 */
 	private array $refContext = [];
 
+	/**
+	 * JSON request bodies referencing a component schema - get named examples when it is polymorphic.
+	 *
+	 * @var list<array{MediaTypeObject, string}>
+	 */
+	private array $entityRequestBodies = [];
+
 	/** @var array<string, TagObject> */
 	private array $tags = [];
 
@@ -100,6 +107,8 @@ final class OpenApiGenerator
 				break;
 			}
 		}
+
+		$this->addDiscriminatorExamples();
 
 		$components = $this->buildComponents($paths, $schema);
 
@@ -201,6 +210,7 @@ final class OpenApiGenerator
 		$this->tags = [];
 		$this->usedTags = [];
 		$this->refContext = [];
+		$this->entityRequestBodies = [];
 		$this->schemaBuilder = new SchemaBuilder($this->schemaFilter, $schemaNames);
 
 		return $this->buildPaths($schema);
@@ -422,12 +432,20 @@ final class OpenApiGenerator
 			// Register the entity class
 			$schemaName = $this->schemaBuilder->registerClass($entity);
 
+			// Hand-written example(s) from #[JsonContent(ref:)] win over generated ones
+			$jsonSpec = $contentSpec['application/json'] ?? [];
+			$mediaType = new MediaTypeObject(
+				schema: new SchemaObject(ref: $schemaName),
+				example: $jsonSpec['example'] ?? null,
+				examples: $jsonSpec['examples'] ?? null,
+			);
+
+			if ($mediaType->example === null && $mediaType->examples === null) {
+				$this->entityRequestBodies[] = [$mediaType, $schemaName];
+			}
+
 			return new RequestBodyObject(
-				content: [
-					'application/json' => new MediaTypeObject(
-						schema: new SchemaObject(ref: $schemaName),
-					),
-				],
+				content: ['application/json' => $mediaType],
 				description: $requestBody->getDescription() ?: null,
 				required: $requestBody->isRequired() ?: null,
 			);
@@ -462,6 +480,24 @@ final class OpenApiGenerator
 		}
 
 		return null;
+	}
+
+	/**
+	 * Swagger UI drops the discriminator from samples of a polymorphic root schema - offer one
+	 * complete named example per discriminator value instead. Runs over finished schemas
+	 * (variants already carry their own discriminator value).
+	 */
+	private function addDiscriminatorExamples(): void
+	{
+		if ($this->entityRequestBodies === []) {
+			return;
+		}
+
+		$exampleBuilder = new ExampleBuilder($this->schemaBuilder->getSchemas());
+
+		foreach ($this->entityRequestBodies as [$mediaType, $schemaName]) {
+			$mediaType->examples = $exampleBuilder->buildDiscriminatorExamples($schemaName);
+		}
 	}
 
 	/**
