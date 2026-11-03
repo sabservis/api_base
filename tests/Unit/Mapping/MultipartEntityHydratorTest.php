@@ -2,6 +2,9 @@
 
 namespace Tests\Unit\Mapping;
 
+use DateTime;
+use DateTimeImmutable;
+use DateTimeInterface;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Pocta\DataMapper\Attributes\Ignore;
@@ -13,6 +16,8 @@ use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\UploadedFile;
 use Sabservis\Api\Mapping\MultipartEntityHydrator;
 use Sabservis\Api\Mapping\Serializer\DataMapperSerializer;
+use function array_keys;
+use const DATE_ATOM;
 
 enum TestCategory: string
 {
@@ -175,6 +180,46 @@ class ParentWithNullableNestedObjectDto
 	public string $name;
 
 	public NestedAddressDto|null $address = null;
+
+}
+
+class NestedOwnerDto
+{
+
+	public string $registrationNumber;
+
+	public int $personId;
+
+}
+
+class ParentWithNestedOwnerDto
+{
+
+	public NestedOwnerDto|null $owner = null;
+
+}
+
+class PromotedDefaultsDto
+{
+
+	public function __construct(
+		public NestedOwnerDto|null $owner = null,
+		public string $status = 'draft',
+		public int|null $count = 5,
+	)
+	{
+	}
+
+}
+
+class DateTimePropertiesDto
+{
+
+	public DateTimeImmutable $publishedAt;
+
+	public DateTimeInterface|null $validFrom = null;
+
+	public DateTime|null $mutableAt = null;
 
 }
 
@@ -533,6 +578,162 @@ final class MultipartEntityHydratorTest extends TestCase
 		$this->expectException(ValidationException::class);
 
 		$this->hydrator->hydrate($request, IntEnumPropertyDto::class);
+	}
+
+	#[Test]
+	public function hydratesNestedObjectFromFormFieldArray(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['owner' => ['registrationNumber' => '000001', 'personId' => '1']]);
+
+		$dto = $this->hydrator->hydrate($request, ParentWithNestedOwnerDto::class);
+
+		self::assertInstanceOf(ParentWithNestedOwnerDto::class, $dto);
+		self::assertInstanceOf(NestedOwnerDto::class, $dto->owner);
+		self::assertSame('000001', $dto->owner->registrationNumber);
+		self::assertSame(1, $dto->owner->personId);
+	}
+
+	#[Test]
+	public function invalidNestedFormFieldArrayReportsPrefixedField(): void
+	{
+		$errors = $this->hydrationErrors(['owner' => ['personId' => 'abc']]);
+
+		self::assertArrayHasKey('owner.registrationNumber', $errors);
+		self::assertArrayHasKey('owner.personId', $errors);
+	}
+
+	#[Test]
+	public function invalidNestedJsonStringReportsPrefixedField(): void
+	{
+		$errors = $this->hydrationErrors(['owner' => '{"registrationNumber":"000001","personId":"abc"}']);
+
+		self::assertSame(['owner.personId'], array_keys($errors));
+		self::assertStringContainsString("'owner.personId'", $errors['owner.personId']);
+	}
+
+	#[Test]
+	public function malformedNestedJsonStringIsValidationError(): void
+	{
+		$errors = $this->hydrationErrors(['owner' => 'not json']);
+
+		self::assertSame(['owner'], array_keys($errors));
+	}
+
+	#[Test]
+	public function nestedJsonScalarIsValidationError(): void
+	{
+		$errors = $this->hydrationErrors(['owner' => '5']);
+
+		self::assertSame(['owner'], array_keys($errors));
+	}
+
+	#[Test]
+	public function arrayForScalarPropertyIsValidationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))
+			->withParsedBody(['count' => ['1', '2']]);
+
+		try {
+			$this->hydrator->hydrate($request, IntPropertyDto::class);
+			self::fail('Expected ValidationException');
+		} catch (ValidationException $e) {
+			self::assertSame(422, $e->getCode());
+			self::assertSame(['count'], array_keys($e->getContext()['validation']));
+		}
+	}
+
+	#[Test]
+	public function promotedPropertiesUseConstructorDefaults(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody([]);
+
+		$dto = $this->hydrator->hydrate($request, PromotedDefaultsDto::class);
+
+		self::assertInstanceOf(PromotedDefaultsDto::class, $dto);
+		self::assertNull($dto->owner);
+		self::assertSame('draft', $dto->status);
+		self::assertSame(5, $dto->count);
+	}
+
+	#[Test]
+	public function promotedPropertiesTakeSentValues(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody(['status' => 'sent']);
+
+		$dto = $this->hydrator->hydrate($request, PromotedDefaultsDto::class);
+
+		self::assertSame('sent', $dto->status);
+		self::assertSame(5, $dto->count);
+	}
+
+	#[Test]
+	public function hydratesDateTimePropertiesFromFormValue(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody([
+			'publishedAt' => '2024-01-30T10:15:00+01:00',
+			'validFrom' => '2024-02-01',
+			'mutableAt' => '2024-03-01 08:00:00',
+		]);
+
+		$dto = $this->hydrator->hydrate($request, DateTimePropertiesDto::class);
+
+		self::assertInstanceOf(DateTimeImmutable::class, $dto->publishedAt);
+		self::assertSame('2024-01-30T10:15:00+01:00', $dto->publishedAt->format(DATE_ATOM));
+		self::assertInstanceOf(DateTimeImmutable::class, $dto->validFrom);
+		self::assertSame('2024-02-01', $dto->validFrom->format('Y-m-d'));
+		self::assertInstanceOf(DateTime::class, $dto->mutableAt);
+		self::assertSame('2024-03-01 08:00:00', $dto->mutableAt->format('Y-m-d H:i:s'));
+	}
+
+	#[Test]
+	public function emptyNullableDateTimeHydratesNull(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody([
+			'publishedAt' => '2024-01-30',
+			'validFrom' => '',
+		]);
+
+		$dto = $this->hydrator->hydrate($request, DateTimePropertiesDto::class);
+
+		self::assertNull($dto->validFrom);
+	}
+
+	#[Test]
+	public function invalidDateTimeIsValidationError(): void
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody(['publishedAt' => 'yesterday-ish']);
+
+		try {
+			$this->hydrator->hydrate($request, DateTimePropertiesDto::class);
+			self::fail('Expected ValidationException');
+		} catch (ValidationException $e) {
+			self::assertSame(422, $e->getCode());
+			self::assertSame(['publishedAt'], array_keys($e->getContext()['validation']));
+			self::assertSame(
+				"Invalid value for field 'publishedAt'. Expected date/datetime (e.g. 2024-01-30 or 2024-01-30T15:30:00), got: yesterday-ish",
+				$e->getContext()['validation']['publishedAt'],
+			);
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $body
+	 * @return array<string, string>
+	 */
+	private function hydrationErrors(array $body): array
+	{
+		$request = (new ApiRequest(method: 'POST', uri: '/test'))->withParsedBody($body);
+
+		try {
+			$this->hydrator->hydrate($request, ParentWithNestedOwnerDto::class);
+		} catch (ValidationException $e) {
+			self::assertSame(422, $e->getCode());
+
+			return $e->getContext()['validation'];
+		}
+
+		self::fail('Expected ValidationException');
 	}
 
 }

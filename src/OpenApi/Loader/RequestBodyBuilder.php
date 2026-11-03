@@ -2,6 +2,7 @@
 
 namespace Sabservis\Api\OpenApi\Loader;
 
+use DateTimeInterface;
 use Pocta\DataMapper\Attributes\Ignore;
 use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionAttribute;
@@ -15,9 +16,14 @@ use Sabservis\Api\Attribute\OpenApi\Hidden;
 use Sabservis\Api\Attribute\OpenApi\JsonContent;
 use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\RequestBody;
+use Sabservis\Api\OpenApi\TypeMapper;
+use Sabservis\Api\Utils\PropertyDefault;
+use UnitEnum;
 use function array_map;
 use function assert;
 use function class_exists;
+use function is_a;
+use function is_subclass_of;
 
 /**
  * Builds request body specifications from attributes.
@@ -230,6 +236,7 @@ final class RequestBodyBuilder
 		$properties = [];
 		$required = [];
 		$fileUploads = [];
+		$encoding = [];
 
 		foreach ($refClass->getProperties(ReflectionProperty::IS_PUBLIC) as $refProperty) {
 			// #[OutputOnly]/#[Ignore] are never read from the request
@@ -253,6 +260,11 @@ final class RequestBodyBuilder
 				);
 			} else {
 				$this->processRegularProperty($refProperty, $properties, $required);
+
+				if ($this->isObjectProperty($refProperty)) {
+					// Object fields are sent as JSON string; form fields owner[key] are accepted as well
+					$encoding[$refProperty->getName()] = ['contentType' => 'application/json'];
+				}
 			}
 		}
 
@@ -265,14 +277,18 @@ final class RequestBodyBuilder
 			$schema['required'] = $required;
 		}
 
+		$multipart = ['schema' => $schema];
+
+		if ($encoding !== []) {
+			$multipart['encoding'] = $encoding;
+		}
+
 		return [
 			'description' => 'Multipart form data',
 			'entity' => $className,
 			'required' => $required !== [],
 			'contentSpec' => [
-				'multipart/form-data' => [
-					'schema' => $schema,
-				],
+				'multipart/form-data' => $multipart,
 			],
 			'fileUploads' => $fileUploads,
 		];
@@ -347,7 +363,8 @@ final class RequestBodyBuilder
 	): void
 	{
 		$fieldName = $refProperty->getName();
-		$isRequired = !$this->isNullableProperty($refProperty);
+		// Missing field with default is hydrated with the default (MultipartEntityHydrator)
+		$isRequired = !$this->isNullableProperty($refProperty) && PropertyDefault::find($refProperty) === null;
 
 		$property = $this->mapPropertyToOpenApiType($refProperty);
 
@@ -385,6 +402,11 @@ final class RequestBodyBuilder
 
 		$typeName = $type->getName();
 
+		// Form value is a date string, not a component schema
+		if (TypeMapper::isDateType($typeName)) {
+			return TypeMapper::phpToOpenApi($typeName);
+		}
+
 		// If it's a class (not a built-in type), store _classRef for later resolution
 		if (!$type->isBuiltin() && class_exists($typeName)) {
 			return ['_classRef' => $typeName];
@@ -401,6 +423,20 @@ final class RequestBodyBuilder
 	/**
 	 * Check if a property has a nullable type.
 	 */
+	private function isObjectProperty(ReflectionProperty $refProperty): bool
+	{
+		$type = $refProperty->getType();
+
+		if (!$type instanceof ReflectionNamedType || $type->isBuiltin()) {
+			return false;
+		}
+
+		$typeName = $type->getName();
+
+		return class_exists($typeName) && !is_subclass_of($typeName, UnitEnum::class)
+			&& !is_a($typeName, DateTimeInterface::class, true);
+	}
+
 	private function isNullableProperty(ReflectionProperty $refProperty): bool
 	{
 		$type = $refProperty->getType();

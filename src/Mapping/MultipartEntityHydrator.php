@@ -3,6 +3,9 @@
 namespace Sabservis\Api\Mapping;
 
 use BackedEnum;
+use DateTime;
+use DateTimeInterface;
+use JsonException;
 use Pocta\DataMapper\Attributes\Ignore;
 use Pocta\DataMapper\Attributes\OutputOnly;
 use ReflectionClass;
@@ -11,10 +14,14 @@ use ReflectionNamedType;
 use ReflectionProperty;
 use ReflectionType;
 use Sabservis\Api\Attribute\OpenApi\FileUpload;
+use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Exception\ErrorMessages;
+use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Mapping\Serializer\EntitySerializer;
+use Sabservis\Api\Utils\DateTimeParser;
+use Sabservis\Api\Utils\PropertyDefault;
 use function array_key_exists;
 use function array_map;
 use function class_exists;
@@ -22,17 +29,23 @@ use function filter_var;
 use function get_debug_type;
 use function implode;
 use function in_array;
+use function is_a;
 use function is_array;
 use function is_int;
 use function is_scalar;
 use function is_string;
 use function is_subclass_of;
+use function json_encode;
 use function preg_match;
 use function sprintf;
+use function str_replace;
 use const FILTER_VALIDATE_BOOLEAN;
+use const JSON_THROW_ON_ERROR;
 
 class MultipartEntityHydrator
 {
+
+	private const ScalarTypes = ['int', 'float', 'bool', 'string'];
 
 	public function __construct(
 		private readonly EntitySerializer|null $entitySerializer = null,
@@ -122,8 +135,10 @@ class MultipartEntityHydrator
 		$name = $property->getName();
 
 		if (!isset($data[$name]) && !array_key_exists($name, $data)) {
-			if ($property->hasDefaultValue()) {
-				$property->setValue($instance, $property->getDefaultValue());
+			$default = PropertyDefault::find($property);
+
+			if ($default !== null) {
+				$property->setValue($instance, $default[0]);
 			}
 
 			// No value and no default → leave uninitialized
@@ -150,16 +165,100 @@ class MultipartEntityHydrator
 				return;
 			}
 
-			// Nested object from JSON string (multipart form-data)
-			if (is_string($value) && class_exists($typeName) && $this->entitySerializer !== null) {
-				$nested = $this->entitySerializer->deserialize($value, $typeName);
-				$property->setValue($instance, $nested);
+			if (is_a($typeName, DateTimeInterface::class, true)) {
+				$property->setValue($instance, $this->toDateTime($typeName, $name, $value));
+
+				return;
+			}
+
+			// Nested object: JSON string (owner={"a":1}) or form fields parsed by PHP into array (owner[a]=1)
+			if (
+				(
+					is_string($value)
+					|| is_array($value)
+				)
+				&& class_exists($typeName)
+				&& $this->entitySerializer !== null
+			) {
+				$property->setValue(
+					$instance,
+					$this->toNestedObject($this->entitySerializer, $typeName, $name, $value),
+				);
 
 				return;
 			}
 		}
 
+		if (
+			is_array($value)
+			&& $type instanceof ReflectionNamedType
+			&& in_array($type->getName(), self::ScalarTypes, true)
+		) {
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED))->withFields([
+				$name => sprintf(ErrorMessages::BODY_UNEXPECTED_ARRAY, $name),
+			]);
+		}
+
 		$property->setValue($instance, $this->castToType($value, $type));
+	}
+
+	/**
+	 * Invalid nested value is always 422 on the field, errors of nested properties are prefixed ("owner.personId").
+	 *
+	 * @param class-string $className
+	 * @param string|array<mixed> $value
+	 */
+	private function toNestedObject(
+		EntitySerializer $serializer,
+		string $className,
+		string $field,
+		string|array $value,
+	): mixed
+	{
+		try {
+			$json = is_array($value) ? json_encode($value, JSON_THROW_ON_ERROR) : $value;
+
+			return $serializer->deserialize($json, $className);
+		} catch (ValidationException $e) {
+			$fields = [];
+
+			foreach ($e->getContext()['validation'] ?? [] as $path => $message) {
+				$prefixed = $field . '.' . $path;
+				$fields[$prefixed] = is_string($message)
+					? str_replace("'" . $path . "'", "'" . $prefixed . "'", $message)
+					: $message;
+			}
+
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED, previous: $e))->withFields($fields);
+		} catch (ClientErrorException | JsonException $e) {
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED, previous: $e))->withFields([
+				$field => sprintf(ErrorMessages::BODY_INVALID_NESTED_OBJECT, $field, $field),
+			]);
+		}
+	}
+
+	/**
+	 * Same formats as DateTime query parameters (DateTimeParser).
+	 */
+	private function toDateTime(string $typeName, string $field, mixed $value): DateTimeInterface
+	{
+		try {
+			if (!is_string($value)) {
+				throw new InvalidArgumentException('Date must be a string');
+			}
+
+			$date = DateTimeParser::parse($value);
+		} catch (InvalidArgumentException $e) {
+			throw (new ValidationException(ErrorMessages::BODY_VALIDATION_FAILED, previous: $e))->withFields([
+				$field => sprintf(
+					ErrorMessages::BODY_INVALID_DATETIME,
+					$field,
+					is_scalar($value) ? (string) $value : get_debug_type($value),
+				),
+			]);
+		}
+
+		return $typeName === DateTime::class ? DateTime::createFromImmutable($date) : $date;
 	}
 
 	/**

@@ -87,4 +87,13 @@ final class ErrorMessages
 
 	public const BODY_INVALID_ENUM = "Invalid value for field '%s'. Expected one of: %s, got: %s";
 
+	// Multipart: nested object field (JSON string or form fields name[key])
+	public const BODY_INVALID_NESTED_OBJECT = "Invalid value for field '%s'. Expected JSON object or form fields %s[...]";
+
+	// Multipart: date/datetime field
+	public const BODY_INVALID_DATETIME = "Invalid value for field '%s'. Expected date/datetime (e.g. 2024-01-30 or 2024-01-30T15:30:00), got: %s";
+
+	// Multipart: array (name[]) sent for a single-value field
+	public const BODY_UNEXPECTED_ARRAY = "Invalid value for field '%s'. Expected a single value, got array";
+
 }

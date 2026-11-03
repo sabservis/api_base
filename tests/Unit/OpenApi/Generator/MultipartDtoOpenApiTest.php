@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\OpenApi\Generator;
 
+use DateTimeImmutable;
 use Nette\DI\ContainerBuilder;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -170,6 +171,56 @@ final class MultipartDtoOpenApiTest extends TestCase
 		self::assertSame(['title', 'password', 'file'], $schema['required']);
 	}
 
+	#[Test]
+	public function multipartPropertiesWithDefaultAreNotRequired(): void
+	{
+		$spec = $this->generateSpecForController(MultipartDefaultsController::class);
+		$schema = $spec['paths']['/upload-defaults']['post']['requestBody']['content']['multipart/form-data']['schema'];
+
+		self::assertSame(['title', 'file'], $schema['required']);
+	}
+
+	#[Test]
+	public function promotedMultipartPropertiesWithDefaultAreNotRequired(): void
+	{
+		$spec = $this->generateSpecForController(MultipartPromotedDefaultsController::class);
+		$schema = $spec['paths']['/upload-promoted']['post']['requestBody']['content']['multipart/form-data']['schema'];
+
+		self::assertSame(['title', 'file'], $schema['required']);
+	}
+
+	#[Test]
+	public function multipartObjectPropertyDeclaresJsonEncoding(): void
+	{
+		$spec = $this->generateSpecForController(MultipartNestedObjectController::class);
+		$content = $spec['paths']['/upload-nested']['post']['requestBody']['content']['multipart/form-data'];
+
+		self::assertSame(['owner' => ['contentType' => 'application/json']], $content['encoding']);
+	}
+
+	#[Test]
+	public function multipartDateTimePropertyIsDateTimeString(): void
+	{
+		$spec = $this->generateSpecForController(MultipartDateTimeController::class);
+		$content = $spec['paths']['/upload-datetime']['post']['requestBody']['content']['multipart/form-data'];
+
+		self::assertSame(
+			['type' => 'string', 'format' => 'date-time'],
+			$content['schema']['properties']['publishedAt'],
+		);
+		self::assertArrayNotHasKey('encoding', $content);
+		self::assertArrayNotHasKey('DateTimeImmutable', $spec['components']['schemas'] ?? []);
+	}
+
+	#[Test]
+	public function multipartWithoutObjectPropertiesHasNoEncoding(): void
+	{
+		$spec = $this->generateSpecForController(MultipartDtoWithEnumController::class);
+		$content = $spec['paths']['/upload-with-enum']['post']['requestBody']['content']['multipart/form-data'];
+
+		self::assertArrayNotHasKey('encoding', $content);
+	}
+
 	/**
 	 * @param class-string $controllerClass
 	 * @return array<string, mixed>
@@ -288,7 +339,116 @@ class MultipartDirectionDto
 
 }
 
+#[Schema]
+class MultipartDefaultsDto
+{
+
+	public string $title;
+
+	public string $status = 'draft';
+
+	#[FileUpload(name: 'file')]
+	public UploadedFile $file;
+
+}
+
+#[Schema]
+class MultipartPromotedDefaultsDto
+{
+
+	public function __construct(
+		public string $title,
+		#[FileUpload(name: 'file')]
+		public UploadedFile $file,
+		public string $status = 'draft',
+		public int $count = 1,
+	)
+	{
+	}
+
+}
+
+#[Schema]
+class MultipartOwnerDto
+{
+
+	public string $registrationNumber;
+
+}
+
+#[Schema]
+class MultipartNestedObjectDto
+{
+
+	public MultipartOwnerDto|null $owner = null;
+
+	public MultipartCategoryEnum|null $category = null;
+
+	#[FileUpload(name: 'file')]
+	public UploadedFile $file;
+
+}
+
+#[Schema]
+class MultipartDateTimeDto
+{
+
+	public DateTimeImmutable $publishedAt;
+
+	#[FileUpload(name: 'file')]
+	public UploadedFile $file;
+
+}
+
 // ==================== TEST CONTROLLERS ====================
+
+class MultipartDateTimeController implements Controller
+{
+
+	#[Post(path: '/upload-datetime')]
+	#[RequestBody(ref: MultipartDateTimeDto::class)]
+	public function upload(MultipartDateTimeDto $input): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
+
+class MultipartDefaultsController implements Controller
+{
+
+	#[Post(path: '/upload-defaults')]
+	#[RequestBody(ref: MultipartDefaultsDto::class)]
+	public function upload(MultipartDefaultsDto $input): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
+
+class MultipartPromotedDefaultsController implements Controller
+{
+
+	#[Post(path: '/upload-promoted')]
+	#[RequestBody(ref: MultipartPromotedDefaultsDto::class)]
+	public function upload(MultipartPromotedDefaultsDto $input): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
+
+class MultipartNestedObjectController implements Controller
+{
+
+	#[Post(path: '/upload-nested')]
+	#[RequestBody(ref: MultipartNestedObjectDto::class)]
+	public function upload(MultipartNestedObjectDto $input): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
 
 class MultipartDtoController implements Controller
 {
