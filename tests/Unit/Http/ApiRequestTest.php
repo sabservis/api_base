@@ -1406,4 +1406,24 @@ final class ApiRequestTest extends TestCase
 		self::assertSame('///users', $request->getPath());
 	}
 
+	#[Test]
+	public function getJsonBodyOrFailRejectsIntegerBeyondInt64(): void
+	{
+		// json_decode() would silently turn this into a float (precision loss)
+		$request = new ApiRequest(method: 'POST', uri: '/', body: '{"id": 9223372036854775808}');
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage('out of range');
+
+		$request->getJsonBodyOrFail();
+	}
+
+	#[Test]
+	public function getJsonBodyReturnsNullForIntegerBeyondInt64(): void
+	{
+		$request = new ApiRequest(method: 'POST', uri: '/', body: '{"id": 9223372036854775808}');
+
+		self::assertNull($request->getJsonBody());
+	}
+
 }

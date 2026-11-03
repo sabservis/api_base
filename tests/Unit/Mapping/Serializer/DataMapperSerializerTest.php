@@ -173,6 +173,25 @@ final class DataMapperSerializerTest extends TestCase
 	}
 
 	#[Test]
+	public function deserializeRejectsIntegerBeyondInt64InsteadOfWrapping(): void
+	{
+		// Decoded as float, then cast by data-mapper to PHP_INT_MIN - must be a 400 instead
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage('out of range');
+
+		$this->serializer->deserialize('{"age": 9223372036854775808}', TestTypedDto::class);
+	}
+
+	#[Test]
+	public function deserializeToArrayRejectsIntegerBeyondInt64(): void
+	{
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage('out of range');
+
+		$this->serializer->deserialize('{"id": 12345678901234567890}');
+	}
+
+	#[Test]
 	public function deserializeToDtoWithOpenApiPropertyOnPromotedParameter(): void
 	{
 		$json = '{"username":"John"}';

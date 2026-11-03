@@ -13,12 +13,12 @@ use Sabservis\Api\Exception\Api\ValidationException;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Http\ListResponse;
 use Sabservis\Api\Http\PaginatedListResponse;
+use Sabservis\Api\Utils\JsonDecoder;
 use Sabservis\Api\Utils\JsonLimits;
 use function array_map;
 use function is_array;
 use function is_object;
 use function is_string;
-use function json_decode;
 use function json_encode;
 use const JSON_THROW_ON_ERROR;
 
@@ -90,7 +90,8 @@ class DataMapperSerializer implements EntitySerializer
 		}
 
 		try {
-			$decoded = json_decode($data, true, $this->jsonDepth, JSON_THROW_ON_ERROR);
+			// Rejects integer literals beyond 64 bits - data-mapper would otherwise wrap/saturate them silently
+			$decoded = JsonDecoder::decode($data, $this->jsonDepth);
 		} catch (JsonException $e) {
 			throw new ClientErrorException(ErrorMessages::BODY_INVALID_JSON, previous: $e);
 		}

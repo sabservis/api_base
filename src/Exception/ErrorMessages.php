@@ -78,6 +78,8 @@ final class ErrorMessages
 
 	public const JSON_NOT_ARRAY = 'JSON must be an object or array';
 
+	public const JSON_INTEGER_OUT_OF_RANGE = 'Integer value at "%s" is out of range (64-bit signed integer expected)';
+
 	// Request body mapping (EntitySerializer, multipart hydrator)
 	public const BODY_NOT_STRING = 'Invalid input data - expected JSON string';
 

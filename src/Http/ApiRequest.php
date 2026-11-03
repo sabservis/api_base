@@ -2,6 +2,7 @@
 
 namespace Sabservis\Api\Http;
 
+use JsonException;
 use ReflectionClass;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\ErrorMessages;
@@ -10,6 +11,7 @@ use Sabservis\Api\Schema\Endpoint;
 use Sabservis\Api\Utils\ByteFormatter;
 use Sabservis\Api\Utils\ClientIpResolver;
 use Sabservis\Api\Utils\IpMatcher;
+use Sabservis\Api\Utils\JsonDecoder;
 use Sabservis\Api\Utils\JsonLimits;
 use function array_change_key_case;
 use function array_filter;
@@ -27,9 +29,6 @@ use function implode;
 use function is_array;
 use function is_int;
 use function is_string;
-use function json_decode;
-use function json_last_error;
-use function json_last_error_msg;
 use function sprintf;
 use function str_replace;
 use function str_starts_with;
@@ -37,7 +36,6 @@ use function strlen;
 use function strtolower;
 use function substr;
 use const CASE_LOWER;
-use const JSON_ERROR_NONE;
 use const UPLOAD_ERR_NO_FILE;
 
 class ApiRequest
@@ -764,7 +762,11 @@ class ApiRequest
 			return null;
 		}
 
-		$decoded = json_decode($contents, true, JsonLimits::DEFAULT_DEPTH);
+		try {
+			$decoded = JsonDecoder::decode($contents, JsonLimits::DEFAULT_DEPTH);
+		} catch (JsonException | ClientErrorException) {
+			return null;
+		}
 
 		return is_array($decoded) ? $decoded : null;
 	}
@@ -786,12 +788,13 @@ class ApiRequest
 			throw new ClientErrorException(ErrorMessages::JSON_EMPTY_BODY, 400);
 		}
 
-		$decoded = json_decode($contents, true, JsonLimits::DEFAULT_DEPTH);
-
-		if (json_last_error() !== JSON_ERROR_NONE) {
+		try {
+			$decoded = JsonDecoder::decode($contents, JsonLimits::DEFAULT_DEPTH);
+		} catch (JsonException $e) {
 			throw new ClientErrorException(
-				sprintf(ErrorMessages::JSON_INVALID, json_last_error_msg()),
+				sprintf(ErrorMessages::JSON_INVALID, $e->getMessage()),
 				400,
+				previous: $e,
 			);
 		}
 
