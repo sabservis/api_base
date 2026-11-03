@@ -5,6 +5,10 @@ namespace Sabservis\Api\Http;
 use function is_int;
 use function is_string;
 use function parse_url;
+use function str_starts_with;
+use function strcspn;
+use function strpos;
+use function substr;
 use const PHP_URL_FRAGMENT;
 use const PHP_URL_HOST;
 use const PHP_URL_PATH;
@@ -43,8 +47,16 @@ final class RequestUri
 		return is_int($port) ? $port : null;
 	}
 
+	/**
+	 * Origin-form URIs (starting with "/") are split literally: parse_url() would read
+	 * "//evil.example/users/1" as host + "/users/1" and route it like "/users/1".
+	 */
 	public function getPath(): string
 	{
+		if (str_starts_with($this->uri, '/')) {
+			return substr($this->uri, 0, strcspn($this->uri, '?#'));
+		}
+
 		$path = parse_url($this->uri, PHP_URL_PATH);
 
 		return is_string($path) ? $path : '/';
@@ -52,6 +64,18 @@ final class RequestUri
 
 	public function getQuery(): string
 	{
+		if (str_starts_with($this->uri, '/')) {
+			$start = strpos($this->uri, '?');
+
+			if ($start === false) {
+				return '';
+			}
+
+			$query = substr($this->uri, $start + 1);
+
+			return substr($query, 0, strcspn($query, '#'));
+		}
+
 		$query = parse_url($this->uri, PHP_URL_QUERY);
 
 		return is_string($query) ? $query : '';

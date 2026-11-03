@@ -32,9 +32,14 @@ class SimpleErrorHandler implements ErrorHandler
 			return $error->getResponse();
 		}
 
-		// Log non-debug errors
+		// Log non-debug errors. Tracy throws when no log directory is configured
+		// (PSR-only setups, CLI) - that must not turn a 404 into a 500.
 		if (!$this->debugMode) {
-			Debugger::log($error, Debugger::ERROR);
+			try {
+				Debugger::log($error, Debugger::ERROR);
+			} catch (Throwable) {
+				// Ignore logging errors - we must return a response
+			}
 		}
 
 		return $this->responseBuilder->build($error, $this->debugMode);

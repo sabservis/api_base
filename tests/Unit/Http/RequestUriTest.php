@@ -44,4 +44,13 @@ final class RequestUriTest extends TestCase
 		self::assertSame('/', $uri->getPath());
 	}
 
+	#[Test]
+	public function schemeRelativeUriIsNotParsedAsAuthority(): void
+	{
+		$uri = new RequestUri('//evil.example/users/1?x=1#f');
+
+		self::assertSame('//evil.example/users/1', $uri->getPath());
+		self::assertSame('x=1', $uri->getQuery());
+	}
+
 }

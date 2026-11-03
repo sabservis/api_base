@@ -487,7 +487,7 @@ final class FileResponseTest extends TestCase
 	#[Test]
 	public function resetAllowedDirectoriesClearsConfig(): void
 	{
-		FileResponse::setAllowedDirectories(['/some/path'], enforce: true);
+		FileResponse::setAllowedDirectories([sys_get_temp_dir()], enforce: true);
 		FileResponse::resetAllowedDirectories();
 
 		self::assertSame([], FileResponse::getAllowedDirectories());
@@ -620,7 +620,7 @@ final class FileResponseTest extends TestCase
 	public function areSymlinksAllowedReturnsTrueWhenEnabled(): void
 	{
 		FileResponse::resetAllowedDirectories();
-		FileResponse::setAllowedDirectories(['/some/path'], enforce: true, allowSymlinks: true);
+		FileResponse::setAllowedDirectories([sys_get_temp_dir()], enforce: true, allowSymlinks: true);
 
 		self::assertTrue(FileResponse::areSymlinksAllowed());
 
@@ -630,7 +630,7 @@ final class FileResponseTest extends TestCase
 	#[Test]
 	public function resetClearsSymlinkSetting(): void
 	{
-		FileResponse::setAllowedDirectories(['/some/path'], enforce: true, allowSymlinks: true);
+		FileResponse::setAllowedDirectories([sys_get_temp_dir()], enforce: true, allowSymlinks: true);
 		self::assertTrue(FileResponse::areSymlinksAllowed());
 
 		FileResponse::resetAllowedDirectories();
@@ -769,6 +769,78 @@ final class FileResponseTest extends TestCase
 			->toApiResponse();
 
 		self::assertSame('nosniff', $response->getHeader('x-content-type-options'));
+	}
+
+	// === Fail-closed allowed directories ===
+
+	#[Test]
+	public function setAllowedDirectoriesRejectsNonExistentDirectory(): void
+	{
+		FileResponse::resetAllowedDirectories();
+
+		try {
+			$this->expectException(RuntimeStateException::class);
+			$this->expectExceptionMessage('/this/does/not/exist');
+
+			FileResponse::setAllowedDirectories(['/this/does/not/exist'], enforce: true);
+		} finally {
+			FileResponse::resetAllowedDirectories();
+		}
+	}
+
+	#[Test]
+	public function enforcedEmptyAllowListDeniesEveryPath(): void
+	{
+		FileResponse::resetAllowedDirectories();
+		FileResponse::setAllowedDirectories([], enforce: true);
+
+		try {
+			$this->expectException(RuntimeStateException::class);
+			$this->expectExceptionMessage('Access denied');
+
+			FileResponse::fromPath($this->testFile);
+		} finally {
+			FileResponse::resetAllowedDirectories();
+		}
+	}
+
+	#[Test]
+	public function fromPathRejectsDirectory(): void
+	{
+		FileResponse::resetAllowedDirectories();
+
+		$this->expectException(RuntimeStateException::class);
+		$this->expectExceptionMessage('not a regular file');
+
+		FileResponse::fromPath(sys_get_temp_dir());
+	}
+
+	#[Test]
+	public function symlinkCycleIsRejectedInsteadOfRecursingForever(): void
+	{
+		$dir = sys_get_temp_dir() . '/symlink-cycle-' . uniqid();
+		@mkdir($dir, 0777, true);
+
+		if (!@symlink($dir . '/b', $dir . '/a') || !@symlink($dir . '/a', $dir . '/b')) {
+			@unlink($dir . '/a');
+			@rmdir($dir);
+			self::markTestSkipped('Cannot create symlinks');
+		}
+
+		FileResponse::resetAllowedDirectories();
+		FileResponse::setAllowedDirectories([$dir], enforce: true, allowSymlinks: true);
+
+		try {
+			$this->expectException(RuntimeStateException::class);
+			$this->expectExceptionMessage('symlink');
+
+			FileResponse::fromPath($dir . '/a');
+		} finally {
+			FileResponse::resetAllowedDirectories();
+			@unlink($dir . '/a');
+			@unlink($dir . '/b');
+			@rmdir($dir);
+		}
 	}
 
 }

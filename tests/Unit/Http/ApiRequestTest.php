@@ -1389,4 +1389,21 @@ final class ApiRequestTest extends TestCase
 		self::assertSame('', $request->getContents());
 	}
 
+	#[Test]
+	public function schemeRelativeUriIsNotParsedAsAuthority(): void
+	{
+		// parse_url() would treat "evil.example" as host and return "/users/1" - path confusion
+		$request = new ApiRequest(method: 'GET', uri: '//evil.example/users/1?x=1');
+
+		self::assertSame('//evil.example/users/1', $request->getPath());
+	}
+
+	#[Test]
+	public function tripleSlashUriKeepsLiteralPath(): void
+	{
+		$request = new ApiRequest(method: 'GET', uri: '///users');
+
+		self::assertSame('///users', $request->getPath());
+	}
+
 }

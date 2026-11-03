@@ -11,6 +11,7 @@ use Sabservis\Api\Exception\Api\ServerErrorException;
 use Sabservis\Api\Exception\Runtime\SnapshotException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
+use Tracy\Debugger;
 use function json_decode;
 
 final class SimpleErrorHandlerTest extends TestCase
@@ -159,6 +160,28 @@ final class SimpleErrorHandlerTest extends TestCase
 		self::assertStringContainsString('Fatal error details', $body['message']);
 		self::assertArrayHasKey('file', $body['context']);
 		self::assertArrayHasKey('line', $body['context']);
+	}
+
+	#[Test]
+	public function productionModeWithoutTracyLogDirectoryStillReturnsClientErrorResponse(): void
+	{
+		$previousLogDirectory = Debugger::$logDirectory;
+		Debugger::$logDirectory = null;
+
+		try {
+			$handler = new SimpleErrorHandler();
+			$handler->setDebugMode(false);
+
+			$response = $handler->handle(
+				new ClientErrorException('Not found', 404),
+				new ApiRequest(method: 'GET', uri: '/'),
+			);
+
+			self::assertSame(404, $response->getStatusCode());
+			self::assertSame(404, json_decode($response->getBody(), true)['code']);
+		} finally {
+			Debugger::$logDirectory = $previousLogDirectory;
+		}
 	}
 
 }

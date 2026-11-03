@@ -2,7 +2,6 @@
 
 namespace Tests\Unit\Utils;
 
-use DateTimeImmutable;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
@@ -40,12 +39,40 @@ final class DateTimeParserTest extends TestCase
 	}
 
 	#[Test]
-	public function parseWithFallbackConstructor(): void
+	public function parseRejectsFormatsOutsideTheGivenList(): void
 	{
-		// This format is not in DEFAULT_FORMATS but works with constructor
-		$result = DateTimeParser::parse('15 January 2024');
+		// No loose constructor fallback: only explicit formats are accepted
+		$this->expectException(InvalidArgumentException::class);
 
-		self::assertSame('2024-01-15', $result->format('Y-m-d'));
+		DateTimeParser::parse('15 January 2024');
+	}
+
+	#[Test]
+	#[DataProvider('provideRejectedValues')]
+	public function parseRejectsEmptyRelativeAndOverflowingValues(string $input): void
+	{
+		$this->expectException(InvalidArgumentException::class);
+
+		DateTimeParser::parse($input);
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function provideRejectedValues(): array
+	{
+		return [
+			'empty' => [''],
+			'whitespace' => [' '],
+			'now' => ['now'],
+			'tomorrow' => ['tomorrow'],
+			'relative' => ['+1 day'],
+			'timestamp' => ['@0'],
+			'day overflow' => ['2024-02-30'],
+			'month overflow' => ['2024-13-01'],
+			'hour overflow' => ['2024-01-30T25:00:00'],
+			'minute overflow' => ['2024-01-30T10:61:00'],
+		];
 	}
 
 	#[Test]
@@ -84,7 +111,9 @@ final class DateTimeParserTest extends TestCase
 			'ISO 8601 no tz' => ['2024-06-15T14:30:00', '2024-06-15'],
 			'date only' => ['2024-06-15', '2024-06-15'],
 			'with Z timezone' => ['2024-06-15T14:30:00Z', '2024-06-15'],
-			'relative date' => ['tomorrow', (new DateTimeImmutable('tomorrow'))->format('Y-m-d')],
+			'leap day' => ['2024-02-29', '2024-02-29'],
+			'datetime-local' => ['2024-06-15T14:30', '2024-06-15'],
+			'space separator' => ['2024-06-15 14:30:00', '2024-06-15'],
 		];
 	}
 
@@ -94,6 +123,8 @@ final class DateTimeParserTest extends TestCase
 		self::assertSame([
 			'Y-m-d\TH:i:sP',
 			'Y-m-d\TH:i:s',
+			'Y-m-d\TH:i',
+			'Y-m-d H:i:s',
 			'!Y-m-d',
 		], DateTimeParser::DEFAULT_FORMATS);
 	}

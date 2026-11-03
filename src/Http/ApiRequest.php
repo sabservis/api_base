@@ -30,7 +30,6 @@ use function is_string;
 use function json_decode;
 use function json_last_error;
 use function json_last_error_msg;
-use function parse_url;
 use function sprintf;
 use function str_replace;
 use function str_starts_with;
@@ -39,7 +38,6 @@ use function strtolower;
 use function substr;
 use const CASE_LOWER;
 use const JSON_ERROR_NONE;
-use const PHP_URL_PATH;
 use const UPLOAD_ERR_NO_FILE;
 
 class ApiRequest
@@ -239,9 +237,7 @@ class ApiRequest
 
 	public function getPath(): string
 	{
-		$path = parse_url($this->uri, PHP_URL_PATH);
-
-		return is_string($path) ? $path : '/';
+		return $this->getUri()->getPath();
 	}
 
 	public function getScheme(): string

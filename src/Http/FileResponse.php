@@ -10,6 +10,7 @@ use function filesize;
 use function fopen;
 use function fstat;
 use function in_array;
+use function is_file;
 use function is_link;
 use function is_resource;
 use function pathinfo;
@@ -156,7 +157,12 @@ final class FileResponse
 		'application/vnd.oasis.opendocument.',
 	];
 
-	/** @var array<string> Allowed directories for file serving (empty = allow all with warning) */
+	/**
+	 * Maximum chained symlink hops followed by validatePath() (guards against cycles).
+	 */
+	private const MAX_SYMLINK_DEPTH = 32;
+
+	/** @var array<string> Allowed directories for file serving (empty + enforce=false = no restriction) */
 	private static array $allowedDirectories = [];
 
 	/** @var bool Whether to enforce allowed directories check */
@@ -198,6 +204,11 @@ final class FileResponse
 	{
 		// Validate and canonicalize path
 		$realPath = self::validatePath($path);
+
+		// fopen() succeeds on a directory - would send Content-Length of the inode with an empty body
+		if (!is_file($realPath)) {
+			throw new RuntimeStateException("Path is not a regular file: $path");
+		}
 
 		$handle = fopen($realPath, 'rb');
 
@@ -292,9 +303,15 @@ final class FileResponse
 		foreach ($directories as $dir) {
 			$realDir = realpath($dir);
 
-			if ($realDir !== false) {
-				self::$allowedDirectories[] = $realDir;
+			// Fail closed: a typo'd / not-yet-created directory must not silently
+			// disappear from the allow-list (and turn enforcement off when it was the only one)
+			if ($realDir === false) {
+				self::$allowedDirectories = [];
+
+				throw new RuntimeStateException("Allowed directory does not exist: $dir");
 			}
+
+			self::$allowedDirectories[] = $realDir;
 		}
 	}
 
@@ -336,7 +353,7 @@ final class FileResponse
 	 *
 	 * @throws RuntimeStateException If path is unsafe, a symlink (when not allowed), or outside allowed directories
 	 */
-	public static function validatePath(string $path): string
+	public static function validatePath(string $path, int $symlinkDepth = 0): string
 	{
 		// SECURITY: Check for symlinks BEFORE realpath() to prevent TOCTOU attacks
 		// A symlink could point to a sensitive file outside allowed directories
@@ -344,6 +361,13 @@ final class FileResponse
 			if (!self::$allowSymlinks) {
 				throw new RuntimeStateException(
 					'Access denied: Symlinks are not allowed for security reasons',
+				);
+			}
+
+			// A symlink cycle (a -> b -> a) would otherwise recurse until memory is exhausted
+			if ($symlinkDepth >= self::MAX_SYMLINK_DEPTH) {
+				throw new RuntimeStateException(
+					'Access denied: Too many levels of symlinks',
 				);
 			}
 
@@ -362,7 +386,7 @@ final class FileResponse
 			}
 
 			// Recursively validate the target (handles chained symlinks)
-			return self::validatePath($linkTarget);
+			return self::validatePath($linkTarget, $symlinkDepth + 1);
 		}
 
 		// Canonicalize path to resolve ../ sequences
@@ -380,8 +404,9 @@ final class FileResponse
 			);
 		}
 
-		// If allowed directories are configured, check path is within one of them
-		if (self::$allowedDirectories !== [] && self::$enforceAllowedDirectories) {
+		// When enforcement is on, the path must be inside one of the allowed directories.
+		// An empty allow-list with enforcement therefore denies everything (fail closed).
+		if (self::$enforceAllowedDirectories) {
 			$isAllowed = false;
 
 			foreach (self::$allowedDirectories as $allowedDir) {

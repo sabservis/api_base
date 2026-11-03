@@ -297,4 +297,40 @@ final class IpMatcherTest extends TestCase
 		self::assertNull(IpMatcher::findInvalidPattern(['127.0.0.1', '10.0.0.0/8', '::1']));
 	}
 
+	#[Test]
+	#[DataProvider('provideMalformedIpv6')]
+	public function isValidRejectsMalformedIpv6(string $ip): void
+	{
+		self::assertFalse(IpMatcher::isValid($ip));
+	}
+
+	/**
+	 * @return array<string, array{string}>
+	 */
+	public static function provideMalformedIpv6(): array
+	{
+		return [
+			'triple colon' => ['1:::2'],
+			'triple colon hex' => ['a:::b'],
+			'triple colon mid' => ['1:2:::3'],
+			'two double colons' => ['1::2::3'],
+			'trailing newline' => ["::1\n"],
+		];
+	}
+
+	#[Test]
+	public function matchesAnyCanonicalizesIpv6ExactMatch(): void
+	{
+		self::assertTrue(IpMatcher::matchesAny('2001:DB8::1', ['2001:db8::1']));
+		self::assertTrue(IpMatcher::matchesAny('2001:0db8:0000:0000:0000:0000:0000:0001', ['2001:db8::1']));
+	}
+
+	#[Test]
+	public function matchesAnyTreatsIpv4MappedIpv6AsIpv4(): void
+	{
+		self::assertTrue(IpMatcher::matchesAny('::ffff:10.0.0.1', ['10.0.0.0/8']));
+		self::assertTrue(IpMatcher::matchesAny('::ffff:10.0.0.1', ['10.0.0.1']));
+		self::assertFalse(IpMatcher::matchesAny('::ffff:11.0.0.1', ['10.0.0.0/8']));
+	}
+
 }

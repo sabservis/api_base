@@ -5,11 +5,13 @@ namespace Sabservis\Api\Utils;
 use function count;
 use function explode;
 use function filter_var;
+use function inet_ntop;
 use function inet_pton;
 use function ip2long;
 use function ord;
 use function preg_match;
 use function str_contains;
+use function str_starts_with;
 use function strlen;
 use function substr;
 use const FILTER_FLAG_IPV4;
@@ -35,33 +37,41 @@ final class IpMatcher
 	private const IPV6_BITS = 128;
 
 	/**
-	 * Regex pattern for validating IPv4 addresses.
+	 * IPv4-mapped IPv6 prefix (::ffff:0:0/96) in binary form.
 	 */
-	private const IPV4_PATTERN = '/^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\z/';
-
-	/**
-	 * Regex pattern for validating IPv6 addresses (simplified).
-	 * \z instead of $ - $ would accept a trailing "\n".
-	 */
-	private const IPV6_PATTERN = '/^(?:(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}|::(?:[0-9a-fA-F]{1,4}:){0,6}[0-9a-fA-F]{1,4}|(?:[0-9a-fA-F]{1,4}:){1,7}:|(?:[0-9a-fA-F]{1,4}:){0,6}::(?:[0-9a-fA-F]{1,4}:){0,5}[0-9a-fA-F]{1,4})\z/';
+	private const IPV4_MAPPED_PREFIX = "\0\0\0\0\0\0\0\0\0\0\xff\xff";
 
 	/**
 	 * Validate that a string is a valid IP address (IPv4 or IPv6).
+	 *
+	 * filter_var() is strict (rejects "1:::2", trailing newline, ...) - a hand-written
+	 * regex previously accepted malformed IPv6 strings.
 	 */
 	public static function isValid(string $ip): bool
 	{
-		// Check IPv4
-		if (preg_match(self::IPV4_PATTERN, $ip) === 1) {
-			return true;
-		}
-
-		// Check IPv6 (simplified pattern)
-		if (preg_match(self::IPV6_PATTERN, $ip) === 1) {
-			return true;
-		}
-
-		// Use filter_var as fallback for edge cases
 		return filter_var($ip, FILTER_VALIDATE_IP) !== false;
+	}
+
+	/**
+	 * Canonical textual form for comparison: lowercase compressed IPv6,
+	 * IPv4-mapped IPv6 (::ffff:10.0.0.1) collapsed to plain IPv4.
+	 * Invalid input is returned unchanged.
+	 */
+	public static function canonicalize(string $ip): string
+	{
+		$binary = @inet_pton($ip);
+
+		if ($binary === false) {
+			return $ip;
+		}
+
+		if (strlen($binary) === 16 && str_starts_with($binary, self::IPV4_MAPPED_PREFIX)) {
+			$binary = substr($binary, 12);
+		}
+
+		$canonical = inet_ntop($binary);
+
+		return $canonical === false ? $ip : $canonical;
 	}
 
 	/**
@@ -234,14 +244,20 @@ final class IpMatcher
 	 */
 	public static function matchesAny(string $ip, array $patterns): bool
 	{
+		$ip = self::canonicalize($ip);
+
 		foreach ($patterns as $pattern) {
-			// Exact match
-			if ($ip === $pattern) {
-				return true;
+			// CIDR notation match
+			if (str_contains($pattern, '/')) {
+				if (self::matchesCidr($ip, $pattern)) {
+					return true;
+				}
+
+				continue;
 			}
 
-			// CIDR notation match
-			if (str_contains($pattern, '/') && self::matchesCidr($ip, $pattern)) {
+			// Exact match - canonicalized so "2001:DB8::1" equals "2001:db8::1"
+			if ($ip === self::canonicalize($pattern)) {
 				return true;
 			}
 		}
