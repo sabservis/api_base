@@ -74,6 +74,22 @@ final class OpenApiMergeTest extends TestCase
 	}
 
 	#[Test]
+	public function mergeIntoExistingResponseKeepsDescriptionAndContent(): void
+	{
+		$spec = $this->generateSpecForController(TestControllerWithMergeIntoResponseContent::class);
+
+		$response = $spec['paths']['/test']['get']['responses']['200'];
+
+		// Partial override adds headers - the generated description and $ref content must survive
+		self::assertSame('integer', $response['headers']['X-Total']['schema']['type']);
+		self::assertNotSame('', $response['description'] ?? '');
+		self::assertSame(
+			'#/components/schemas/MergeUserDto',
+			$response['content']['application/json']['schema']['$ref'],
+		);
+	}
+
+	#[Test]
 	public function mergeWithoutAttributeDoesNotAddExtras(): void
 	{
 		$spec = $this->generateSpecForController(TestControllerWithoutMerge::class);
@@ -173,6 +189,30 @@ class TestControllerWithMergeResponseOverride implements Controller
 	#[OpenApiMerge([
 		'responses' => [
 			'200' => ['description' => 'Custom success description'],
+		],
+	])]
+	public function test(ApiRequest $request): array
+	{
+		return [];
+	}
+
+}
+
+class MergeUserDto
+{
+
+	public int $id;
+
+}
+
+class TestControllerWithMergeIntoResponseContent implements Controller
+{
+
+	#[Get(path: '/test')]
+	#[Response(ref: MergeUserDto::class)]
+	#[OpenApiMerge([
+		'responses' => [
+			'200' => ['headers' => ['X-Total' => ['schema' => ['type' => 'integer']]]],
 		],
 	])]
 	public function test(ApiRequest $request): array

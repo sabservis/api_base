@@ -104,7 +104,7 @@ final class OpenApiControllerTest extends TestCase
 
 		$decoded = json_decode($body, true);
 		self::assertSame('Empty API', $decoded['info']['title']);
-		self::assertArrayNotHasKey('paths', $decoded); // Empty paths are omitted from output
+		self::assertSame([], $decoded['paths']); // "paths" is required by OAS 3.0 - emitted as {} even when empty
 	}
 
 }

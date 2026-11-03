@@ -12,6 +12,7 @@ use Sabservis\Api\Attribute\OpenApi\Property;
 use Sabservis\Api\Attribute\OpenApi\Schema;
 use Sabservis\Api\OpenApi\Generator\SchemaBuilder;
 use Sabservis\Api\OpenApi\Spec\SchemaObject;
+use function array_keys;
 use function str_contains;
 
 final class SchemaBuilderTest extends TestCase
@@ -396,6 +397,85 @@ final class SchemaBuilderTest extends TestCase
 
 		self::assertSame(['type' => 'string', 'enum' => ['cat']], $catKind->jsonSerialize());
 		self::assertSame(['type' => 'string', 'enum' => ['dog']], $dogKind->jsonSerialize());
+	}
+
+	#[Test]
+	public function propertyWithDefaultIsNotRequiredAndEmitsDefault(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(ReqDefaultsDto::class);
+		$schema = $builder->getSchemas()['ReqDefaultsDto'];
+
+		// A client may omit it - the hydrators fill the default
+		self::assertSame(['name'], $schema->required);
+		self::assertSame(10, $schema->properties['limit']->default);
+		self::assertSame('id', $schema->properties['sort']->default);
+		self::assertSame(1, $schema->properties['page']->default);
+		self::assertSame([], $schema->properties['tags']->default);
+	}
+
+	#[Test]
+	public function nonNullableUnionPropertyIsRequired(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(ReqUnionDto::class);
+		$schema = $builder->getSchemas()['ReqUnionDto'];
+
+		self::assertSame(['id'], $schema->required);
+	}
+
+	#[Test]
+	public function propertyAttributeRequiredTrueWinsOverNullableAndDefault(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(ReqExplicitDto::class);
+		$schema = $builder->getSchemas()['ReqExplicitDto'];
+
+		self::assertSame(['note'], $schema->required);
+	}
+
+	#[Test]
+	public function staticPropertiesAreNotPartOfSchema(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(ReqStaticDto::class);
+		$schema = $builder->getSchemas()['ReqStaticDto'];
+
+		self::assertSame(['id'], array_keys($schema->properties));
+		self::assertSame(['id'], $schema->required);
+	}
+
+	#[Test]
+	public function discriminatorRestrictionKeepsVariantPropertyMetadata(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(DiscMetaDto::class);
+		$kind = $builder->getSchemas()['DiscMetaCatDto']->properties['kind'];
+
+		// $ref to the enum is replaced by the inline restriction ($ref siblings are ignored in OAS 3.0),
+		// but nullable / example / deprecated / description from the property must survive
+		self::assertSame([
+			'type' => 'string',
+			'description' => 'Kind of animal',
+			'enum' => ['cat'],
+			'example' => 'cat',
+			'nullable' => true,
+			'deprecated' => true,
+		], $kind->jsonSerialize());
+	}
+
+	#[Test]
+	public function discriminatorMappingWithNumericStringKeysKeepsStringType(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(DiscNumericDto::class);
+		$schemas = $builder->getSchemas();
+
+		// PHP casts the array key '1' to int - the wire value is still the string "1"
+		$invoice = $schemas['DiscNumericInvoiceDto']->properties['type']->jsonSerialize();
+		$credit = $schemas['DiscNumericCreditDto']->properties['type']->jsonSerialize();
+		self::assertSame(['type' => 'string', 'enum' => ['1']], $invoice);
+		self::assertSame(['type' => 'string', 'enum' => ['2']], $credit);
 	}
 
 	#[Test]
@@ -887,5 +967,107 @@ class AdditionalPropertiesRefDto
 
 	#[Property(type: 'object', additionalProperties: new AdditionalProperties(ref: ChildDto::class))]
 	public array $items;
+
+}
+
+class ReqDefaultsDto
+{
+
+	public string $name;
+
+	public int $limit = 10;
+
+	public string $sort = 'id';
+
+	/** @var list<string> */
+	public array $tags = [];
+
+	public function __construct(public int $page = 1)
+	{
+	}
+
+}
+
+class ReqUnionDto
+{
+
+	public int|string $id;
+
+	public int|string|null $parentId = null;
+
+}
+
+class ReqExplicitDto
+{
+
+	#[Property(required: true)]
+	public string|null $note = null;
+
+	#[Property(required: false)]
+	public string $optionalByAttribute = '';
+
+}
+
+class ReqStaticDto
+{
+
+	public int $id;
+
+	public static int $counter = 0;
+
+}
+
+enum DiscMetaKind: string
+{
+
+	case Cat = 'cat';
+
+	case Dog = 'dog';
+
+}
+
+#[Schema(oneOf: [DiscMetaCatDto::class, DiscMetaDogDto::class])]
+#[Discriminator(propertyName: 'kind', mapping: ['cat' => DiscMetaCatDto::class, 'dog' => DiscMetaDogDto::class])]
+class DiscMetaDto
+{
+
+}
+
+class DiscMetaCatDto
+{
+
+	#[Property(description: 'Kind of animal', example: 'cat', deprecated: true)]
+	public DiscMetaKind|null $kind = null;
+
+}
+
+class DiscMetaDogDto
+{
+
+	public DiscMetaKind $kind;
+
+}
+
+#[Schema(oneOf: [DiscNumericInvoiceDto::class, DiscNumericCreditDto::class])]
+#[Discriminator(
+	propertyName: 'type',
+	mapping: ['1' => DiscNumericInvoiceDto::class, '2' => DiscNumericCreditDto::class],
+)]
+class DiscNumericDto
+{
+
+}
+
+class DiscNumericInvoiceDto
+{
+
+	public string $type;
+
+}
+
+class DiscNumericCreditDto
+{
+
+	public string $type;
 
 }

@@ -4,6 +4,8 @@ namespace Tests\Unit\OpenApi\Generator;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Sabservis\Api\Attribute\OpenApi\Discriminator;
+use Sabservis\Api\Attribute\OpenApi\Schema as OpenApiSchema;
 use Sabservis\Api\OpenApi\Generator\OpenApiGenerator;
 use Sabservis\Api\OpenApi\OpenApiConfig;
 use Sabservis\Api\Schema\Endpoint;
@@ -12,6 +14,7 @@ use Sabservis\Api\Schema\EndpointRequestBody;
 use Sabservis\Api\Schema\EndpointResponse;
 use Sabservis\Api\Schema\Schema;
 use function json_decode;
+use function json_encode;
 
 final class OpenApiGeneratorTest extends TestCase
 {
@@ -382,6 +385,148 @@ MD;
 		self::assertJson($json);
 		$decoded = json_decode($json, true);
 		self::assertSame('3.0.3', $decoded['openapi']);
+	}
+
+	#[Test]
+	public function explicitParameterSchemaKeepsItemsAndArrayConstraints(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/items');
+		$ids = new EndpointParameter('ids', 'array');
+		$ids->setIn(EndpointParameter::InQuery);
+		$ids->setSchemaSpec([
+			'type' => 'array',
+			'items' => ['type' => 'integer'],
+			'minItems' => 1,
+			'maxItems' => 5,
+			'uniqueItems' => true,
+			'description' => 'Item ids',
+		]);
+		$endpoint->addParameter($ids);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+		$spec = (new OpenApiGenerator($this->createConfig()))->generate($schema);
+		$parameter = json_decode(json_encode($spec), true)['paths']['/items']['get']['parameters'][0];
+
+		self::assertSame([
+			'type' => 'array',
+			'description' => 'Item ids',
+			'minItems' => 1,
+			'maxItems' => 5,
+			'uniqueItems' => true,
+			'items' => ['type' => 'integer'],
+		], $parameter['schema']);
+	}
+
+	#[Test]
+	public function explicitParameterSchemaHonoursParameterFormat(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/events');
+		$day = new EndpointParameter('day', 'string');
+		$day->setIn(EndpointParameter::InQuery);
+		$day->setSchemaSpec(['type' => 'string', 'pattern' => '^\d{4}-\d{2}-\d{2}$']);
+		$day->setFormat('date');
+		$endpoint->addParameter($day);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+		$spec = (new OpenApiGenerator($this->createConfig()))->generate($schema);
+		$parameter = json_decode(json_encode($spec), true)['paths']['/events']['get']['parameters'][0];
+
+		// Runtime (ParameterTypeConverter) validates format: date - the spec must say so too
+		self::assertSame('date', $parameter['schema']['format']);
+		self::assertSame('^\d{4}-\d{2}-\d{2}$', $parameter['schema']['pattern']);
+	}
+
+	#[Test]
+	public function securitySchemesKeepFlowsAndOpenIdConnectUrl(): void
+	{
+		$flows = ['clientCredentials' => ['tokenUrl' => 'https://auth.example.com/token', 'scopes' => ['read' => 'Read']]];
+		$config = new OpenApiConfig(
+			title: 'Test API',
+			version: '1.0.0',
+			securitySchemes: [
+				'OAuth' => ['type' => 'oauth2', 'flows' => $flows],
+				'OIDC' => ['type' => 'openIdConnect', 'openIdConnectUrl' => 'https://auth.example.com/.well-known'],
+			],
+		);
+
+		$schema = new Schema();
+		$schema->addEndpoint($this->createEndpoint('GET', '/x'));
+		$spec = json_decode(json_encode((new OpenApiGenerator($config))->generate($schema)), true);
+
+		self::assertSame($flows, $spec['components']['securitySchemes']['OAuth']['flows']);
+		self::assertSame(
+			'https://auth.example.com/.well-known',
+			$spec['components']['securitySchemes']['OIDC']['openIdConnectUrl'],
+		);
+	}
+
+	#[Test]
+	public function schemaNameWithHyphenSurvivesUnusedSchemaFilter(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/user');
+		$response = new EndpointResponse('200', 'OK');
+		$response->setEntity(HyphenNamedDto::class);
+		$endpoint->addResponse($response);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+		$spec = json_decode((new OpenApiGenerator($this->createConfig()))->generateJson($schema), true);
+
+		self::assertSame(
+			'#/components/schemas/user-dto',
+			$spec['paths']['/user']['get']['responses']['200']['content']['application/json']['schema']['$ref'],
+		);
+		self::assertArrayHasKey('user-dto', $spec['components']['schemas']);
+	}
+
+	#[Test]
+	public function discriminatorMappingTargetsSurviveUnusedSchemaFilter(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/pet');
+		$response = new EndpointResponse('200', 'OK');
+		$response->setEntity(GenPetDto::class);
+		$endpoint->addResponse($response);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+		$spec = json_decode((new OpenApiGenerator($this->createConfig()))->generateJson($schema), true);
+
+		// GenBirdDto is only reachable through discriminator.mapping - still must not dangle
+		self::assertArrayHasKey('GenBirdDto', $spec['components']['schemas']);
+	}
+
+	#[Test]
+	public function responseRefToInterfaceProducesSchema(): void
+	{
+		$endpoint = $this->createEndpoint('GET', '/shape');
+		$response = new EndpointResponse('200', 'OK');
+		$response->setEntity(GenShapeInterface::class);
+		$endpoint->addResponse($response);
+
+		$schema = new Schema();
+		$schema->addEndpoint($endpoint);
+		$spec = json_decode((new OpenApiGenerator($this->createConfig()))->generateJson($schema), true);
+
+		self::assertSame(
+			'#/components/schemas/GenShapeInterface',
+			$spec['paths']['/shape']['get']['responses']['200']['content']['application/json']['schema']['$ref'],
+		);
+		self::assertArrayHasKey('GenShapeInterface', $spec['components']['schemas']);
+	}
+
+	#[Test]
+	public function emptyPathsIsEmittedAsObject(): void
+	{
+		$schema = new Schema();
+		$schema->addEndpoint($this->createEndpoint('GET', '/internal'));
+
+		$json = (new OpenApiGenerator($this->createConfig(), static fn (Endpoint $e): bool => false))
+			->generateJson($schema);
+
+		// "paths" is REQUIRED in OAS 3.0 and must be an object, not [] or absent
+		self::assertMatchesRegularExpression('/"paths":\s*\{\s*\}/', $json);
 	}
 
 	#[Test]
@@ -799,5 +944,51 @@ enum TestItemType: string
 	case Lead = 'lead';
 
 	case Customer = 'customer';
+
+}
+
+#[OpenApiSchema(name: 'user-dto')]
+class HyphenNamedDto
+{
+
+	public int $id;
+
+}
+
+class GenCatDto
+{
+
+	public string $type;
+
+}
+
+class GenDogDto
+{
+
+	public string $type;
+
+}
+
+class GenBirdDto
+{
+
+	public string $type;
+
+}
+
+#[OpenApiSchema(oneOf: [GenCatDto::class, GenDogDto::class])]
+#[Discriminator(
+	propertyName: 'type',
+	mapping: ['cat' => GenCatDto::class, 'dog' => GenDogDto::class, 'bird' => GenBirdDto::class],
+)]
+class GenPetDto
+{
+
+}
+
+interface GenShapeInterface
+{
+
+	public function area(): float;
 
 }

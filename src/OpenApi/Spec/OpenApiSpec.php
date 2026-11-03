@@ -3,6 +3,7 @@
 namespace Sabservis\Api\OpenApi\Spec;
 
 use JsonSerializable;
+use stdClass;
 use function json_encode;
 use const JSON_PRETTY_PRINT;
 use const JSON_THROW_ON_ERROR;
@@ -51,9 +52,8 @@ final class OpenApiSpec implements JsonSerializable
 			$data['servers'] = $this->servers;
 		}
 
-		if ($this->paths !== []) {
-			$data['paths'] = $this->paths;
-		}
+		// REQUIRED in OAS 3.0 - an empty map must still be emitted, as an object ({}), not []
+		$data['paths'] = $this->paths === [] ? new stdClass() : $this->paths;
 
 		if ($this->components !== null) {
 			$componentsData = $this->components->jsonSerialize();

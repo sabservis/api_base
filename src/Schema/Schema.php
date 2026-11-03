@@ -12,8 +12,11 @@ class Schema
 	/** @var array<Endpoint> */
 	private array $endpoints = [];
 
-	/** @var array<string, array{name: string, description: string|null}> */
+	/** @var array<string, array{name: string, description: string|null, hidden: bool}> */
 	private array $tags = [];
+
+	/** @var array<string, array<string, mixed>> */
+	private array $securitySchemes = [];
 
 	private string|null $hash = null;
 
@@ -30,23 +33,42 @@ class Schema
 		return $this->endpoints;
 	}
 
-	public function addTag(string $name, string|null $description = null): void
+	public function addTag(string $name, string|null $description = null, bool $hidden = false): void
 	{
 		// Only add if not exists or if new one has description and old one doesn't
 		if (!isset($this->tags[$name]) || ($description !== null && $this->tags[$name]['description'] === null)) {
 			$this->tags[$name] = [
 				'name' => $name,
 				'description' => $description,
+				'hidden' => $hidden || ($this->tags[$name]['hidden'] ?? false),
 			];
 		}
 	}
 
 	/**
-	 * @return array<string, array{name: string, description: string|null}>
+	 * @return array<string, array{name: string, description: string|null, hidden: bool}>
 	 */
 	public function getTags(): array
 	{
 		return $this->tags;
+	}
+
+	/**
+	 * Security scheme declared by #[SecurityScheme] on a controller (merged into components by the generator).
+	 *
+	 * @param array<string, mixed> $spec
+	 */
+	public function addSecurityScheme(string $name, array $spec): void
+	{
+		$this->securitySchemes[$name] = $spec;
+	}
+
+	/**
+	 * @return array<string, array<string, mixed>>
+	 */
+	public function getSecuritySchemes(): array
+	{
+		return $this->securitySchemes;
 	}
 
 	/**

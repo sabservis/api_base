@@ -16,6 +16,7 @@ use Sabservis\Api\Attribute\OpenApi\Operation;
 use Sabservis\Api\Attribute\OpenApi\RequestOperationAttribute;
 use Sabservis\Api\Attribute\OpenApi\RequestParameter;
 use Sabservis\Api\Attribute\OpenApi\Security;
+use Sabservis\Api\Attribute\OpenApi\SecurityScheme;
 use Sabservis\Api\Attribute\OpenApi\Tag;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
@@ -56,8 +57,11 @@ final class OpenApiAttributeLoader
 	/** @var array<string, array{parents: array<string, ReflectionClass<object>>, reflection: ReflectionClass<object>}> */
 	private array $meta = [];
 
-	/** @var array<string, array{name: string, description: string|null}> */
+	/** @var array<string, array{name: string, description: string|null, hidden: bool}> */
 	private array $tags = [];
+
+	/** @var array<string, array<string, mixed>> Security schemes declared by #[SecurityScheme] on controllers */
+	private array $securitySchemes = [];
 
 	private ParameterInferenceEngine $parameterEngine;
 
@@ -75,7 +79,7 @@ final class OpenApiAttributeLoader
 	/**
 	 * Load schema from controller attributes and return as array.
 	 *
-	 * @return array{endpoints: array<mixed>, tags: array<string, array{name: string, description: string|null}>}
+	 * @return array{endpoints: array<mixed>, tags: array<string, array{name: string, description: string|null, hidden: bool}>, securitySchemes: array<string, array<string, mixed>>}
 	 */
 	public function load(): array
 	{
@@ -113,6 +117,7 @@ final class OpenApiAttributeLoader
 		return [
 			'endpoints' => $endpoints,
 			'tags' => $this->tags,
+			'securitySchemes' => $this->securitySchemes,
 		];
 	}
 
@@ -240,7 +245,14 @@ final class OpenApiAttributeLoader
 			$tag = $attribute->newInstance();
 			assert($tag instanceof Tag);
 			$controllerTags[$tag->getName()] = 1;
-			$this->addTag($tag->getName(), $tag->description);
+			$this->addTag($tag->getName(), $tag->description, $tag->isHidden());
+		}
+
+		// #[SecurityScheme] on the controller declares a components.securitySchemes entry
+		foreach ($reflectionClass->getAttributes(SecurityScheme::class) as $attribute) {
+			$scheme = $attribute->newInstance();
+			assert($scheme instanceof SecurityScheme);
+			$this->securitySchemes[$scheme->securityScheme] = $scheme->toOpenApiSpec();
 		}
 
 		if ($controllerTags === []) {
@@ -249,7 +261,7 @@ final class OpenApiAttributeLoader
 					$tag = $attribute->newInstance();
 					assert($tag instanceof Tag);
 					$controllerTags[$tag->getName()] = 1;
-					$this->addTag($tag->getName(), $tag->description);
+					$this->addTag($tag->getName(), $tag->description, $tag->isHidden());
 				}
 
 				if ($controllerTags !== []) {
@@ -314,6 +326,8 @@ final class OpenApiAttributeLoader
 			// Create a copy of the endpoint with the alias path
 			$aliasEndpoint = $originalEndpoint;
 			$aliasEndpoint['mask'] = $this->buildMask($controllerPath, $alias->path);
+			// operationIds must be unique - the alias gets a generated one, not a copy of the explicit id
+			$aliasEndpoint['id'] = null;
 
 			// Rebuild pattern for the new mask
 			$this->rebuildPattern($aliasEndpoint);
@@ -729,12 +743,13 @@ final class OpenApiAttributeLoader
 		}
 	}
 
-	private function addTag(string $name, string|null $description): void
+	private function addTag(string $name, string|null $description, bool $hidden = false): void
 	{
 		if (!isset($this->tags[$name]) || ($description !== null && $this->tags[$name]['description'] === null)) {
 			$this->tags[$name] = [
 				'name' => $name,
 				'description' => $description,
+				'hidden' => $hidden || ($this->tags[$name]['hidden'] ?? false),
 			];
 		}
 	}

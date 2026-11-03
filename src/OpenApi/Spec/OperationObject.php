@@ -103,6 +103,12 @@ final class OperationObject implements JsonSerializable
 	private function deepMerge(array $base, array $override): array
 	{
 		foreach ($override as $key => $value) {
+			// Generated Spec objects (ResponseObject, RequestBodyObject...) take part in the merge
+			// as arrays - a partial override must not replace the whole object
+			if (isset($base[$key]) && $base[$key] instanceof JsonSerializable && is_array($value)) {
+				$base[$key] = $base[$key]->jsonSerialize();
+			}
+
 			// phpcs:ignore SlevomatCodingStandard.ControlStructures.RequireTernaryOperator.TernaryOperatorNotUsed
 			if (
 				is_array($value)

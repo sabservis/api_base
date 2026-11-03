@@ -49,6 +49,25 @@ final class AliasTest extends TestCase
 	}
 
 	#[Test]
+	public function aliasDoesNotInheritExplicitOperationId(): void
+	{
+		$containerBuilder = new ContainerBuilder();
+		$containerBuilder->addDefinition('testController')
+			->setType(TestControllerWithAliasAndOperationId::class);
+
+		$endpoints = (new OpenApiAttributeLoader($containerBuilder))->load()['endpoints'];
+		$byMask = [];
+
+		foreach ($endpoints as $endpoint) {
+			$byMask[$endpoint['mask']] = $endpoint;
+		}
+
+		// operationIds must be unique - the alias gets a generated one instead of a copy
+		self::assertSame('getEmployee', $byMask['/employees/{id}']['id']);
+		self::assertNull($byMask['/people/{id}']['id'] ?? null);
+	}
+
+	#[Test]
 	public function multipleAliasesCreateMultipleEndpoints(): void
 	{
 		$containerBuilder = new ContainerBuilder();
@@ -124,6 +143,19 @@ final class AliasTest extends TestCase
 }
 
 // Test controllers
+
+class TestControllerWithAliasAndOperationId implements Controller
+{
+
+	#[Get(path: '/employees/{id}', operationId: 'getEmployee')]
+	#[Alias('/people/{id}')]
+	#[PathParameter(name: 'id', type: 'int')]
+	public function get(ApiRequest $request): array
+	{
+		return [];
+	}
+
+}
 
 class TestControllerWithAlias implements Controller
 {

@@ -28,11 +28,11 @@ use Sabservis\Api\Schema\Schema;
 use function array_map;
 use function array_unique;
 use function array_values;
-use function array_walk_recursive;
 use function class_exists;
 use function end;
 use function explode;
 use function in_array;
+use function interface_exists;
 use function is_array;
 use function is_bool;
 use function is_string;
@@ -101,7 +101,7 @@ final class OpenApiGenerator
 			}
 		}
 
-		$components = $this->buildComponents($paths);
+		$components = $this->buildComponents($paths, $schema);
 
 		// Filter tags to only include used ones
 		$filteredTags = $this->filterUnusedTags();
@@ -342,19 +342,12 @@ final class OpenApiGenerator
 		$schemaSpec = $param->getSchemaSpec();
 
 		if ($schemaSpec !== null) {
-			return new SchemaObject(
-				type: $schemaSpec['type'] ?? null,
-				format: $schemaSpec['format'] ?? null,
-				enum: $schemaSpec['enum'] ?? null,
-				minimum: $schemaSpec['minimum'] ?? null,
-				maximum: $schemaSpec['maximum'] ?? null,
-				minLength: $schemaSpec['minLength'] ?? null,
-				maxLength: $schemaSpec['maxLength'] ?? null,
-				pattern: $schemaSpec['pattern'] ?? null,
-				default: $schemaSpec['default'] ?? null,
-				example: $schemaSpec['example'] ?? null,
-				nullable: $schemaSpec['nullable'] ?? null,
-			);
+			// Full conversion (items, min/maxItems, description, composition...) - not a whitelist of keys
+			$schema = $this->buildSchemaFromSpec($schemaSpec);
+			// format: on the attribute is what the runtime converter enforces
+			$schema->format = $param->getFormat() ?? $schema->format;
+
+			return $schema;
 		}
 
 		$type = $param->getType();
@@ -577,10 +570,13 @@ final class OpenApiGenerator
 			enum: $spec['enum'] ?? null,
 			minimum: $spec['minimum'] ?? null,
 			maximum: $spec['maximum'] ?? null,
+			exclusiveMinimum: $spec['exclusiveMinimum'] ?? null,
+			exclusiveMaximum: $spec['exclusiveMaximum'] ?? null,
 			minLength: $spec['minLength'] ?? null,
 			maxLength: $spec['maxLength'] ?? null,
 			minItems: $spec['minItems'] ?? null,
 			maxItems: $spec['maxItems'] ?? null,
+			uniqueItems: $spec['uniqueItems'] ?? null,
 			pattern: $spec['pattern'] ?? null,
 			default: $spec['default'] ?? null,
 			example: $spec['example'] ?? null,
@@ -635,7 +631,7 @@ final class OpenApiGenerator
 				$content = [
 					'application/json' => new MediaTypeObject(schema: $schema),
 				];
-			} elseif ($entity !== null && is_string($entity) && class_exists($entity)) {
+			} elseif ($entity !== null && is_string($entity) && (class_exists($entity) || interface_exists($entity))) {
 				$schemaName = $this->schemaBuilder->registerClass($entity);
 
 				if ($response->isListWithMeta()) {
@@ -873,6 +869,11 @@ final class OpenApiGenerator
 
 		foreach ($endpoint->getTags() as $name => $value) {
 			if (is_string($name) && $name !== Endpoint::TAG_ID) {
+				// #[Tag(hidden: true)] - the operation stays documented, the tag is neither listed nor attached
+				if ($schemaTags[$name]['hidden'] ?? false) {
+					continue;
+				}
+
 				$tags[] = $name;
 
 				// Register tag if not already registered
@@ -893,10 +894,10 @@ final class OpenApiGenerator
 	/**
 	 * @param array<string, PathItemObject> $paths
 	 */
-	private function buildComponents(array $paths): ComponentsObject|null
+	private function buildComponents(array $paths, Schema $schema): ComponentsObject|null
 	{
 		$allSchemas = $this->schemaBuilder->getSchemas();
-		$securitySchemes = $this->buildSecuritySchemes();
+		$securitySchemes = $this->buildSecuritySchemes($schema);
 
 		// Filter unused schemas
 		$schemas = $this->filterUnusedSchemas($allSchemas, $paths);
@@ -953,20 +954,45 @@ final class OpenApiGenerator
 	private function findAllReferences(array $data): array
 	{
 		$references = [];
-
-		array_walk_recursive($data, static function (mixed $value, string|int $key) use (&$references): void {
-			if ($key !== '$ref' || !is_string($value)) {
-				return;
-			}
-
-			if (preg_match('/#\/components\/schemas\/(\w+)/', $value, $matches) !== 1) {
-				return;
-			}
-
-			$references[] = $matches[1];
-		});
+		$this->collectReferences($data, $references);
 
 		return array_values(array_unique($references));
+	}
+
+	/**
+	 * $ref values plus discriminator.mapping targets (a mapping-only variant is a reference too).
+	 * Component names may contain "-" and "." (OAS: ^[a-zA-Z0-9.\-_]+$), not just \w.
+	 *
+	 * @param array<mixed> $data
+	 * @param list<string> $references
+	 */
+	private function collectReferences(array $data, array &$references): void
+	{
+		foreach ($data as $key => $value) {
+			if ($key === '$ref' && is_string($value)) {
+				$this->addReference($value, $references);
+			} elseif ($key === 'mapping' && is_array($value)) {
+				foreach ($value as $target) {
+					if (is_string($target)) {
+						$this->addReference($target, $references);
+					}
+				}
+			}
+
+			if (is_array($value)) {
+				$this->collectReferences($value, $references);
+			}
+		}
+	}
+
+	/**
+	 * @param list<string> $references
+	 */
+	private function addReference(string $ref, array &$references): void
+	{
+		if (preg_match('#^\#/components/schemas/([A-Za-z0-9._-]+)$#', $ref, $matches) === 1) {
+			$references[] = $matches[1];
+		}
 	}
 
 	/**
@@ -1038,15 +1064,18 @@ final class OpenApiGenerator
 	/**
 	 * @return array<string, SecuritySchemeObject>|null
 	 */
-	private function buildSecuritySchemes(): array|null
+	private function buildSecuritySchemes(Schema $schema): array|null
 	{
-		if ($this->config->securitySchemes === []) {
+		// #[SecurityScheme] on controllers first, config entries with the same name win
+		$definitions = $schema->getSecuritySchemes() + $this->config->securitySchemes;
+
+		if ($definitions === []) {
 			return null;
 		}
 
 		$schemes = [];
 
-		foreach ($this->config->securitySchemes as $name => $config) {
+		foreach ($definitions as $name => $config) {
 			$schemes[$name] = new SecuritySchemeObject(
 				type: $config['type'] ?? 'http',
 				description: $config['description'] ?? null,
@@ -1054,6 +1083,8 @@ final class OpenApiGenerator
 				in: $config['in'] ?? null,
 				scheme: $config['scheme'] ?? null,
 				bearerFormat: $config['bearerFormat'] ?? null,
+				flows: $config['flows'] ?? null, // required for type: oauth2
+				openIdConnectUrl: $config['openIdConnectUrl'] ?? null, // required for type: openIdConnect
 			);
 		}
 

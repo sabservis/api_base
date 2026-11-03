@@ -213,6 +213,19 @@ final class MultipartDtoOpenApiTest extends TestCase
 	}
 
 	#[Test]
+	public function multipartArrayAndNullablePropertiesAreTypedCorrectly(): void
+	{
+		$spec = $this->generateSpecForController(MultipartArrayController::class);
+		$schema = $spec['paths']['/upload-array']['post']['requestBody']['content']['multipart/form-data']['schema'];
+
+		// array $tags - form fields tags[]=a&tags[]=b, not a single string
+		self::assertSame(['type' => 'array', 'items' => ['type' => 'string']], $schema['properties']['tags']);
+		// ?int $count - nullable must be visible in the spec
+		self::assertSame(['type' => 'integer', 'nullable' => true], $schema['properties']['count']);
+		self::assertSame(['file'], $schema['required']);
+	}
+
+	#[Test]
 	public function multipartWithoutObjectPropertiesHasNoEncoding(): void
 	{
 		$spec = $this->generateSpecForController(MultipartDtoWithEnumController::class);
@@ -444,6 +457,32 @@ class MultipartNestedObjectController implements Controller
 	#[Post(path: '/upload-nested')]
 	#[RequestBody(ref: MultipartNestedObjectDto::class)]
 	public function upload(MultipartNestedObjectDto $input): ApiResponse
+	{
+		return new ApiResponse();
+	}
+
+}
+
+#[Schema]
+class MultipartArrayAndNullableDto
+{
+
+	#[FileUpload]
+	public UploadedFile $file;
+
+	/** @var list<string> */
+	public array $tags = [];
+
+	public int|null $count = null;
+
+}
+
+class MultipartArrayController implements Controller
+{
+
+	#[Post(path: '/upload-array')]
+	#[RequestBody(ref: MultipartArrayAndNullableDto::class)]
+	public function upload(MultipartArrayAndNullableDto $input): ApiResponse
 	{
 		return new ApiResponse();
 	}

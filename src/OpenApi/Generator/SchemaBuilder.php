@@ -2,6 +2,7 @@
 
 namespace Sabservis\Api\OpenApi\Generator;
 
+use BackedEnum;
 use Closure;
 use Pocta\DataMapper\Attributes\Ignore;
 use Pocta\DataMapper\Attributes\InputOnly;
@@ -22,15 +23,18 @@ use Sabservis\Api\Attribute\OpenApi\Schema;
 use Sabservis\Api\OpenApi\Spec\DiscriminatorObject;
 use Sabservis\Api\OpenApi\Spec\SchemaObject;
 use Sabservis\Api\OpenApi\TypeMapper;
+use Sabservis\Api\Utils\PropertyDefault;
 use UnitEnum;
 use function array_keys;
+use function array_map;
 use function array_unique;
 use function array_values;
 use function class_exists;
 use function count;
 use function in_array;
-use function is_int;
+use function is_object;
 use function is_string;
+use function is_subclass_of;
 
 final class SchemaBuilder
 {
@@ -212,6 +216,11 @@ final class SchemaBuilder
 		$required = [];
 
 		foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC) as $property) {
+			// Static properties are not part of the payload
+			if ($property->isStatic()) {
+				continue;
+			}
+
 			// #[Ignore] - data-mapper never sends nor reads the property
 			if ($property->getAttributes(Hidden::class) !== [] || $property->getAttributes(Ignore::class) !== []) {
 				continue;
@@ -219,18 +228,16 @@ final class SchemaBuilder
 
 			$propertyName = $this->getPropertyName($property);
 			$propertySchema = $this->buildPropertySchema($property);
+			$default = PropertyDefault::find($property);
+
+			if ($default !== null && $propertySchema->default === null) {
+				$propertySchema->default = $this->toSpecValue($default[0]);
+			}
 
 			$properties[$propertyName] = $propertySchema;
 
-			// Check if required
-			$type = $property->getType();
-
-			if ($type instanceof ReflectionNamedType && !$type->allowsNull()) {
-				$propertyAttr = $this->getPropertyAttribute($property);
-
-				if ($propertyAttr === null || $propertyAttr->required !== false) {
-					$required[] = $propertyName;
-				}
+			if ($this->isRequiredProperty($property, $default !== null)) {
+				$required[] = $propertyName;
 			}
 		}
 
@@ -242,6 +249,39 @@ final class SchemaBuilder
 			required: $required !== [] ? $required : null,
 			deprecated: $schemaAttr?->deprecated,
 		);
+	}
+
+	/**
+	 * #[Property(required:)] wins; otherwise a property is required when its type (named or union)
+	 * excludes null AND it has no default - the hydrators fill defaults, so a client may omit those.
+	 */
+	private function isRequiredProperty(ReflectionProperty $property, bool $hasDefault): bool
+	{
+		$explicit = $this->getPropertyAttribute($property)?->required;
+
+		if ($explicit !== null) {
+			return $explicit;
+		}
+
+		$type = $property->getType();
+
+		return $type !== null && !$type->allowsNull() && !$hasDefault;
+	}
+
+	/**
+	 * PHP default value as it appears on the wire (enums by value/name; objects are not representable).
+	 */
+	private function toSpecValue(mixed $value): mixed
+	{
+		if ($value instanceof BackedEnum) {
+			return $value->value;
+		}
+
+		if ($value instanceof UnitEnum) {
+			return $value->name;
+		}
+
+		return is_object($value) ? null : $value;
 	}
 
 	/**
@@ -658,13 +698,63 @@ final class SchemaBuilder
 				$values = array_values(array_unique($values));
 				$property = $schema->properties[$propertyName];
 
-				$schema->properties[$propertyName] = new SchemaObject(
-					type: is_int($values[0]) ? 'integer' : 'string',
-					description: $property instanceof SchemaObject ? $property->description : null,
-					enum: $values,
-				);
+				// Keep description / nullable / example / deprecated / readOnly... of the variant property;
+				// only the value restriction replaces $ref (OAS 3.0 ignores siblings of $ref) and composition
+				$restricted = $property instanceof SchemaObject ? clone $property : new SchemaObject();
+				$restricted->ref = null;
+				$restricted->oneOf = null;
+				$restricted->anyOf = null;
+				$restricted->allOf = null;
+				$restricted->type = $this->discriminatorValueType($property, $values);
+				// PHP casts numeric-string array keys ('1') to int - cast back to the declared type
+				$restricted->enum = $restricted->type === 'string'
+					? array_map(static fn (int|string $value): string => (string) $value, $values)
+					: $values;
+
+				$schema->properties[$propertyName] = $restricted;
 			}
 		}
+	}
+
+	/**
+	 * @param list<int|string> $values
+	 */
+	private function discriminatorValueType(mixed $property, array $values): string
+	{
+		if ($property instanceof SchemaObject) {
+			if (is_string($property->type)) {
+				return $property->type;
+			}
+
+			// $ref to a backed enum: its backing type decides
+			$refClass = $property->ref !== null ? $this->findClassBySchemaName($property->ref) : null;
+
+			if ($refClass !== null && is_subclass_of($refClass, BackedEnum::class)) {
+				return (string) (new ReflectionEnum($refClass))->getBackingType() === 'int' ? 'integer' : 'string';
+			}
+		}
+
+		foreach ($values as $value) {
+			if (is_string($value)) {
+				return 'string';
+			}
+		}
+
+		return 'integer';
+	}
+
+	/**
+	 * @return class-string|null
+	 */
+	private function findClassBySchemaName(string $schemaName): string|null
+	{
+		foreach (array_keys($this->classes) as $class) {
+			if ($this->getSchemaNameForClass($class) === $schemaName) {
+				return $class;
+			}
+		}
+
+		return null;
 	}
 
 	private function getPropertyAttribute(ReflectionProperty $property): Property|null

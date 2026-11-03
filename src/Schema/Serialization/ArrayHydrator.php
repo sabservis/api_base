@@ -43,7 +43,14 @@ class ArrayHydrator implements Hydrator
 			$schema->addTag(
 				$tagData['name'] ?? $name,
 				$tagData['description'] ?? null,
+				(bool) ($tagData['hidden'] ?? false),
 			);
+		}
+
+		foreach ($data['securitySchemes'] ?? [] as $name => $spec) {
+			if (is_array($spec)) {
+				$schema->addSecurityScheme((string) $name, $spec);
+			}
 		}
 
 		return $schema;

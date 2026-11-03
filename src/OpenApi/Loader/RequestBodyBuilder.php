@@ -368,6 +368,11 @@ final class RequestBodyBuilder
 
 		$property = $this->mapPropertyToOpenApiType($refProperty);
 
+		// ?int $count - an empty form field hydrates to null, the spec must allow it
+		if ($this->isNullableProperty($refProperty) && !isset($property['_classRef'])) {
+			$property['nullable'] = true;
+		}
+
 		// Preserve description from #[Property] attribute if present
 		$propertyAttrs = $refProperty->getAttributes(Property::class);
 
@@ -416,6 +421,8 @@ final class RequestBodyBuilder
 			'int' => ['type' => 'integer'],
 			'float' => ['type' => 'number'],
 			'bool' => ['type' => 'boolean'],
+			// tags[]=a&tags[]=b - PHP parses repeated form fields into an array of strings
+			'array' => ['type' => 'array', 'items' => ['type' => 'string']],
 			default => ['type' => 'string'],
 		};
 	}

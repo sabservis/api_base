@@ -71,15 +71,25 @@ final class JsonContent implements OpenApiAttributeInterface
 
 			if ($this->properties !== null) {
 				$props = [];
+				$required = [];
 
 				foreach ($this->properties as $property) {
 					if ($property->property !== null) {
 						$props[$property->property] = $property->toOpenApiSpec();
+
+						// required is a schema-level list in OpenAPI, not a property keyword
+						if ($property->required === true) {
+							$required[] = $property->property;
+						}
 					}
 				}
 
 				if ($props !== []) {
 					$schema['properties'] = $props;
+				}
+
+				if ($required !== []) {
+					$schema['required'] = $required;
 				}
 			}
 

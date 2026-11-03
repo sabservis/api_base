@@ -279,7 +279,7 @@ class ProductDto
 | `deprecated` | `bool` | Oznaceni jako deprecated |
 | `readOnly` | `bool` | Jen pro cteni (napr. ID) |
 | `writeOnly` | `bool` | Jen pro zapis (napr. heslo) |
-| `required` | `bool` | Override - `false` pro optional non-nullable property |
+| `required` | `bool` | Override automatiky: `true` vynutí required i u nullable / property s defaultem, `false` ho zruší. Bez override je required každá non-nullable property **bez defaultu** (default se do specu emituje jako `default`) |
 | `items` | `Items` | Schema polozek pole |
 | `ref` | `class-string` | Reference na jiny DTO |
 | `additionalProperties` | `AdditionalProperties` | Schema dynamickych klicu (mapy) |
@@ -462,6 +462,8 @@ class UserController implements Controller
 ```
 
 **Pravidlo:** Pokud metoda má vlastní `#[Tag]`, přepíše tagy z controlleru. Jinak dědí.
+
+**Skrytý tag:** `#[Tag(name: 'Internal', hidden: true)]` - endpointy zůstanou ve specu, ale tag se neobjeví v seznamu `tags` ani u operací (např. vlastní `OpenApiController` používá `OpenAPI` tag jako hidden). Celý endpoint schová `#[Hidden]`.
 
 ### Dědičnost tagů z rodičovské třídy
 
