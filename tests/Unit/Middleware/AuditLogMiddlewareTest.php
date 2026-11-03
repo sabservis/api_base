@@ -5,10 +5,15 @@ namespace Tests\Unit\Middleware;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\Log\LoggerInterface;
+use ReflectionClass;
 use RuntimeException;
+use Sabservis\Api\Attribute\Core\MiddlewarePriority;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\AuditLogMiddleware;
+use Sabservis\Api\Middleware\BasicAuthMiddleware;
+use Sabservis\Api\Middleware\CORSMiddleware;
+use Sabservis\Api\Middleware\RateLimitMiddleware;
 use stdClass;
 use function strlen;
 
@@ -360,6 +365,22 @@ final class AuditLogMiddlewareTest extends TestCase
 		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
 
 		$middleware($request, $response, $next);
+	}
+
+	#[Test]
+	public function runsBeforeRateLimitAndBasicAuthSoRejectionsAreAudited(): void
+	{
+		$priority = static function (string $class): int {
+			$attributes = (new ReflectionClass($class))->getAttributes(MiddlewarePriority::class);
+
+			return $attributes[0]->newInstance()->level;
+		};
+
+		// Outer middleware sees the 401/429 responses produced by the inner ones
+		self::assertLessThan($priority(RateLimitMiddleware::class), $priority(AuditLogMiddleware::class));
+		self::assertLessThan($priority(BasicAuthMiddleware::class), $priority(AuditLogMiddleware::class));
+		// ...but still after CORS so preflights are not double-logged
+		self::assertGreaterThan($priority(CORSMiddleware::class), $priority(AuditLogMiddleware::class));
 	}
 
 }

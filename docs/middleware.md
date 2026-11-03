@@ -12,9 +12,9 @@ Middleware umožňuje zpracovat request/response v pipeline.
 | `RequestSizeLimitMiddleware` | 15 | Omezení velikosti body |
 | `EnforceHttpsMiddleware` | 20 | Odmítne HTTP (400) před autentizací a rate limitem |
 | `CORSMiddleware` | 200 | CORS headers + preflight |
-| `RateLimitMiddleware` | 450 | Rate limiting per IP |
+| `AuditLogMiddleware` | 400 | Audit trail logging (před RateLimit/BasicAuth, aby se zalogovaly i 429/401) |
+| `RateLimitMiddleware` | 450 | Rate limiting per IP (429 vrací jako response s `Retry-After`, pokud je autowired `ErrorHandler`) |
 | `BasicAuthMiddleware` | 460 | HTTP Basic Auth (za RateLimit, aby se počítaly i neúspěšné pokusy) |
-| `AuditLogMiddleware` | 500 | Audit trail logging |
 
 Nižší priorita = spustí se dříve.
 

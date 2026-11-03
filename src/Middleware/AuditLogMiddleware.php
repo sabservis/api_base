@@ -29,8 +29,11 @@ use function round;
  * - User agent
  *
  * Error requests are logged at error level with exception details.
+ *
+ * Priority 400: runs OUTSIDE RateLimit (450) and BasicAuth (460) so that 429 and 401
+ * rejections are audited too (at 500 it would never see them).
  */
-#[MiddlewarePriority(500)]
+#[MiddlewarePriority(400)]
 final class AuditLogMiddleware implements Middleware
 {
 

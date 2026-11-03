@@ -4,6 +4,8 @@ namespace Sabservis\Api\Middleware;
 
 use Psr\Cache\CacheItemPoolInterface;
 use Sabservis\Api\Attribute\Core\MiddlewarePriority;
+use Sabservis\Api\ErrorHandler\ErrorHandler;
+use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
@@ -58,6 +60,9 @@ final class RateLimitMiddleware implements Middleware
 	 * @param array<string> $trustedProxies List of trusted proxy IPs (enables X-Forwarded-For parsing)
 	 * @param string $clientIpHeader Header name for client IP (default: X-Forwarded-For)
 	 * @param LockFactory|null $lockFactory Serializes counter increments (requires symfony/lock)
+	 * @param ErrorHandler|null $errorHandler When set, 429 is returned as a response (with Retry-After and
+	 *   X-RateLimit-* headers) instead of thrown, so outer middlewares (CORS, RequestId) still decorate it.
+	 *   Autowired by the DI extension; null keeps the throwing behaviour.
 	 */
 	public function __construct(
 		RateLimitCache|CacheInterface|CacheItemPoolInterface $cache,
@@ -67,6 +72,7 @@ final class RateLimitMiddleware implements Middleware
 		private readonly array $trustedProxies = [],
 		private readonly string $clientIpHeader = 'X-Forwarded-For',
 		LockFactory|null $lockFactory = null,
+		private readonly ErrorHandler|null $errorHandler = null,
 	)
 	{
 		$invalidProxy = IpMatcher::findInvalidPattern($trustedProxies);
@@ -97,7 +103,7 @@ final class RateLimitMiddleware implements Middleware
 	}
 
 	/**
-	 * @return array{maxRequests: int, windowSeconds: int}
+	 * @return array{maxRequests: int, windowSeconds: int, ipSpecific: bool}
 	 */
 	private function getLimitsForIp(string $ip): array
 	{
@@ -106,6 +112,7 @@ final class RateLimitMiddleware implements Middleware
 			return [
 				'maxRequests' => $this->ipLimits[$ip]['maxRequests'],
 				'windowSeconds' => $this->ipLimits[$ip]['windowSeconds'] ?? $this->windowSeconds,
+				'ipSpecific' => true,
 			];
 		}
 
@@ -115,6 +122,7 @@ final class RateLimitMiddleware implements Middleware
 				return [
 					'maxRequests' => $limits['maxRequests'],
 					'windowSeconds' => $limits['windowSeconds'] ?? $this->windowSeconds,
+					'ipSpecific' => true,
 				];
 			}
 		}
@@ -123,6 +131,7 @@ final class RateLimitMiddleware implements Middleware
 		return [
 			'maxRequests' => $this->maxRequests,
 			'windowSeconds' => $this->windowSeconds,
+			'ipSpecific' => false,
 		];
 	}
 
@@ -195,19 +204,35 @@ final class RateLimitMiddleware implements Middleware
 	): ApiResponse
 	{
 		$ip = $this->getClientIp($request);
-		$identifier = $this->getClientIdentifier($request, $ip);
 
 		// Get limits for this client (IP-specific or global)
 		$limits = $this->getLimitsForIp($ip);
 		$maxRequests = $limits['maxRequests'];
 		$windowSeconds = $limits['windowSeconds'];
 
+		// An IP-specific limit is a property of that IP, so its counter is keyed by the IP too -
+		// otherwise a per-IP allowance would be checked against a cross-IP per-user counter
+		$identifier = $limits['ipSpecific'] ? 'ip:' . $ip : $this->getClientIdentifier($request, $ip);
+
 		// Use sliding window with time-based key for better distribution
 		$windowId = (int) floor(time() / $windowSeconds);
 		$key = sprintf('rate_limit_%s_w%d', md5($identifier), $windowId);
 		$resetTime = ($windowId + 1) * $windowSeconds;
 
-		$newCount = $this->cache->increment($key, $maxRequests, $windowSeconds);
+		try {
+			$newCount = $this->cache->increment($key, $maxRequests, $windowSeconds);
+		} catch (ClientErrorException $e) {
+			if ($this->errorHandler === null) {
+				throw $e;
+			}
+
+			// Return (not throw) so outer middlewares still see and decorate the 429
+			return $this->errorHandler->handle($e, $request)
+				->withHeader('Retry-After', (string) max(1, $resetTime - time()))
+				->withHeader('X-RateLimit-Limit', (string) $maxRequests)
+				->withHeader('X-RateLimit-Remaining', '0')
+				->withHeader('X-RateLimit-Reset', (string) $resetTime);
+		}
 
 		// Execute next middleware
 		$response = $next($request, $response);

@@ -61,9 +61,9 @@ ApiException (ExceptionExtra trait)
 | 15 | RequestSizeLimitMiddleware |
 | 20 | EnforceHttpsMiddleware (před auth - žádná WWW-Authenticate výzva přes HTTP) |
 | 200 | CORSMiddleware |
-| 450 | RateLimitMiddleware |
+| 400 | AuditLogMiddleware (před RateLimit/BasicAuth - audituje i 429/401) |
+| 450 | RateLimitMiddleware (s autowired ErrorHandler vrací 429 jako response, ne výjimku) |
 | 460 | BasicAuthMiddleware (za RateLimit - brute force) |
-| 500 | AuditLogMiddleware |
 | - | ApiMiddleware (vždy poslední) |
 
 ## ErrorMessages konstanty

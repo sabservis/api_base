@@ -4,15 +4,18 @@ namespace Tests\Unit\Middleware;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
+use Sabservis\Api\ErrorHandler\SimpleErrorHandler;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\Logical\InvalidArgumentException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\ApiResponse;
 use Sabservis\Api\Middleware\RateLimitMiddleware;
+use stdClass;
 use Symfony\Component\Cache\Adapter\ArrayAdapter;
 use Symfony\Component\Lock\LockFactory;
 use Symfony\Component\Lock\Store\InMemoryStore;
 use Tests\Unit\Middleware\RateLimit\LockProbingRateLimitCache;
+use function json_decode;
 
 final class RateLimitMiddlewareTest extends TestCase
 {
@@ -527,6 +530,73 @@ final class RateLimitMiddlewareTest extends TestCase
 		$this->expectException(ClientErrorException::class);
 		$this->expectExceptionMessage('Too Many Requests');
 		$middleware($request2, $response, $next);
+	}
+
+	#[Test]
+	public function exceededLimitBecomesResponseWithHeadersWhenErrorHandlerIsProvided(): void
+	{
+		$middleware = new RateLimitMiddleware(
+			new ArrayAdapter(),
+			maxRequests: 1,
+			windowSeconds: 60,
+			errorHandler: new SimpleErrorHandler(),
+		);
+
+		$request = new ApiRequest(method: 'GET', uri: '/', serverParams: ['REMOTE_ADDR' => '127.0.0.1']);
+		$response = new ApiResponse();
+		$nextCalls = 0;
+		$next = static function (ApiRequest $req, ApiResponse $res) use (&$nextCalls): ApiResponse {
+			$nextCalls++;
+
+			return $res->withStatus(200);
+		};
+
+		$middleware($request, $response, $next);
+		$limited = $middleware($request, $response, $next);
+
+		// Response (not exception) so outer middlewares (CORS, RequestId) still decorate it
+		self::assertSame(429, $limited->getStatusCode());
+		self::assertSame(1, $nextCalls);
+		self::assertSame('1', $limited->getHeader('X-RateLimit-Limit'));
+		self::assertSame('0', $limited->getHeader('X-RateLimit-Remaining'));
+		self::assertNotNull($limited->getHeader('X-RateLimit-Reset'));
+		self::assertGreaterThanOrEqual(1, (int) $limited->getHeader('Retry-After'));
+		self::assertLessThanOrEqual(60, (int) $limited->getHeader('Retry-After'));
+		self::assertSame(429, json_decode($limited->getBody(), true)['code']);
+	}
+
+	#[Test]
+	public function ipSpecificLimitIsCountedPerIpEvenForAuthenticatedUser(): void
+	{
+		$middleware = new RateLimitMiddleware(
+			new ArrayAdapter(),
+			maxRequests: 5,
+			windowSeconds: 60,
+			ipLimits: ['10.0.0.1' => ['maxRequests' => 2]],
+		);
+
+		$user = new stdClass();
+		$user->id = 7;
+		$response = new ApiResponse();
+		$next = static fn (ApiRequest $req, ApiResponse $res): ApiResponse => $res->withStatus(200);
+
+		$viaLimitedIp = (new ApiRequest(method: 'GET', uri: '/', serverParams: ['REMOTE_ADDR' => '10.0.0.1']))
+			->withAttribute('user', $user);
+		$viaOtherIp = (new ApiRequest(method: 'GET', uri: '/', serverParams: ['REMOTE_ADDR' => '10.0.0.2']))
+			->withAttribute('user', $user);
+
+		$middleware($viaLimitedIp, $response, $next);
+		$middleware($viaLimitedIp, $response, $next);
+
+		// The IP-specific bucket is exhausted, but the user's default bucket via another IP is untouched
+		$other = $middleware($viaOtherIp, $response, $next);
+		self::assertSame(200, $other->getStatusCode());
+		self::assertSame('5', $other->getHeader('X-RateLimit-Limit'));
+		self::assertSame('4', $other->getHeader('X-RateLimit-Remaining'));
+
+		$this->expectException(ClientErrorException::class);
+		$this->expectExceptionMessage('Limit: 2 per 60s');
+		$middleware($viaLimitedIp, $response, $next);
 	}
 
 }

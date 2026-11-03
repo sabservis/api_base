@@ -523,10 +523,11 @@ final class ApiExtensionTest extends TestCase
 		self::assertSame(401, $chain($request, new ApiResponse())->getStatusCode());
 		self::assertSame(401, $chain($request, new ApiResponse())->getStatusCode());
 
-		$this->expectException(ClientErrorException::class);
-		$this->expectExceptionCode(429);
+		// ErrorHandler is autowired into RateLimitMiddleware → 429 is a response, not an exception
+		$limited = $chain($request, new ApiResponse());
 
-		$chain($request, new ApiResponse());
+		self::assertSame(429, $limited->getStatusCode());
+		self::assertNotNull($limited->getHeader('Retry-After'));
 	}
 
 	#[Test]
