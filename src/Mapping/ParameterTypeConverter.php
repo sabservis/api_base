@@ -136,6 +136,10 @@ class ParameterTypeConverter
 
 	protected function toDateTime(mixed $value, EndpointParameter $parameter): DateTimeImmutable
 	{
+		if ($parameter->getFormat() === 'date') {
+			return $this->toDate((string) $value, $parameter);
+		}
+
 		try {
 			return DateTimeParser::parse((string) $value);
 		} catch (InvalidArgumentException) {
@@ -145,6 +149,22 @@ class ParameterTypeConverter
 				$value,
 			));
 		}
+	}
+
+	/**
+	 * format: 'date' accepts only an existing calendar date YYYY-MM-DD, time is midnight.
+	 */
+	private function toDate(string $value, EndpointParameter $parameter): DateTimeImmutable
+	{
+		$date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
+
+		if ($date === false || $date->format('Y-m-d') !== $value) {
+			throw new ClientErrorException(
+				sprintf(ErrorMessages::PARAMETER_INVALID_DATE, $parameter->getName(), $value),
+			);
+		}
+
+		return $date;
 	}
 
 	/**

@@ -58,6 +58,8 @@ final class ErrorMessages
 
 	public const PARAMETER_INVALID_DATETIME = "Parameter '%s': invalid value '%s'. Expected date/datetime (e.g. 2024-01-30 or 2024-01-30T15:30:00).";
 
+	public const PARAMETER_INVALID_DATE = "Parameter '%s': invalid value '%s'. Expected date (YYYY-MM-DD).";
+
 	public const PARAMETER_INVALID_ENUM = "Parameter '%s': invalid value '%s'. Expected one of: %s.";
 
 	// Files

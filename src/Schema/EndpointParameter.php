@@ -47,6 +47,8 @@ class EndpointParameter
 
 	private string|null $argument = null;
 
+	private string|null $format = null;
+
 	public function __construct(
 		private string $name,
 		private string $type = self::TypeString,
@@ -174,6 +176,19 @@ class EndpointParameter
 	public function setSchemaRef(string|null $schemaRef): void
 	{
 		$this->schemaRef = $schemaRef;
+	}
+
+	/**
+	 * OpenAPI format (e.g. 'date'); for DateTime parameters 'date' also restricts input to YYYY-MM-DD.
+	 */
+	public function getFormat(): string|null
+	{
+		return $this->format;
+	}
+
+	public function setFormat(string|null $format): void
+	{
+		$this->format = $format;
 	}
 
 	/**

@@ -261,8 +261,8 @@ final class ParameterInferenceEngine
 		if ($param->schema !== null) {
 			$schemaSpec = $param->schema->toOpenApiSpec();
 
-			// If schema has type, use it (overrides default 'string')
-			if (isset($schemaSpec['type'])) {
+			// Schema type replaces the default 'string'; explicit type (e.g. DateTimeImmutable) keeps driving conversion
+			if (isset($schemaSpec['type']) && !$param->hasExplicitType()) {
 				$type = $schemaSpec['type'];
 			}
 
@@ -297,6 +297,7 @@ final class ParameterInferenceEngine
 			'explode' => $param->explode,
 			'schemaSpec' => $schemaSpec,
 			'schemaRef' => $schemaRef,
+			'format' => $param->format ?? $schemaSpec['format'] ?? null,
 		];
 	}
 

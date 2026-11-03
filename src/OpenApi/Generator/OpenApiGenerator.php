@@ -365,7 +365,7 @@ final class OpenApiGenerator
 
 			return new SchemaObject(
 				type: $openApiType['type'],
-				format: $openApiType['format'] ?? null,
+				format: $param->getFormat() ?? $openApiType['format'] ?? null,
 			);
 		}
 
@@ -379,7 +379,7 @@ final class OpenApiGenerator
 
 		return new SchemaObject(
 			type: $openApiType['type'],
-			format: $openApiType['format'] ?? null,
+			format: $param->getFormat() ?? $openApiType['format'] ?? null,
 		);
 	}
 
