@@ -9,11 +9,12 @@ use Sabservis\Api\Http\ApiResponse;
 use Throwable;
 use function array_map;
 use function get_debug_type;
+use function in_array;
 use function is_array;
 use function is_object;
 use function is_scalar;
-use function preg_match;
-use function strtolower;
+use function preg_split;
+use const PREG_SPLIT_NO_EMPTY;
 
 /**
  * Builds consistent JSON error responses.
@@ -38,30 +39,38 @@ final class ErrorResponseBuilder
 {
 
 	/**
-	 * Patterns for detecting sensitive context keys.
-	 * Keys matching these patterns (case-insensitive) are automatically removed.
+	 * Words marking a context key as sensitive. A key is split into words (camelCase, snake_case,
+	 * kebab-case, digits) and removed when any word - or any two adjacent words joined - is listed.
+	 * Whole words, not substrings: "author", "issuingAuthority", "pinned", "hashtags" are legitimate
+	 * validation field names and must survive, while "passwordHash", "pinCode", "api_key" must not.
 	 */
-	private const SENSITIVE_KEY_PATTERNS = [
-		'/password/i',
-		'/passwd/i',
-		'/secret/i',
-		'/token/i',
-		'/api[_-]?key/i',
-		'/auth/i',
-		'/credential/i',
-		'/private[_-]?key/i',
-		'/access[_-]?key/i',
-		'/session[_-]?id/i',
-		'/cookie/i',
-		'/bearer/i',
-		'/hash/i',
-		'/salt/i',
-		'/cipher/i',
-		'/encrypt/i',
-		'/card[_-]?number/i',
-		'/cvv/i',
-		'/pin/i',
-		'/ssn/i',
+	private const SENSITIVE_WORDS = [
+		'password',
+		'passwd',
+		'pwd',
+		'secret',
+		'token',
+		'jwt',
+		'apikey',
+		'auth',
+		'authorization',
+		'credential',
+		'credentials',
+		'privatekey',
+		'accesskey',
+		'sessionid',
+		'cookie',
+		'bearer',
+		'hash',
+		'salt',
+		'cipher',
+		'encrypt',
+		'encrypted',
+		'encryption',
+		'cardnumber',
+		'cvv',
+		'pin',
+		'ssn',
 	];
 
 	private ErrorContextFilter|null $contextFilter = null;
@@ -336,10 +345,27 @@ final class ErrorResponseBuilder
 	 */
 	private function isSensitiveKey(string $key): bool
 	{
-		$lowerKey = strtolower($key);
+		// "passwordHash" → [password, hash]; "api_key" → [api, key]; "X-Auth-Token" → [x, auth, token]
+		$words = preg_split(
+			'/(?<=[a-z0-9])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])|[^A-Za-z]+/',
+			$key,
+			-1,
+			PREG_SPLIT_NO_EMPTY,
+		);
 
-		foreach (self::SENSITIVE_KEY_PATTERNS as $pattern) {
-			if (preg_match($pattern, $lowerKey) === 1) {
+		if ($words === false) {
+			return false;
+		}
+
+		$words = array_map('strtolower', $words);
+
+		foreach ($words as $i => $word) {
+			if (in_array($word, self::SENSITIVE_WORDS, true)) {
+				return true;
+			}
+
+			// Compound names written as separate words: api_key, private-key, session id, card number
+			if (isset($words[$i + 1]) && in_array($word . $words[$i + 1], self::SENSITIVE_WORDS, true)) {
 				return true;
 			}
 		}

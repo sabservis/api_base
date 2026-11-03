@@ -233,7 +233,7 @@ Pokud provider vrátí `null`, pole `traceId` se v response neobjeví.
 
 ### Context filtrování
 
-Kontextová data jsou automaticky sanitizována - klíče odpovídající citlivým vzorům (`password`, `token`, `secret`, `api_key` atd.) jsou odstraněny.
+Kontextová data jsou automaticky sanitizována - klíče obsahující citlivé **slovo** (`password`, `token`, `secret`, `api_key`, `auth`, `pin`, `hash` atd.) jsou odstraněny. Klíč se rozdělí na slova (camelCase, snake_case, kebab-case), porovnávají se celá slova - `passwordHash`, `pinCode`, `x-auth-token` se odstraní, `author`, `issuingAuthority`, `pinned`, `hashtags` zůstanou.
 
 Pro vlastní filtrování:
 

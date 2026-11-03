@@ -581,6 +581,43 @@ final class ErrorResponseBuilderTest extends TestCase
 		self::assertArrayNotHasKey('Secret', $body['context']);
 	}
 
+	#[Test]
+	public function sensitiveKeyMatchingUsesWholeWordsNotSubstrings(): void
+	{
+		$exception = (new ClientErrorException('Validation failed', 422))
+			->withContext([
+				'validation' => [
+					// legitimate field names that merely CONTAIN auth/pin/hash/encrypt/token/salt
+					'author' => ['Required'],
+					'issuingAuthority' => ['Required'],
+					'shipping' => ['Required'],
+					'pinned' => ['Required'],
+					'hashtags' => ['Required'],
+					'spinner' => ['Required'],
+					'basalt' => ['Required'],
+					'name' => ['Required'],
+					// real secrets - still removed
+					'passwordHash' => ['x'],
+					'pinCode' => ['x'],
+					'apiKey' => ['x'],
+					'api_token_123' => ['x'],
+					'leadToken' => ['x'],
+					'auth' => ['x'],
+					'x-auth-token' => ['x'],
+					'encrypted' => ['x'],
+					'ssn' => ['x'],
+				],
+			]);
+
+		$response = $this->builder->build($exception);
+		$validation = json_decode($response->getBody(), true)['context']['validation'];
+
+		self::assertSame(
+			['author', 'issuingAuthority', 'shipping', 'pinned', 'hashtags', 'spinner', 'basalt', 'name'],
+			array_keys($validation),
+		);
+	}
+
 	// === Interface Acceptance Tests ===
 
 	#[Test]
