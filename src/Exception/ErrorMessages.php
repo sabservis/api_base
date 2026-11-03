@@ -100,4 +100,7 @@ final class ErrorMessages
 
 	public const BODY_INVALID_SCALAR = "Invalid value for field '%s'. Expected %s, got: %s";
 
+	// Routing
+	public const ROUTE_DUPLICATE = 'Duplicate route %s %s: %s::%s() and %s::%s()';
+
 }

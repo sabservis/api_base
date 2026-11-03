@@ -17,8 +17,10 @@ use Sabservis\Api\Attribute\OpenApi\RequestOperationAttribute;
 use Sabservis\Api\Attribute\OpenApi\RequestParameter;
 use Sabservis\Api\Attribute\OpenApi\Security;
 use Sabservis\Api\Attribute\OpenApi\Tag;
+use Sabservis\Api\Exception\ErrorMessages;
 use Sabservis\Api\Exception\Logical\InvalidStateException;
 use Sabservis\Api\Router\PathVariable;
+use Sabservis\Api\Router\Router;
 use Sabservis\Api\Schema\EndpointParameter;
 use Sabservis\Api\Security\Authorizer;
 use Sabservis\Api\UI\Controller\Controller as ControllerInterface;
@@ -34,6 +36,7 @@ use function is_array;
 use function is_string;
 use function is_subclass_of;
 use function preg_replace;
+use function rtrim;
 use function sprintf;
 use function strtoupper;
 use function trim;
@@ -105,10 +108,46 @@ final class OpenApiAttributeLoader
 		// Sort endpoints by mask for consistent output
 		usort($endpoints, static fn (array $a, array $b): int => $a['mask'] <=> $b['mask']);
 
+		$this->assertNoDuplicateRoutes($endpoints);
+
 		return [
 			'endpoints' => $endpoints,
 			'tags' => $this->tags,
 		];
+	}
+
+	/**
+	 * Fail at container build (not on the first request) when two endpoints - incl. aliases and
+	 * copy-pasted paths across controllers - claim the same method + path shape.
+	 *
+	 * @param array<array<mixed>> $endpoints
+	 */
+	private function assertNoDuplicateRoutes(array $endpoints): void
+	{
+		/** @var array<string, array<mixed>> $seen */
+		$seen = [];
+
+		foreach ($endpoints as $endpoint) {
+			$signature = Router::routeSignature(rtrim((string) $endpoint['mask'], '/'));
+
+			foreach ($endpoint['methods'] as $method) {
+				$key = strtoupper($method) . ' ' . $signature;
+
+				if (isset($seen[$key])) {
+					throw new InvalidStateException(sprintf(
+						ErrorMessages::ROUTE_DUPLICATE,
+						strtoupper($method),
+						$endpoint['mask'],
+						$seen[$key]['handler']['class'],
+						$seen[$key]['handler']['method'],
+						$endpoint['handler']['class'],
+						$endpoint['handler']['method'],
+					));
+				}
+
+				$seen[$key] = $endpoint;
+			}
+		}
 	}
 
 	/**

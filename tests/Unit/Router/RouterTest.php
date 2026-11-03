@@ -6,6 +6,7 @@ use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 use Psr\SimpleCache\CacheInterface;
 use Sabservis\Api\Exception\Api\ClientErrorException;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Router\Router;
@@ -437,6 +438,51 @@ final class RouterTest extends TestCase
 		self::assertSame($params['name'], $matched->getAttribute(RequestAttributes::PathParameters->value)['name']);
 
 		return $params;
+	}
+
+	#[Test]
+	public function duplicateStaticRouteIsRejected(): void
+	{
+		$schema = new Schema();
+		$schema->addEndpoint($this->createEndpoint('App\UserController', 'list', 'GET', '/users'));
+		$schema->addEndpoint($this->createEndpoint('App\LegacyUserController', 'index', 'GET', '/users'));
+
+		$this->expectException(RuntimeStateException::class);
+		$this->expectExceptionMessage(
+			'Duplicate route GET /users: App\UserController::list() and App\LegacyUserController::index()',
+		);
+
+		(new Router($schema))->match(new ApiRequest(method: 'GET', uri: '/users'));
+	}
+
+	#[Test]
+	public function duplicateDynamicRouteWithDifferentVariableNameIsRejected(): void
+	{
+		$byId = $this->createEndpoint('App\UserController', 'byId', 'GET', '/users/{id}');
+		$byId->setPattern('#^/users/(?P<id>[^/]+)#');
+		$bySlug = $this->createEndpoint('App\ProfileController', 'bySlug', 'GET', '/users/{slug}');
+		$bySlug->setPattern('#^/users/(?P<slug>[^/]+)#');
+
+		$schema = new Schema();
+		$schema->addEndpoint($byId);
+		$schema->addEndpoint($bySlug);
+
+		$this->expectException(RuntimeStateException::class);
+		$this->expectExceptionMessage('Duplicate route GET /users/{slug}');
+
+		(new Router($schema))->match(new ApiRequest(method: 'GET', uri: '/users/1'));
+	}
+
+	#[Test]
+	public function sameMaskWithDifferentMethodsIsAllowed(): void
+	{
+		$schema = new Schema();
+		$schema->addEndpoint($this->createEndpoint('App\UserController', 'list', 'GET', '/users'));
+		$schema->addEndpoint($this->createEndpoint('App\UserController', 'create', 'POST', '/users'));
+
+		$matched = (new Router($schema))->match(new ApiRequest(method: 'POST', uri: '/users'));
+
+		self::assertInstanceOf(ApiRequest::class, $matched);
 	}
 
 	private function createEndpoint(string $class, string $method, string $httpMethod, string $mask): Endpoint

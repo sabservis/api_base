@@ -5,6 +5,7 @@ namespace Sabservis\Api\Router;
 use Psr\SimpleCache\CacheInterface;
 use Sabservis\Api\Exception\Api\ClientErrorException;
 use Sabservis\Api\Exception\ErrorMessages;
+use Sabservis\Api\Exception\RuntimeStateException;
 use Sabservis\Api\Http\ApiRequest;
 use Sabservis\Api\Http\RequestAttributes;
 use Sabservis\Api\Schema\Endpoint;
@@ -13,6 +14,7 @@ use Sabservis\Api\Schema\Schema;
 use Sabservis\Api\Utils\Regex;
 use function is_array;
 use function is_string;
+use function preg_replace;
 use function rawurldecode;
 use function sprintf;
 use function str_contains;
@@ -225,8 +227,20 @@ final class Router
 		return $endpoint->getControllerClass() . '::' . $endpoint->getControllerMethod() . '@' . $endpoint->getMask();
 	}
 
+	/**
+	 * Shape of a route for duplicate detection: path variables are always "[^/]+", so
+	 * "/users/{id}" and "/users/{slug}" match the same requests and collide.
+	 */
+	public static function routeSignature(string $mask): string
+	{
+		return (string) preg_replace('/\{[^}]+\}/', '{}', $mask);
+	}
+
 	private function compile(): void
 	{
+		/** @var array<string, Endpoint> $seen method + signature → first endpoint */
+		$seen = [];
+
 		foreach ($this->schema->getEndpoints() as $endpoint) {
 			$mask = $endpoint->getMask();
 
@@ -238,6 +252,23 @@ final class Router
 
 			foreach ($endpoint->getMethods() as $method) {
 				$method = strtoupper($method);
+
+				// Without this a duplicate silently wins by registration order (last for static, first for dynamic)
+				$signature = $method . ' ' . self::routeSignature($normalizedMask);
+
+				if (isset($seen[$signature])) {
+					throw new RuntimeStateException(sprintf(
+						ErrorMessages::ROUTE_DUPLICATE,
+						$method,
+						$mask,
+						$seen[$signature]->getControllerClass(),
+						$seen[$signature]->getControllerMethod(),
+						$endpoint->getControllerClass(),
+						$endpoint->getControllerMethod(),
+					));
+				}
+
+				$seen[$signature] = $endpoint;
 
 				if ($this->isStaticRoute($mask)) {
 					// Static route - direct hash lookup
