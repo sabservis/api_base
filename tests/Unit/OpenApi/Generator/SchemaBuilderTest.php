@@ -385,6 +385,51 @@ final class SchemaBuilderTest extends TestCase
 	}
 
 	#[Test]
+	public function discriminatorMappingRestrictsVariantEnumProperty(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(AnimalDto::class);
+		$schemas = $builder->getSchemas();
+
+		$catKind = $schemas['AnimalCatDto']->properties['kind'];
+		$dogKind = $schemas['AnimalDogDto']->properties['kind'];
+
+		self::assertSame(['type' => 'string', 'enum' => ['cat']], $catKind->jsonSerialize());
+		self::assertSame(['type' => 'string', 'enum' => ['dog']], $dogKind->jsonSerialize());
+	}
+
+	#[Test]
+	public function discriminatorMappingRestrictsVariantStringProperty(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(ShapeDto::class);
+		$schemas = $builder->getSchemas();
+
+		self::assertSame(['circle'], $schemas['ShapeCircleDto']->properties['shape']->enum);
+		self::assertSame(['square', 'box'], $schemas['ShapeSquareDto']->properties['shape']->enum);
+	}
+
+	#[Test]
+	public function discriminatorMappingLeavesVariantWithoutPropertyUntouched(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(PetWithMappingDto::class);
+		$schemas = $builder->getSchemas();
+
+		self::assertArrayNotHasKey('type', $schemas['CatDto']->properties);
+	}
+
+	#[Test]
+	public function discriminatorWithoutMappingLeavesVariantsUntouched(): void
+	{
+		$builder = new SchemaBuilder();
+		$builder->registerClass(PetDto::class);
+		$schemas = $builder->getSchemas();
+
+		self::assertNull($schemas['CatDto']->properties['petType']->enum);
+	}
+
+	#[Test]
 	public function discriminatorOnlyAddedWithComposition(): void
 	{
 		$builder = new SchemaBuilder();
@@ -722,6 +767,67 @@ class PetDto
 #[Schema(oneOf: [CatDto::class, DogDto::class])]
 #[Discriminator(propertyName: 'type', mapping: ['cat' => CatDto::class, 'dog' => DogDto::class])]
 class PetWithMappingDto
+{
+
+}
+
+enum AnimalKind: string
+{
+
+	case Cat = 'cat';
+
+	case Dog = 'dog';
+
+}
+
+abstract class AnimalBaseDto
+{
+
+	public AnimalKind $kind;
+
+}
+
+class AnimalCatDto extends AnimalBaseDto
+{
+
+	public string $meow;
+
+}
+
+class AnimalDogDto extends AnimalBaseDto
+{
+
+	public string $bark;
+
+}
+
+#[Schema(oneOf: [AnimalCatDto::class, AnimalDogDto::class])]
+#[Discriminator(propertyName: 'kind', mapping: ['cat' => AnimalCatDto::class, 'dog' => AnimalDogDto::class])]
+class AnimalDto
+{
+
+}
+
+class ShapeCircleDto
+{
+
+	public string $shape;
+
+}
+
+class ShapeSquareDto
+{
+
+	public string $shape;
+
+}
+
+#[Schema(oneOf: [ShapeCircleDto::class, ShapeSquareDto::class])]
+#[Discriminator(
+	propertyName: 'shape',
+	mapping: ['circle' => ShapeCircleDto::class, 'square' => ShapeSquareDto::class, 'box' => ShapeSquareDto::class],
+)]
+class ShapeDto
 {
 
 }

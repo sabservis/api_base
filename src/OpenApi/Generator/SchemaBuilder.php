@@ -24,9 +24,12 @@ use Sabservis\Api\OpenApi\Spec\SchemaObject;
 use Sabservis\Api\OpenApi\TypeMapper;
 use UnitEnum;
 use function array_keys;
+use function array_unique;
+use function array_values;
 use function class_exists;
 use function count;
 use function in_array;
+use function is_int;
 use function is_string;
 
 final class SchemaBuilder
@@ -44,6 +47,13 @@ final class SchemaBuilder
 
 	/** @var array<string, list<class-string>> */
 	private array $classesByShortName = [];
+
+	/**
+	 * Discriminator values per variant schema and property (from Discriminator mapping).
+	 *
+	 * @var array<string, array<string, list<int|string>>>
+	 */
+	private array $discriminatorValues = [];
 
 	/**
 	 * @param Closure(string): bool|null $schemaFilter Filter schemas by class name - return true to include
@@ -143,6 +153,8 @@ final class SchemaBuilder
 	 */
 	public function getSchemas(): array
 	{
+		$this->applyDiscriminatorValues();
+
 		return $this->schemas;
 	}
 
@@ -612,6 +624,7 @@ final class SchemaBuilder
 				if (class_exists($className)) {
 					$schemaName = $this->registerClass($className);
 					$mapping[$value] = '#/components/schemas/' . $schemaName;
+					$this->discriminatorValues[$schemaName][$discriminator->propertyName][] = $value;
 				} else {
 					$mapping[$value] = '#/components/schemas/' . $className;
 				}
@@ -622,6 +635,36 @@ final class SchemaBuilder
 			propertyName: $discriminator->propertyName,
 			mapping: $mapping,
 		);
+	}
+
+	/**
+	 * Each oneOf/anyOf variant accepts only its own discriminator value(s) from the mapping.
+	 * Variants usually share the property (enum of all values or plain string), so without this
+	 * a valid body matches several variants and strict JSON Schema validators reject oneOf.
+	 *
+	 * Applied lazily - variant schemas may still be in progress when the discriminator is built.
+	 */
+	private function applyDiscriminatorValues(): void
+	{
+		foreach ($this->discriminatorValues as $schemaName => $propertyValues) {
+			$schema = $this->schemas[$schemaName] ?? null;
+
+			foreach ($propertyValues as $propertyName => $values) {
+				// Variant without the property: do not invent it
+				if ($schema?->properties === null || !isset($schema->properties[$propertyName])) {
+					continue;
+				}
+
+				$values = array_values(array_unique($values));
+				$property = $schema->properties[$propertyName];
+
+				$schema->properties[$propertyName] = new SchemaObject(
+					type: is_int($values[0]) ? 'integer' : 'string',
+					description: $property instanceof SchemaObject ? $property->description : null,
+					enum: $values,
+				);
+			}
+		}
 	}
 
 	private function getPropertyAttribute(ReflectionProperty $property): Property|null
